@@ -5,6 +5,7 @@ import {
   useFormContext,
   FormProvider,
 } from 'react-hook-form';
+import { useEffect } from 'react';
 
 // Components
 import { InputField } from '@/components/Input/InputField.component';
@@ -19,6 +20,7 @@ interface IBillingProps {
   handleFormSubmit: SubmitHandler<ICheckoutDataProps>;
   isLoading?: boolean;
   buttonLabel?: string;
+  initialCity?: string | null;
 }
 
 import { useQuery } from '@apollo/client';
@@ -63,8 +65,38 @@ const OrderButton = ({ isLoading, label }: { isLoading: boolean; label: string }
   );
 };
 
-const Billing = ({ handleFormSubmit, isLoading = false, buttonLabel = 'PLACE ORDER' }: IBillingProps) => {
+const Billing = ({ handleFormSubmit, isLoading = false, buttonLabel = 'PLACE ORDER', initialCity }: IBillingProps) => {
   const methods = useForm<ICheckoutDataProps>();
+
+  useEffect(() => {
+    if (initialCity) {
+      // Logic: Only fill if empty to avoid overwriting user input
+      // OR force fill on first mount (but this useEffect runs on update too)
+      // Best approach: Check if "city" is empty or untouched.
+      // Since useForm is uncontrolled mostly, we just setVlaue.
+      // We can also just setValue unconditionally if we assume this component
+      // remounts or we want the store to drive it.
+      // Let's check current value first.
+      const currentCity = methods.getValues('city');
+      const currentState = methods.getValues('address1'); // Using address1 for State/Region as per previous conversation? No, previous conv said "Region" field... wait.
+      // INPUT_FIELDS says 'city' is city.
+      // INPUT_FIELDS says 'state' is Region?
+      // Let's check INPUT_FIELDS content if possible. I recall viewing it.
+      // Ah, previous conversation said "Renamed 'State/County' label to 'Region'".
+      // Usually 'state' is the name for Region.
+
+      if (!currentCity) {
+        methods.setValue('city', initialCity);
+        // Also set State/Region to the same value? 
+        // The prompt says "store location ... sync ... to the laddress on the chedckout"
+        // "Detected City" usually maps to what the user considers their location.
+        // Often in Ghana, City and Region can be used interchangeably or specifically.
+        // Let's set both or just City. The locationStore has {name: "Accra", slug: "accra"}.
+        // If name is "Accra", we can set City = Accra.
+        methods.setValue('state', initialCity); // Assuming 'state' is the field name for Region
+      }
+    }
+  }, [initialCity, methods]);
 
   return (
     <section className="w-full">

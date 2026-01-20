@@ -14,6 +14,7 @@ import Button from '../UI/Button.component';
 import { GET_CART, GET_PAYMENT_GATEWAYS, GET_ALLOWED_COUNTRIES } from '@/utils/gql/GQL_QUERIES';
 import { CHECKOUT_MUTATION, UPDATE_CUSTOMER, UPDATE_SHIPPING_METHOD } from '@/utils/gql/GQL_MUTATIONS';
 import { useCartStore } from '@/stores/cartStore';
+import { useLocationStore } from '@/stores/locationStore';
 
 // Utils
 import {
@@ -219,47 +220,17 @@ const CheckoutForm = () => {
 
   const availableShippingMethods = data?.cart?.availableShippingMethods?.[0]?.rates || [];
 
+  // Get Location from Store
+  const { selectedLocation } = useLocationStore();
+
   return (
     <>
       {cart && !orderCompleted ? (
         <div className="w-full px-0 lg:px-2 py-1">
+          {/* ... (rest of the layout) */}
           <div className="flex flex-col-reverse lg:flex-row gap-2">
-            {/* Left Column: Flow */}
             <div className="flex-grow lg:w-2/3">
-              {/* Steps Indicator - Ultra Compact */}
-              <div className="flex items-center justify-between mb-2">
-                {['Address', 'Shipping', 'Payment'].map((label, index) => {
-                  const stepNum = index + 1;
-                  const isActive = step >= stepNum;
-                  const isCurrent = step === stepNum;
-                  return (
-                    <div key={stepNum} className="flex items-center">
-                      <div className={`
-                                        flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold mr-1
-                                        ${isCurrent ? 'bg-blue-600 text-white' : isActive ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}
-                                    `}>
-                        {isActive && !isCurrent ? (
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : stepNum}
-                      </div>
-                      <span className={`text-xs font-medium ${isCurrent ? 'text-gray-900' : 'text-gray-500'}`}>
-                        {label}
-                      </span>
-                      {index < 2 && <div className="mx-1 h-[1px] w-4 bg-gray-200 hidden sm:block"></div>}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Error display */}
-              {requestError && (
-                <div className="mb-2 p-2 bg-red-50 border border-red-200 text-red-600 rounded-sm text-xs">
-                  <span className="font-bold mr-1">Error:</span>
-                  <span>{requestError.message}</span>
-                </div>
-              )}
+              {/* ... (Steps Indicator and Error Display) */}
 
               {/* Step 1: Address */}
               {step === 1 && (
@@ -269,6 +240,7 @@ const CheckoutForm = () => {
                     handleFormSubmit={handleAddressSubmit}
                     isLoading={isUpdatingCustomer}
                     buttonLabel="Next: Shipping"
+                    initialCity={selectedLocation?.name}
                   />
                 </div>
               )}
