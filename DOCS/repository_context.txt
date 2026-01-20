@@ -13547,6 +13547,24 @@ module.exports = {
 }
 ````
 
+## File: ecosystem.config.js
+````javascript
+module.exports = {
+    apps: [{
+        name: "shopwice-web",
+        script: "server.js",
+        cwd: ".next/standalone",
+        args: "",
+        instances: "max",
+        exec_mode: "cluster",
+        env: {
+            PORT: 3001,
+            NODE_ENV: "production"
+        }
+    }]
+}
+````
+
 ## File: deploy.sh
 ````bash
 #!/bin/bash
@@ -13558,7 +13576,7 @@ pm2 delete all
 echo ">>> Pulling latest code..."
 git pull origin main
 echo ">>> Rebuilding project..."
-npm ci
+npm ci --include=dev
 npm run build
 echo ">>> Copying static assets to standalone folder..."
 mkdir -p .next/standalone/.next
@@ -13578,22 +13596,4 @@ pm2 start ecosystem.config.js
 pm2 save
 echo ">>> Done! Server should be running on Port 3001."
 pm2 list
-````
-
-## File: ecosystem.config.js
-````javascript
-module.exports = {
-    apps: [{
-        name: "shopwice-web",
-        script: "server.js",
-        cwd: ".next/standalone",
-        args: "",
-        instances: "max",
-        exec_mode: "cluster",
-        env: {
-            PORT: 3001,
-            NODE_ENV: "production"
-        }
-    }]
-}
 ````
