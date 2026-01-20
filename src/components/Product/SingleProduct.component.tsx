@@ -17,6 +17,8 @@ import Accordion from '../UI/Accordion.component';
 import DOMPurify from 'isomorphic-dompurify';
 import DeliveryInfo from './DeliveryInfo.component';
 import PaymentInfo from './PaymentInfo.component';
+import ProductLocationDisplay from './ProductLocationDisplay.component';
+import ProductActions from './ProductActions.component';
 
 // Dynamic Imports for Performance
 const ProductReviews = dynamic(() => import('./ProductReviews.component'), {
@@ -393,6 +395,8 @@ const SingleProduct = ({ product }: IProductRootObject) => {
               <div className="pt-1">
                 <DeliveryInfo />
                 <PaymentInfo />
+                <ProductLocationDisplay />
+                <ProductActions productName={name} productUrl={`/product/${product.slug}`} productId={product.databaseId} />
 
                 {product.variations && (
                   <div className="mb-3">
