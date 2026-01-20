@@ -163,11 +163,35 @@ export const filteredVariantPrice = (price: string, side: string) => {
     return '';
   }
 
-  if ('right' === side) {
-    return price.substring(price.length, price.indexOf('-')).replace('-', '');
+  const dashIndex = price.indexOf('-');
+
+  if (dashIndex === -1) {
+    // If no dash, it's a single price.
+    // If asking for 'right' (regular/high), return empty or same?
+    // Usually 'right' is used for struck-through regular price in the context of a range.
+    // But in SingleProduct, 'right' is used for regular price.
+    // If there's no range, there's only one price.
+    // Let's assume if side is 'right', we might not want to show it if it's the same as left?
+    // But the current logic returned the WHOLE string for 'right' (due to substring(length, -1)) and EMPTY for 'left'.
+    // We want 'left' (sale/main) to show the price.
+    if (side === 'right') {
+      return ''; // Don't show a "regular" price if there's no range? Or handle in component?
+      // Actually, if we return empty for right, the component might hide the struck-through price.
+      // Let's see SingleProduct usage:
+      // {product.variations ? filteredVariantPrice(price, 'right') : regularPrice}
+      // If we return '', it shows nothing.
+      // {product.variations ? filteredVariantPrice(price, '') : salePrice}
+      // If we return 'GH₵100', it shows 'GH₵100'.
+      // This seems correct for a single price variable product.
+    }
+    return price;
   }
 
-  return price.substring(0, price.indexOf('-')).replace('-', '');
+  if ('right' === side) {
+    return price.substring(dashIndex + 1).trim();
+  }
+
+  return price.substring(0, dashIndex).trim();
 };
 
 /**
