@@ -208,6 +208,7 @@ src/
 .prettierrc
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
+ecosystem.config.js
 LICENSE
 lighthouserc.json
 next.config.js
@@ -12311,6 +12312,24 @@ available at [http://contributor-covenant.org/version/1/4][version]
 [homepage]: http://contributor-covenant.org
 
 [version]: http://contributor-covenant.org/version/1/4/
+````
+
+## File: ecosystem.config.js
+````javascript
+module.exports = {
+    apps: [{
+        name: "shopwice-web",
+        script: "server.js",
+        cwd: ".next/standalone",
+        args: "",
+        instances: "max",
+        exec_mode: "cluster",
+        env: {
+            PORT: 3000,
+            NODE_ENV: "production"
+        }
+    }]
+}
 ````
 
 ## File: LICENSE
