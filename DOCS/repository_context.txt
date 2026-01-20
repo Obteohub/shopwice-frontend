@@ -208,6 +208,7 @@ src/
 .prettierrc
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
+deploy.sh
 ecosystem.config.js
 LICENSE
 lighthouserc.json
@@ -222,6 +223,28 @@ tsconfig.json
 ```
 
 # Files
+
+## File: deploy.sh
+````bash
+#!/bin/bash
+# Deployment Fix Script for Vultr/CloudPanel
+# Usage: ./deploy.sh
+echo ">>> Stopping all Node processes to clear ports..."
+pkill -f node
+pm2 delete all
+echo ">>> Pulling latest code..."
+git pull origin main
+echo ">>> Rebuilding project..."
+npm ci
+npm run build
+echo ">>> Checking PM2 Config..."
+cat ecosystem.config.js
+echo ">>> Starting Server with PM2..."
+pm2 start ecosystem.config.js
+pm2 save
+echo ">>> Done! Server should be running on Port 3001."
+pm2 list
+````
 
 ## File: .github/ISSUE_TEMPLATE/bug_report.md
 ````markdown
@@ -12314,24 +12337,6 @@ available at [http://contributor-covenant.org/version/1/4][version]
 [version]: http://contributor-covenant.org/version/1/4/
 ````
 
-## File: ecosystem.config.js
-````javascript
-module.exports = {
-    apps: [{
-        name: "shopwice-web",
-        script: "server.js",
-        cwd: ".next/standalone",
-        args: "",
-        instances: "max",
-        exec_mode: "cluster",
-        env: {
-            PORT: 3000,
-            NODE_ENV: "production"
-        }
-    }]
-}
-````
-
 ## File: LICENSE
 ````
 GNU GENERAL PUBLIC LICENSE
@@ -13561,5 +13566,23 @@ module.exports = {
   "exclude": [
     "node_modules"
   ]
+}
+````
+
+## File: ecosystem.config.js
+````javascript
+module.exports = {
+    apps: [{
+        name: "shopwice-web",
+        script: "server.js",
+        cwd: ".next/standalone",
+        args: "",
+        instances: "max",
+        exec_mode: "cluster",
+        env: {
+            PORT: 3001,
+            NODE_ENV: "production"
+        }
+    }]
 }
 ````
