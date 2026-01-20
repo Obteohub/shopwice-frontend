@@ -169,29 +169,35 @@ const AddToCart = ({
   }, [data, syncWithWooCommerce]);
 
   // Add to cart mutation
-  const [addToCart, { loading: addToCartLoading }] = useMutation(ADD_TO_CART, {
+  const [addToCart, { loading: addToCartLoading, data: addToCartData, error: addToCartError }] = useMutation(ADD_TO_CART, {
     variables: {
       input: productQueryInput,
     },
     // Refetch all GET_CART queries to update cart across all components
     refetchQueries: [{ query: GET_CART }],
     awaitRefetchQueries: true,
+  });
 
-    onCompleted: () => {
+  useEffect(() => {
+    if (addToCartData) {
       // Update the cart with new values in React context.
       setIsSuccess(true);
-      setTimeout(() => setIsSuccess(false), 2000);
+      const timer = setTimeout(() => setIsSuccess(false), 2000);
 
       if (buyNow) {
         router.push('/checkout');
       }
-    },
 
-    onError: (error) => {
-      console.log('Add to cart error:', error);
+      return () => clearTimeout(timer);
+    }
+  }, [addToCartData, buyNow, router]);
+
+  useEffect(() => {
+    if (addToCartError) {
+      console.log('Add to cart error:', addToCartError);
       setRequestError(true);
-    },
-  });
+    }
+  }, [addToCartError]);
 
   const handleAddToCart = () => {
     addToCart();

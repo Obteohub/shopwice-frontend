@@ -43,16 +43,19 @@ const CartContents = () => {
   }, [data, clearWooCommerceSession, syncWithWooCommerce]);
 
   // Update Cart Mutation
-  const [updateCart] = useMutation(UPDATE_CART, {
+  const [updateCart, { data: updateCartData }] = useMutation(UPDATE_CART, {
     refetchQueries: [{ query: GET_CART }],
     awaitRefetchQueries: true,
-    onCompleted: () => {
-      setIsUpdating(false);
-    },
     onError: () => {
       setIsUpdating(false);
     }
   });
+
+  useEffect(() => {
+    if (updateCartData) {
+      setIsUpdating(false);
+    }
+  }, [updateCartData]);
 
   // Effect to refetch on mount
   useEffect(() => {

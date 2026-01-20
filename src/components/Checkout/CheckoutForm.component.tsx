@@ -93,15 +93,18 @@ const CheckoutForm = () => {
   }, [data, syncWithWooCommerce]);
 
   // Mutations
-  const [updateCustomer, { loading: isUpdatingCustomer }] = useMutation(UPDATE_CUSTOMER, {
-    onCompleted: () => {
-      refetch();
-      setStep(2);
-    },
+  const [updateCustomer, { loading: isUpdatingCustomer, data: updateCustomerData }] = useMutation(UPDATE_CUSTOMER, {
     onError: (error) => {
       setRequestError(error);
     }
   });
+
+  useEffect(() => {
+    if (updateCustomerData) {
+      refetch();
+      setStep(2);
+    }
+  }, [updateCustomerData, refetch]);
 
   const [updateShippingMethod, { loading: isUpdatingShipping }] = useMutation(UPDATE_SHIPPING_METHOD, {
     onCompleted: () => {
@@ -113,28 +116,29 @@ const CheckoutForm = () => {
     }
   });
 
-  const [checkout, { loading: checkoutLoading }] = useMutation(CHECKOUT_MUTATION, {
-    variables: {
-      input: {
-        ...orderData,
-        paymentMethod: selectedPaymentMethod
-      },
-    },
-    onCompleted: (data) => {
-      // If checkout specifies a redirect (e.g. Paystack), go there
-      if (data?.checkout?.redirect) {
-        window.location.href = data.checkout.redirect;
-        return;
-      }
+  const [checkout, { loading: checkoutLoading, error: checkoutError, data: checkoutData }] = useMutation(CHECKOUT_MUTATION);
 
+  useEffect(() => {
+    if (checkoutData) {
+      // Order success
+      // router.push('/order-received'); 
+      // Logic handled in component or redirect
+      const result = checkoutData?.checkout;
+      if (result?.redirect) {
+        window.location.href = result.redirect;
+        return; // Stop further execution if redirecting
+      }
       clearWooCommerceSession();
       setOrderCompleted(true);
       refetch();
-    },
-    onError: (error) => {
-      setRequestError(error);
-    },
-  });
+    }
+  }, [checkoutData, clearWooCommerceSession, refetch]);
+
+  useEffect(() => {
+    if (checkoutError) {
+      setRequestError(checkoutError); // Pass the full ApolloError object
+    }
+  }, [checkoutError]);
 
   useEffect(() => {
     refetch();
