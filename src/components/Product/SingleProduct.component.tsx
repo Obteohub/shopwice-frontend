@@ -158,8 +158,11 @@ const SingleProduct = ({ product }: IProductRootObject) => {
           </div>
 
           {/* Fourth Row: Gallery */}
-          <div className="mb-4">
+          <div className="mb-4 relative group">
             <ProductGallery mainImage={image} galleryImages={galleryImages} />
+            <div className="absolute bottom-4 right-4 z-10">
+              <ProductActions productName={name} productUrl={`/product/${product.slug}`} productId={product.databaseId} />
+            </div>
           </div>
 
           {/* Fifth Row: Action Cards Section */}
@@ -396,7 +399,7 @@ const SingleProduct = ({ product }: IProductRootObject) => {
                 <DeliveryInfo />
                 <PaymentInfo />
                 <ProductLocationDisplay />
-                <ProductActions productName={name} productUrl={`/product/${product.slug}`} productId={product.databaseId} />
+                {/* ProductActions moved to Image Gallery Overlay */}
 
                 {product.variations && (
                   <div className="mb-3">
