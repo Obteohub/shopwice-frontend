@@ -16,6 +16,7 @@ import ProductCard from './ProductCard.component';
 import Accordion from '../UI/Accordion.component';
 import DOMPurify from 'isomorphic-dompurify';
 import DeliveryInfo from './DeliveryInfo.component';
+import PaymentInfo from './PaymentInfo.component';
 
 // Dynamic Imports for Performance
 const ProductReviews = dynamic(() => import('./ProductReviews.component'), {
@@ -391,6 +392,7 @@ const SingleProduct = ({ product }: IProductRootObject) => {
               {/* Variations & Add to Cart */}
               <div className="pt-1">
                 <DeliveryInfo />
+                <PaymentInfo />
 
                 {product.variations && (
                   <div className="mb-3">
