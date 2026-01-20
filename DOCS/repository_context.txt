@@ -115,10 +115,13 @@ src/
       ComparePriceModal.component.tsx
       DeliveryInfo.component.tsx
       DisplayProducts.component.tsx
+      PaymentInfo.component.tsx
+      ProductActions.component.tsx
       ProductCard.component.tsx
       ProductFilters.component.tsx
       ProductGallery.component.tsx
       ProductList.component.tsx
+      ProductLocationDisplay.component.tsx
       ProductReviews.component.tsx
       SingleProduct.component.tsx
       WhatIsRefurbishedModal.component.tsx
@@ -1353,97 +1356,6 @@ const Categories = ({ categories }: ICategoriesProps) => (
   </section>
 );
 export default Categories;
-````
-
-## File: src/components/Checkout/Billing.component.tsx
-````typescript
-// Imports
-import {
-  SubmitHandler,
-  useForm,
-  useFormContext,
-  FormProvider,
-} from 'react-hook-form';
-// Components
-import { InputField } from '@/components/Input/InputField.component';
-import AddressAutocomplete from '@/components/Input/AddressAutocomplete.component';
-import Button from '../UI/Button.component';
-// Constants
-import { INPUT_FIELDS } from '@/utils/constants/INPUT_FIELDS';
-import { ICheckoutDataProps } from '@/utils/functions/functions';
-interface IBillingProps {
-  handleFormSubmit: SubmitHandler<ICheckoutDataProps>;
-  isLoading?: boolean;
-  buttonLabel?: string;
-}
-import { useQuery } from '@apollo/client';
-import { GET_ALLOWED_COUNTRIES } from '@/utils/gql/GQL_QUERIES';
-const CountrySelect = ({ label, name, customValidation }: { label: string, name: string, customValidation: any }) => {
-  const { register } = useFormContext();
-  const { data } = useQuery(GET_ALLOWED_COUNTRIES);
-  const allowedCountries = data?.wooCommerce?.countries || [];
-  return (
-    <div className="w-full">
-      <label htmlFor={name} className="block mb-1 text-xs font-bold text-gray-700">
-        {label}
-      </label>
-      <select
-        id={name}
-        {...register(name, customValidation)}
-        className="bg-white border border-gray-300 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
-      >
-        {allowedCountries.length > 0 ? (
-          allowedCountries.map((c: any) => (
-            <option key={c.code} value={c.code}>{c.name}</option>
-          ))
-        ) : (
-          <option value="GH">Ghana (Default)</option>
-        )}
-      </select>
-    </div>
-  );
-};
-const OrderButton = ({ isLoading, label }: { isLoading: boolean; label: string }) => {
-  return (
-    <div className="w-full p-2">
-      <div className="mt-4 flex justify-center">
-        <Button buttonDisabled={isLoading}>
-          {isLoading ? 'Processing...' : label}
-        </Button>
-      </div>
-    </div>
-  );
-};
-const Billing = ({ handleFormSubmit, isLoading = false, buttonLabel = 'PLACE ORDER' }: IBillingProps) => {
-  const methods = useForm<ICheckoutDataProps>();
-  return (
-    <section className="w-full">
-      <FormProvider {...methods}>
-        <form onSubmit={methods.handleSubmit(handleFormSubmit)}>
-          <div className="flex flex-wrap -mx-1">
-            {INPUT_FIELDS.map(({ id, label, name, customValidation }) => (
-              <div key={id} className="w-full md:w-1/2 px-1 mb-2">
-                {name === 'address1' ? (
-                  <AddressAutocomplete label={label} name={name} />
-                ) : name === 'country' ? (
-                  <CountrySelect label={label} name={name} customValidation={customValidation} />
-                ) : (
-                  <InputField
-                    inputLabel={label}
-                    inputName={name}
-                    customValidation={customValidation}
-                  />
-                )}
-              </div>
-            ))}
-            <OrderButton isLoading={isLoading} label={buttonLabel} />
-          </div>
-        </form>
-      </FormProvider>
-    </section>
-  );
-};
-export default Billing;
 ````
 
 ## File: src/components/Checkout/CheckoutCartItem.component.tsx
@@ -3254,277 +3166,6 @@ const ComparePriceModal = ({ isOpen, onClose, newPrice, refurbPrice, productName
 export default ComparePriceModal;
 ````
 
-## File: src/components/Product/DeliveryInfo.component.tsx
-````typescript
-import React, { useState, useEffect } from 'react';
-const DeliveryInfo = () => {
-    const [deliveryData, setDeliveryData] = useState<{
-        text: React.ReactNode;
-        showTimer: boolean;
-        isActive: boolean;
-    } | null>(null);
-    const [timeLeft, setTimeLeft] = useState<string>('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-    useEffect(() => {
-        // 1. Calculate Delivery Status
-        const calculateStatus = () => {
-            // Create a date object for the current time in Accra (GMT)
-            // Since Accra is GMT+0, we can use UTC methods directly which is safer than relying on local machine time offset
-            const now = new Date();
-            const day = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
-            const hour = now.getUTCHours();
-            const minute = now.getUTCMinutes();
-            let text: React.ReactNode = '';
-            let showTimer = false;
-            let isActive = false;
-            // Logic from PHP:
-            // 1. SAT 4:01 PM to SUN (Monday Delivery)
-            //    (Day == 6 && Time >= 16:01) OR (Day == 0)
-            if ((day === 6 && (hour > 16 || (hour === 16 && minute >= 1))) || day === 0) {
-                text = (
-                    <>
-                        Order it now and get it on <strong>Monday</strong>
-                    </>
-                );
-            }
-            // 2. MON-FRI EARLY MORNING (Get it Today)
-            //    Day != 6 && Day != 0 && Time >= 00:01 && Time <= 07:59
-            else if (
-                day !== 6 &&
-                day !== 0 &&
-                (hour === 0 && minute >= 1 || (hour > 0 && hour < 8)) // 00:01 to 07:59
-            ) {
-                text = (
-                    <>
-                        <span className="text-[#27ae60]">Order it now and get it <strong>today</strong></span>
-                    </>
-                );
-            }
-            // 3. WORKING HOURS: THE "3 HOURS" WINDOW
-            //    Day != 0 && Time >= 08:00 && Time <= 16:00
-            else if (
-                day !== 0 &&
-                (hour >= 8 && (hour < 16 || (hour === 16 && minute === 0)))
-            ) {
-                text = (
-                    <>
-                        <span className="text-[#27ae60]">Order it now and get it in the <strong>next 3 hours</strong></span>
-                    </>
-                );
-                showTimer = true;
-                isActive = true;
-            }
-            // 4. EVENING (Deliver Tomorrow)
-            else {
-                text = (
-                    <>
-                        <span className="text-[#e67e22]">Order it now and get it tomorrow</span>
-                    </>
-                );
-            }
-            setDeliveryData({ text, showTimer, isActive });
-        };
-        calculateStatus();
-        const statusInterval = setInterval(calculateStatus, 60000); // Update status every minute
-        return () => clearInterval(statusInterval);
-    }, []);
-    // 2. Countdown Timer Logic
-    useEffect(() => {
-        if (!deliveryData?.showTimer) return;
-        const tick = () => {
-            const now = new Date();
-            // Target is today at 16:00 UTC (Accra)
-            const target = new Date();
-            target.setUTCHours(16, 0, 0, 0);
-            const diff = target.getTime() - now.getTime();
-            if (diff <= 0) {
-                setTimeLeft('0h 0m 0s');
-                return;
-            }
-            const sec = Math.floor(diff / 1000);
-            const h = Math.floor(sec / 3600);
-            const m = Math.floor((sec % 3600) / 60);
-            const s = sec % 60;
-            setTimeLeft(`${h}h ${m}m ${s}s`);
-        };
-        tick(); // Initial call
-        const timerInterval = setInterval(tick, 1000);
-        return () => clearInterval(timerInterval);
-    }, [deliveryData?.showTimer]);
-    if (!deliveryData) return null;
-    return (
-        <>
-            <style jsx>{`
-                @keyframes pulse-green {
-                    0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.4); }
-                    70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
-                    100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
-                }
-                .accra-delivery-active {
-                    animation: pulse-green 2s infinite;
-                }
-            `}</style>
-            <div className={`py-2 mb-2 border-b border-gray-200 ${deliveryData.isActive ? 'accra-delivery-active' : ''}`}>
-                <div className="flex items-start justify-between gap-2">
-                    <div className="text-xs text-gray-600 leading-relaxed flex-1">
-                        <strong>Greater Accra:</strong> {deliveryData.text}
-                    </div>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="text-blue-600 text-xs font-semibold hover:underline focus:outline-none flex-shrink-0"
-                        aria-label="Learn more about shipping"
-                    >
-                        Details
-                    </button>
-                </div>
-                {deliveryData.showTimer && (
-                    <div className="text-[11px] text-[#d32f2f] mt-2 font-bold">
-                        Order within <span className="font-mono">{timeLeft}</span> for this window!
-                    </div>
-                )}
-            </div>
-            {/* Payment Information */}
-            <div className="py-2 mb-2 border-b border-gray-200">
-                <div className="flex items-center gap-1">
-                    <div className="text-xs text-gray-600 leading-relaxed">
-                        Payment: Pay On Delivery.
-                    </div>
-                    <button
-                        onClick={() => setIsPaymentModalOpen(true)}
-                        className="text-blue-600 text-xs font-semibold hover:underline focus:outline-none flex-shrink-0"
-                        aria-label="Learn more about payment"
-                    >
-                        Learn more
-                    </button>
-                </div>
-            </div>
-            {/* Shipping Information Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-bold text-gray-900">Shipping Information</h3>
-                                <button
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                                    aria-label="Close modal"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div className="px-6 py-5 space-y-4">
-                            <div>
-                                <h4 className="font-semibold text-gray-900 mb-3">Delivery Windows (Accra, Tema, Kasoa, Amasaman, Adenta)</h4>
-                                <div className="space-y-3">
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">🚀</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Same-Day Delivery</p>
-                                            <p className="text-xs text-gray-600">Orders within these hours Mon-Fri: 12:01 AM - 7:59 AM, qualifies for same day delivery</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">⚡</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">3-Hour Express</p>
-                                            <p className="text-xs text-gray-600">Order between these hours: Mon-Sat: 8:00 AM - 4:00 PM qualifies for express sharp delivery.</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">📅</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Next Business Day</p>
-                                            <p className="text-xs text-gray-600">Orders made from Mon-Fri: After 4:00 PM automatically qualify for standard next day delivery</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">🚚</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Monday Delivery</p>
-                                            <p className="text-xs text-gray-600">Orders made on Sat (After 4:01 PM) - Sunday automatically qualify for Monday delivery.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                                <p className="text-xs text-blue-900">
-                                    <strong>Note:</strong> This delivery times apply to Greater Accra region only and Kasoa only. Other regions have different delivery schedules. Please learn more from our delivery page.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* Payment Information Modal */}
-            {isPaymentModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setIsPaymentModalOpen(false)}>
-                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-bold text-gray-900">Payment Information</h3>
-                                <button
-                                    onClick={() => setIsPaymentModalOpen(false)}
-                                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                                    aria-label="Close modal"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div className="px-6 py-5 space-y-4">
-                            <div>
-                                <h4 className="font-semibold text-gray-900 mb-3">Available Payment Methods</h4>
-                                <div className="space-y-3">
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">💵</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Cash on Delivery</p>
-                                            <p className="text-xs text-gray-600">Pay with cash when your order arrives</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">💳</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Mobile Money</p>
-                                            <p className="text-xs text-gray-600">Pay on delivery via MTN, Vodafone, or AirtelTigo</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">📱</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Card and MOMO Online Payment</p>
-                                            <p className="text-xs text-gray-600">Pay with debit/credit card and MOMO online before delivery</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-green-50 border border-green-100 rounded-lg p-4">
-                                <p className="text-xs text-green-900">
-                                    <strong>Secure Payment:</strong> All payment methods are safe and secure. You only pay when you receive your order.
-                                </p>
-                            </div>
-                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                                <p className="text-xs text-blue-900 leading-relaxed">
-                                    <strong>Please Be Ready:</strong> Ensure you are available and your payment is prepared before the rider arrives. Keeping the dispatch rider waiting causes delays for other customers' orders. Help us serve everyone efficiently by being ready to receive your package immediately.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-};
-export default DeliveryInfo;
-````
-
 ## File: src/components/Product/DisplayProducts.component.tsx
 ````typescript
 /*eslint complexity: ["error", 20]*/
@@ -3663,6 +3304,93 @@ const DisplayProducts = ({ products }: IDisplayProductsProps) => (
   </section>
 );
 export default DisplayProducts;
+````
+
+## File: src/components/Product/PaymentInfo.component.tsx
+````typescript
+import React, { useState } from 'react';
+const PaymentInfo = () => {
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    return (
+        <>
+            {/* Payment Information */}
+            <div className="py-2 mb-2 border-b border-gray-200">
+                <div className="flex items-center gap-1">
+                    <div className="text-xs text-gray-600 leading-relaxed">
+                        Payment: Pay On Delivery.
+                    </div>
+                    <button
+                        onClick={() => setIsPaymentModalOpen(true)}
+                        className="text-blue-600 text-xs font-semibold hover:underline focus:outline-none flex-shrink-0"
+                        aria-label="Learn more about payment"
+                    >
+                        Learn more
+                    </button>
+                </div>
+            </div>
+            {/* Payment Information Modal */}
+            {isPaymentModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setIsPaymentModalOpen(false)}>
+                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold text-gray-900">Payment Information</h3>
+                                <button
+                                    onClick={() => setIsPaymentModalOpen(false)}
+                                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                                    aria-label="Close modal"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <h4 className="font-semibold text-gray-900 mb-3">Available Payment Methods</h4>
+                                <div className="space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">💵</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Cash on Delivery</p>
+                                            <p className="text-xs text-gray-600">Pay with cash when your order arrives</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">💳</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Mobile Money</p>
+                                            <p className="text-xs text-gray-600">Pay on delivery via MTN, Vodafone, or AirtelTigo</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">📱</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Card and MOMO Online Payment</p>
+                                            <p className="text-xs text-gray-600">Pay with debit/credit card and MOMO online before delivery</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-green-50 border border-green-100 rounded-lg p-4">
+                                <p className="text-xs text-green-900">
+                                    <strong>Secure Payment:</strong> All payment methods are safe and secure. You only pay when you receive your order.
+                                </p>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                                <p className="text-xs text-blue-900 leading-relaxed">
+                                    <strong>Please Be Ready:</strong> Ensure you are available and your payment is prepared before the rider arrives. Keeping the dispatch rider waiting causes delays for other customers' orders. Help us serve everyone efficiently by being ready to receive your package immediately.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+export default PaymentInfo;
 ````
 
 ## File: src/components/Product/ProductCard.component.tsx
@@ -4173,6 +3901,105 @@ const ProductList = ({
 export default ProductList;
 ````
 
+## File: src/components/Product/ProductLocationDisplay.component.tsx
+````typescript
+import { useState, useEffect } from 'react';
+import { useLocationStore } from '@/stores/locationStore';
+import { useQuery } from '@apollo/client';
+import { FETCH_ALL_LOCATIONS_QUERY } from '@/utils/gql/GQL_QUERIES';
+const ProductLocationDisplay = () => {
+    const { selectedLocation, setSelectedLocation } = useLocationStore();
+    const [isDetecting, setIsDetecting] = useState(false);
+    const [geoError, setGeoError] = useState<string | null>(null);
+    const { data } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
+    // Auto-detect on first load if no location is selected? 
+    // The user requested "fetch the users current location"
+    // We should probably only do it if they click or if it's not set. 
+    // But the prompt said "after the payment information ... show the location ... fetch the users current location"
+    // Let's stick to showing what's selected, and offering a way to change/detect.
+    const locations = data?.productLocations?.nodes || [];
+    const handleDetectLocation = () => {
+        setIsDetecting(true);
+        setGeoError(null);
+        if (!navigator.geolocation) {
+            setGeoError('Geolocation is not supported');
+            setIsDetecting(false);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                try {
+                    const { latitude, longitude } = position.coords;
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+                    );
+                    const data = await response.json();
+                    const detectedCity = data.address?.city || data.address?.town || data.address?.suburb || data.address?.state;
+                    if (detectedCity) {
+                        const match = locations.find((loc: any) =>
+                            loc.name.toLowerCase().includes(detectedCity.toLowerCase()) ||
+                            detectedCity.toLowerCase().includes(loc.name.toLowerCase())
+                        );
+                        if (match) {
+                            setSelectedLocation({ name: match.name, slug: match.slug });
+                        } else {
+                            setGeoError(`Location "${detectedCity}" not in delivery zones.`);
+                        }
+                    } else {
+                        setGeoError('Could not determine city.');
+                    }
+                } catch (error) {
+                    setGeoError('Failed to fetch address.');
+                } finally {
+                    setIsDetecting(false);
+                }
+            },
+            (error) => {
+                setGeoError('Location access denied.');
+                setIsDetecting(false);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    };
+    return (
+        <div className="py-3 border-b border-gray-100 mb-2">
+            <div className="flex items-center gap-2 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                </svg>
+                <span className="text-sm text-gray-600">
+                    Deliver to: <span className="font-bold text-gray-900">{selectedLocation ? selectedLocation.name : 'Select Location'}</span>
+                </span>
+                {!selectedLocation && !isDetecting && (
+                    <button
+                        onClick={handleDetectLocation}
+                        className="text-xs text-blue-600 hover:underline ml-2 font-medium"
+                    >
+                        Auto-detect
+                    </button>
+                )}
+                {selectedLocation && !isDetecting && (
+                    <button
+                        onClick={handleDetectLocation}
+                        className="text-xs text-blue-600 hover:underline ml-auto font-medium"
+                    >
+                        Change
+                    </button>
+                )}
+                {isDetecting && (
+                    <span className="text-xs text-gray-400 ml-2 animate-pulse">Detecting...</span>
+                )}
+            </div>
+            {geoError && (
+                <p className="text-[10px] text-red-500 ml-7">{geoError}</p>
+            )}
+        </div>
+    );
+};
+export default ProductLocationDisplay;
+````
+
 ## File: src/components/Product/ProductReviews.component.tsx
 ````typescript
 import React from 'react';
@@ -4221,566 +4048,6 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ reviews }) => {
     );
 };
 export default ProductReviews;
-````
-
-## File: src/components/Product/SingleProduct.component.tsx
-````typescript
-// Imports
-import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import dynamic from 'next/dynamic';
-// Utils
-import { filteredVariantPrice, paddedPrice } from '@/utils/functions/functions';
-// Components
-import AddToCart, { IProductRootObject } from './AddToCart.component';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-import Breadcrumbs from '@/components/UI/Breadcrumbs.component';
-import StarRating from '@/components/UI/StarRating.component';
-import ProductGallery from './ProductGallery.component';
-import ProductCard from './ProductCard.component';
-import Accordion from '../UI/Accordion.component';
-import DOMPurify from 'isomorphic-dompurify';
-import DeliveryInfo from './DeliveryInfo.component';
-// Dynamic Imports for Performance
-const ProductReviews = dynamic(() => import('./ProductReviews.component'), {
-  loading: () => <p className="p-4 text-center text-gray-500">Loading reviews...</p>
-});
-const ComparePriceModal = dynamic(() => import('./ComparePriceModal.component'), { ssr: false });
-const WhatIsRefurbishedModal = dynamic(() => import('./WhatIsRefurbishedModal.component'), { ssr: false });
-import QuantityControl from '@/components/Cart/QuantityControl.component';
-const SingleProduct = ({ product }: IProductRootObject) => {
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [selectedVariation, setSelectedVariation] = useState<number>();
-  const [quantity, setQuantity] = useState<number>(1);
-  const [isShortDescriptionExpanded, setIsShortDescriptionExpanded] = useState(false);
-  const [showCompareModal, setShowCompareModal] = useState(false);
-  const [showWhatIsRefurbishedModal, setShowWhatIsRefurbishedModal] = useState(false);
-  const reviewsRef = useRef<HTMLDivElement>(null);
-  const placeholderFallBack = 'https://via.placeholder.com/600';
-  useEffect(() => {
-    setIsLoading(false);
-    if (product.variations && product.variations.nodes && product.variations.nodes.length > 0) {
-      const firstVariant = product.variations.nodes[0].databaseId;
-      setSelectedVariation(firstVariant);
-    }
-  }, [product.variations]);
-  let { description, shortDescription, image, name, onSale, price, regularPrice, salePrice, productCategories, productBrand, averageRating, reviewCount, galleryImages, reviews, attributes, sku, stockStatus, stockQuantity } =
-    product;
-  useEffect(() => {
-    console.log('Product Data:', product);
-    console.log('Related:', product.related);
-    console.log('Upsell:', product.upsell);
-    console.log('CrossSell:', product.crossSell);
-  }, [product]);
-  // Add padding/empty character after currency symbol here
-  if (price) {
-    price = paddedPrice(price, 'GH₵');
-  }
-  if (regularPrice) {
-    regularPrice = paddedPrice(regularPrice, 'GH₵');
-  }
-  if (salePrice) {
-    salePrice = paddedPrice(salePrice, 'GH₵');
-  }
-  // Check if product is in "Mobile Phones" category
-  const isMobilePhone = productCategories?.nodes?.some(
-    (cat) => cat.name.toLowerCase() === 'mobile phones' || cat.slug === 'mobile-phones'
-  );
-  // Check if product has ANY attribute with an option containing "Refurbish"
-  const isRefurbished = attributes?.nodes?.some(
-    (attr) => attr.options?.some((opt) => opt.toLowerCase().includes('refurbish'))
-  );
-  const showRefurbishedBadge = isMobilePhone && isRefurbished;
-  const showWarrantyBadge = isMobilePhone && isRefurbished;
-  const scrollToReviews = () => {
-    reviewsRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-  const getStockStatusColor = (status: string | undefined, quantity: number) => {
-    if (status === 'OUT_OF_STOCK') return 'text-red-600 bg-red-50 border-red-100';
-    if (status === 'ON_BACKORDER') return 'text-orange-600 bg-orange-50 border-orange-100';
-    return 'text-green-700 bg-green-50 border-green-100';
-  };
-  const selectedVariationNode = product.variations?.nodes.find(
-    (node) => node.databaseId === selectedVariation,
-  );
-  const currentStockQuantity = selectedVariationNode
-    ? selectedVariationNode.stockQuantity
-    : stockQuantity;
-  const currentStockStatus = selectedVariationNode
-    ? selectedVariationNode.stockStatus
-    : stockStatus;
-  const currentSku = selectedVariationNode && selectedVariationNode.sku
-    ? selectedVariationNode.sku
-    : sku;
-  const currentFormattedStockStatus = currentStockStatus?.replace(/_/g, ' ').toLowerCase();
-  return (
-    <section className="bg-white mb-[8rem] md:mb-12">
-      {isLoading ? (
-        <div className="h-56 mt-20">
-          <p className="text-xl font-bold text-center">Loading product...</p>
-          <br />
-          <LoadingSpinner />
-        </div>
-      ) : (
-        <div className="w-full md:container md:mx-auto md:px-4 py-0 md:py-2 max-w-3xl md:max-w-5xl lg:max-w-6xl">
-          {/* Top Row: Breadcrumbs & Header Info */}
-          <div className="px-4 md:px-0">
-            <Breadcrumbs categories={productCategories} productName={name} />
-            {/* Second Row: Ratings & Brand */}
-            <div className="flex justify-between items-center mb-1">
-              <div
-                className="flex items-center gap-2 cursor-pointer hover:opacity-75 transition-opacity"
-                onClick={scrollToReviews}
-              >
-                <StarRating rating={averageRating || 0} size={16} />
-                <span className="text-sm text-gray-500 font-medium">
-                  {reviewCount || 0} Reviews
-                </span>
-              </div>
-              {productBrand?.nodes?.[0] && (
-                <Link href={`/brand/${productBrand.nodes[0].slug}`} className="text-sm font-semibold text-blue-600 hover:underline hover:text-blue-800 transition-colors uppercase tracking-wide">
-                  {productBrand.nodes[0].name}
-                </Link>
-              )}
-            </div>
-            {/* Third Row: Product Title */}
-            <h1 className="text-[19px] font-medium text-gray-900 leading-tight">
-              {name}
-            </h1>
-            {showRefurbishedBadge && (
-              <div className="flex items-center gap-2 mb-3 mt-1">
-                <p className="text-sm text-green-700 font-medium whitespace-nowrap">Refurbished - Excellent Condition</p>
-              </div>
-            )}
-          </div>
-          {/* Fourth Row: Gallery */}
-          <div className="mb-4">
-            <ProductGallery mainImage={image} galleryImages={galleryImages} />
-          </div>
-          {/* Fifth Row: Action Cards Section */}
-          <div className="bg-gray-50 rounded-none md:rounded-xl p-4 mb-4 border-y md:border border-gray-100 shadow-sm mx-0">
-            <div className="flex flex-col gap-3">
-              {/* Price and Stock */}
-              <div className="flex justify-between items-start">
-                <div>
-                  {onSale ? (
-                    <div className="flex flex-col items-start gap-1">
-                      <div className="flex flex-row items-end gap-4">
-                        <div className="flex flex-col">
-                          {isRefurbished && (
-                            <span className="text-[10px] uppercase font-extrabold text-blue-700 mb-0.5">Refurbished Price</span>
-                          )}
-                          <p className="text-2xl font-bold text-gray-900 leading-none">
-                            {product.variations
-                              ? filteredVariantPrice(price, '')
-                              : salePrice}
-                          </p>
-                        </div>
-                        <div className="flex flex-col">
-                          {isRefurbished && (
-                            <span className="text-[10px] uppercase font-extrabold text-gray-400 mb-0.5">Brand New Price</span>
-                          )}
-                          <p className="text-lg text-gray-500 line-through leading-none">
-                            {product.variations
-                              ? filteredVariantPrice(price, 'right')
-                              : regularPrice}
-                          </p>
-                        </div>
-                      </div>
-                      {(() => {
-                        const currentSale = product.variations ? filteredVariantPrice(price, '') : salePrice;
-                        const currentReg = product.variations ? filteredVariantPrice(price, 'right') : regularPrice;
-                        if (currentSale && currentReg) {
-                          const saleVal = parseFloat(currentSale.replace(/[^0-9.]/g, ''));
-                          const regVal = parseFloat(currentReg.replace(/[^0-9.]/g, ''));
-                          if (!isNaN(saleVal) && !isNaN(regVal) && regVal > saleVal) {
-                            const savings = regVal - saleVal;
-                            const savingsFormatted = savings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                            return (
-                              <p className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-md inline-block mt-1">
-                                You Save: GH₵{savingsFormatted}
-                              </p>
-                            );
-                          }
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  ) : (
-                    <p className="text-2xl font-bold text-gray-900">{price}</p>
-                  )}
-                  {isRefurbished && (
-                    <div className="mt-4 flex flex-col gap-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span className="font-medium">6 months warranty included</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span className="font-medium">100% performance. Battery is always 100</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                        <span className="font-medium">Fresh in Box</span>
-                      </div>
-                    </div>
-                  )}
-                  {isRefurbished && (
-                    <div className="mt-4 pt-3 border-t border-gray-100">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                          </svg>
-                          What's in the Box
-                        </h4>
-                        <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                          Fresh in Box
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {[
-                          { name: 'Device', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
-                          { name: 'User Manual', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-                          { name: 'Charging Cable', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
-                          { name: 'SIM Ejector', icon: 'M15 7a2 2 0 012 2m-2 4a2 2 0 012 2m-8-3a2 2 0 012-2m-2 4a2 2 0 012 2' }
-                        ].map((item) => (
-                          <div key={item.name} className="flex items-center gap-1.5 text-[12px] text-gray-600 font-medium bg-gray-50/50 p-1 rounded-lg border border-gray-100/50">
-                            <div className="p-1 bg-white rounded shadow-sm shrink-0 border border-gray-100">
-                              <svg className="w-3 h-3 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon}></path>
-                              </svg>
-                            </div>
-                            {item.name}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {/* Stock Status Badge */}
-                  <div className="mt-2 flex flex-col gap-2">
-                    {(() => {
-                      const showEmergencyStock = isRefurbished && currentStockQuantity !== undefined && currentStockQuantity !== null && currentStockQuantity > 0 && currentStockQuantity < 5;
-                      return (
-                        <>
-                          <div className="flex items-center gap-3">
-                            {!showEmergencyStock && (
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStockStatusColor(currentStockStatus, currentStockQuantity || 0)} capitalized`}
-                              >
-                                {currentStockQuantity ? `${currentStockQuantity} in stock` : (currentFormattedStockStatus || 'In Stock')}
-                              </span>
-                            )}
-                            {currentSku && (
-                              <span className="text-xs text-gray-500 font-mono">
-                                SKU: {currentSku}
-                              </span>
-                            )}
-                          </div>
-                          {/* Stock Warning - Only for Refurbished */}
-                          {showEmergencyStock && (
-                            <div className="text-red-600 text-xs font-bold animate-pulse">
-                              Only {currentStockQuantity} left in stock!
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                    {showWarrantyBadge && (
-                      <div className="flex items-center gap-3 mt-1">
-                        <button
-                          onClick={() => setShowCompareModal(true)}
-                          className="text-xs text-blue-600 underline hover:text-blue-800 transition-colors"
-                        >
-                          Compare vs New
-                        </button>
-                        <div className="w-px h-3 bg-gray-300"></div>
-                        <button
-                          onClick={() => setShowWhatIsRefurbishedModal(true)}
-                          className="text-xs text-gray-500 underline hover:text-gray-700 transition-colors flex items-center gap-1"
-                        >
-                          What is refurbished?
-                        </button>
-                      </div>
-                    )}
-                    {/* Compare modal render */}
-                    {(() => {
-                      const currentSale = product.variations ? filteredVariantPrice(price, '') : salePrice;
-                      const currentReg = product.variations ? filteredVariantPrice(price, 'right') : regularPrice;
-                      const saleVal = parseFloat((currentSale || '').replace(/[^0-9.]/g, ''));
-                      const regVal = parseFloat((currentReg || '').replace(/[^0-9.]/g, ''));
-                      const savings = regVal - saleVal;
-                      const savingsFormatted = savings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                      return (
-                        <>
-                          <ComparePriceModal
-                            isOpen={showCompareModal}
-                            onClose={() => setShowCompareModal(false)}
-                            newPrice={currentReg || ''}
-                            refurbPrice={currentSale || ''}
-                            productName={name}
-                            savings={savingsFormatted}
-                          />
-                          <WhatIsRefurbishedModal
-                            isOpen={showWhatIsRefurbishedModal}
-                            onClose={() => setShowWhatIsRefurbishedModal(false)}
-                          />
-                        </>
-                      );
-                    })()}
-                  </div>
-                </div>
-                {/* Valuation / Rating Badge (Optional visual reinforcement) */}
-                {averageRating && averageRating > 4 && (
-                  <div className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-bold uppercase tracking-wider">
-                    Top Rated
-                  </div>
-                )}
-              </div>
-              {/* Short Description with Read More */}
-              {shortDescription && (
-                <div className="mb-4">
-                  <div
-                    className={`text-gray-600 text-xs leading-relaxed ${!isShortDescriptionExpanded ? 'line-clamp-3' : ''}`}
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(shortDescription) }}
-                  />
-                  <button
-                    onClick={() => setIsShortDescriptionExpanded(!isShortDescriptionExpanded)}
-                    className="text-blue-600 text-xs font-semibold mt-1 hover:underline flex items-center gap-1 focus:outline-none"
-                  >
-                    {isShortDescriptionExpanded ? 'Read Less' : 'Read More'}
-                    <svg className={`w-3 h-3 transform transition-transform ${isShortDescriptionExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                    </svg>
-                  </button>
-                </div>
-              )}
-              <style jsx>{`
-                .no-scrollbar::-webkit-scrollbar {
-                  display: none;
-                }
-                .no-scrollbar {
-                  -ms-overflow-style: none;
-                  scrollbar-width: none;
-                }
-              `}</style>
-              {/* Variations & Add to Cart */}
-              <div className="pt-1">
-                <DeliveryInfo />
-                {product.variations && (
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-2 text-gray-700">
-                      Select Option
-                    </label>
-                    <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar scroll-smooth">
-                      {product.variations.nodes.map(
-                        ({ id, name, databaseId, stockQuantity, stockStatus }) => {
-                          const isOutOfStock = stockStatus === 'OUT_OF_STOCK' || (stockQuantity !== null && stockQuantity === 0);
-                          const isSelected = selectedVariation === databaseId;
-                          const variantName = name.split('- ').pop();
-                          return (
-                            <button
-                              key={id}
-                              type="button"
-                              onClick={() => !isOutOfStock && setSelectedVariation(databaseId)}
-                              disabled={isOutOfStock}
-                              className={`
-                                flex-shrink-0 min-w-fit px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all
-                                ${isSelected && !isOutOfStock
-                                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                  : isOutOfStock
-                                    ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
-                                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
-                                }
-                              `}
-                            >
-                              <div className={isOutOfStock ? 'line-through' : ''}>
-                                {variantName}
-                              </div>
-                              <div className="text-[10px] mt-0.5 font-normal">
-                                {isOutOfStock
-                                  ? 'Out of Stock'
-                                  : stockQuantity !== null
-                                    ? `${stockQuantity} in stock`
-                                    : 'In Stock'
-                                }
-                              </div>
-                            </button>
-                          );
-                        }
-                      )}
-                    </div>
-                  </div>
-                )}
-                <div className="flex flex-col gap-3 mb-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-gray-700">Quantity</label>
-                    <div className="w-32">
-                      <QuantityControl
-                        quantity={quantity}
-                        onIncrease={() => setQuantity(prev => prev + 1)}
-                        onDecrease={() => setQuantity(prev => Math.max(1, prev - 1))}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-3">
-                  {product.variations ? (
-                    <>
-                      <AddToCart
-                        product={product}
-                        variationId={selectedVariation}
-                        fullWidth={true}
-                        quantity={quantity}
-                      />
-                      <AddToCart
-                        product={product}
-                        variationId={selectedVariation}
-                        fullWidth={true}
-                        buyNow={true}
-                        quantity={quantity}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <AddToCart product={product} fullWidth={true} quantity={quantity} />
-                      <AddToCart product={product} fullWidth={true} buyNow={true} quantity={quantity} />
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* Product Information Accordions */}
-          <div className="mb-6 px-4 md:px-0">
-            {/* Full Description */}
-            {description && (
-              <Accordion title="Product Details" defaultOpen={false}>
-                <div className="prose prose-sm max-w-none text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: description }} />
-              </Accordion>
-            )}
-            {/* Specifications */}
-            {attributes && attributes.nodes && attributes.nodes.length > 0 && (
-              <Accordion title="Specifications">
-                <div className="bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <tbody className="divide-y divide-gray-200">
-                      {attributes.nodes.map((attr: { name: string; options: string[] }, index: number) => (
-                        <tr key={index} className="bg-white">
-                          <td className="px-4 py-2 text-sm font-medium text-gray-900 w-1/3 bg-gray-50">
-                            {attr.name}
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-500">
-                            {attr.options ? attr.options.join(', ') : ''}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Accordion>
-            )}
-            {/* Reviews */}
-            <div ref={reviewsRef} className="scroll-mt-24">
-              <Accordion title={`Reviews (${reviewCount || 0})`}>
-                <ProductReviews reviews={reviews?.nodes || []} />
-              </Accordion>
-            </div>
-            {/* Categories & Meta */}
-            {((productCategories?.nodes && productCategories.nodes.length > 0) || sku) && (
-              <Accordion title="More Information">
-                <div className="flex flex-col gap-2">
-                  {sku && (
-                    <p><span className="font-semibold text-gray-900">SKU:</span> {sku}</p>
-                  )}
-                  {productCategories?.nodes && productCategories.nodes.length > 0 && (
-                    <p>
-                      <span className="font-semibold text-gray-900">Categories: </span>
-                      {productCategories.nodes.map((cat, index) => (
-                        <span key={cat.slug}>
-                          {index > 0 && ', '}
-                          <Link href={`/product-category/${cat.slug}`} className="text-blue-600 hover:underline">
-                            {cat.name}
-                          </Link>
-                        </span>
-                      ))}
-                    </p>
-                  )}
-                </div>
-              </Accordion>
-            )}
-            {/* Short Description relocated under accordions */}
-          </div>
-          {/* Related Products */}
-          {product.related?.nodes && product.related.nodes.length > 0 && (
-            <div className="mb-6 border-t border-gray-100 pt-6">
-              <h3 className="text-xl font-bold mb-4 text-gray-900 px-4 md:px-0">Related Products</h3>
-              <div className="flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar px-4 md:px-0">
-                {product.related.nodes.map((relatedProduct) => (
-                  <div key={relatedProduct.id} className="min-w-[160px] md:min-w-[220px] snap-start">
-                    <ProductCard
-                      {...relatedProduct}
-                      stockQuantity={relatedProduct.stockQuantity}
-                      reviewCount={relatedProduct.reviewCount}
-                      productCategories={relatedProduct.productCategories}
-                      attributes={relatedProduct.attributes}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {/* Upsell Products */}
-          {product.upsell?.nodes && product.upsell.nodes.length > 0 && (
-            <div className="mb-6 border-t border-gray-100 pt-6">
-              <h3 className="text-xl font-bold mb-4 text-gray-900 px-4 md:px-0">You May Also Like</h3>
-              <div className="flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar px-4 md:px-0">
-                {product.upsell.nodes.map((upsellProduct) => (
-                  <div key={upsellProduct.id} className="min-w-[160px] md:min-w-[220px] snap-start">
-                    <ProductCard
-                      {...upsellProduct}
-                      stockQuantity={upsellProduct.stockQuantity}
-                      reviewCount={upsellProduct.reviewCount}
-                      productCategories={upsellProduct.productCategories}
-                      attributes={upsellProduct.attributes}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {/* Cross-Sell Products */}
-          {product.crossSell?.nodes && product.crossSell.nodes.length > 0 && (
-            <div className="mb-6 border-t border-gray-100 pt-6">
-              <h3 className="text-xl font-bold mb-4 text-gray-900 px-4 md:px-0">Mostly Bought Together</h3>
-              <div className="flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar px-4 md:px-0">
-                {product.crossSell.nodes.map((crossSellProduct) => (
-                  <div key={crossSellProduct.id} className="min-w-[160px] md:min-w-[220px] snap-start">
-                    <ProductCard
-                      {...crossSellProduct}
-                      stockQuantity={crossSellProduct.stockQuantity}
-                      reviewCount={crossSellProduct.reviewCount}
-                      productCategories={crossSellProduct.productCategories}
-                      attributes={crossSellProduct.attributes}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )
-      }
-    </section >
-  );
-};
-export default SingleProduct;
 ````
 
 ## File: src/components/Product/WhatIsRefurbishedModal.component.tsx
@@ -8588,316 +7855,6 @@ const LINKS: ILinks[] = [
 export default LINKS;
 ````
 
-## File: src/utils/functions/functions.tsx
-````typescript
-/*eslint complexity: ["error", 20]*/
-import { v4 as uuidv4 } from 'uuid';
-import type { Product } from '@/stores/cartStore';
-interface RootObject {
-  products: Product[];
-  totalProductsCount: number;
-  totalProductsPrice: number;
-}
-import { ChangeEvent } from 'react';
-import { IVariationNodes } from '@/components/Product/AddToCart.component';
-/* Interface for products*/
-export interface IImage {
-  __typename: string;
-  id: string;
-  sourceUrl?: string;
-  srcSet?: string;
-  altText: string;
-  title: string;
-}
-export interface IGalleryImages {
-  __typename: string;
-  nodes: IImage[];
-}
-interface IProductNode {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  description: string;
-  stockStatus: string;
-  type: string;
-  onSale: boolean;
-  slug: string;
-  averageRating: number;
-  reviewCount: number;
-  image: IImage;
-  galleryImages: IGalleryImages;
-  productId: number;
-}
-interface IProduct {
-  __typename: string;
-  node: IProductNode;
-}
-interface IVariationNode {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  description: string;
-  type: string;
-  onSale: boolean;
-  price: string;
-  regularPrice: string;
-  salePrice: string;
-  image: IImage;
-  attributes: {
-    nodes: Array<{
-      id: string;
-      name: string;
-      value: string;
-    }>;
-  };
-}
-interface IVariation {
-  __typename: string;
-  node: IVariationNode;
-}
-export interface IProductRootObject {
-  __typename: string;
-  key: string;
-  product: IProduct;
-  variation?: IVariation;
-  quantity: number;
-  total: string;
-  subtotal: string;
-  subtotalTax: string;
-}
-type TUpdatedItems = { key: string; quantity: number }[];
-export interface IUpdateCartItem {
-  key: string;
-  quantity: number;
-}
-export interface IUpdateCartInput {
-  clientMutationId: string;
-  items: IUpdateCartItem[];
-}
-export interface IUpdateCartVariables {
-  input: IUpdateCartInput;
-}
-export interface IUpdateCartRootObject {
-  variables: IUpdateCartVariables;
-}
-/* Interface for props */
-interface IFormattedCartProps {
-  cart: { contents: { nodes: IProductRootObject[] }; total: number };
-}
-export interface ICheckoutDataProps {
-  firstName: string;
-  lastName: string;
-  address1: string;
-  address2: string;
-  city: string;
-  country: string;
-  state: string;
-  postcode: string;
-  email: string;
-  phone: string;
-  company: string;
-  paymentMethod: string;
-}
-/**
- * Add empty character after currency symbol
- * @param {string} price The price string that we input
- * @param {string} symbol Currency symbol to add empty character/padding after
- */
-export const paddedPrice = (price: string, symbol: string) => {
-  if (!price) return '';
-  return price.split(symbol).join(`${symbol} `);
-};
-/**
- * Shorten inputted string (usually product description) to a maximum of length
- * @param {string} input The string that we input
- * @param {number} length The length that we want to shorten the text to
- */
-export const trimmedStringToLength = (input: string, length: number) => {
-  if (input.length > length) {
-    const subStr = input.substring(0, length);
-    return `${subStr}...`;
-  }
-  return input;
-};
-/**
- * Filter variant price. Changes "kr198.00 - kr299.00" to kr299.00 or kr198 depending on the side variable
- * @param {String} side Which side of the string to return (which side of the "-" symbol)
- * @param {String} price The inputted price that we need to convert
- */
-export const filteredVariantPrice = (price: string, side: string) => {
-  if (!price) {
-    return '';
-  }
-  if ('right' === side) {
-    return price.substring(price.length, price.indexOf('-')).replace('-', '');
-  }
-  return price.substring(0, price.indexOf('-')).replace('-', '');
-};
-/**
- * Returns cart data in the required format.
- * @param {String} data Cart data
- */
-export const getFormattedCart = (data: IFormattedCartProps) => {
-  const formattedCart: RootObject = {
-    products: [],
-    totalProductsCount: 0,
-    totalProductsPrice: 0,
-  };
-  if (!data) {
-    return;
-  }
-  const givenProducts = data.cart.contents.nodes;
-  // Create an empty object.
-  formattedCart.products = [];
-  const product: Product = {
-    productId: 0,
-    cartKey: '',
-    name: '',
-    qty: 0,
-    price: 0,
-    totalPrice: '0',
-    image: { sourceUrl: '', srcSet: '', title: '' },
-  };
-  let totalProductsCount = 0;
-  let i = 0;
-  if (!givenProducts.length) {
-    return;
-  }
-  givenProducts.forEach(() => {
-    const givenProduct = givenProducts[Number(i)].product.node;
-    // Convert price to a float value
-    const convertedCurrency = givenProducts[Number(i)].total.replace(
-      /[^0-9.-]+/g,
-      '',
-    );
-    product.productId = givenProduct.productId;
-    product.cartKey = givenProducts[Number(i)].key;
-    product.name = givenProduct.name;
-    product.qty = givenProducts[Number(i)].quantity;
-    product.price = Number(convertedCurrency) / product.qty;
-    product.totalPrice = givenProducts[Number(i)].total;
-    // Ensure we can add products without images to the cart
-    product.image = givenProduct.image.sourceUrl
-      ? {
-        sourceUrl: givenProduct.image.sourceUrl,
-        srcSet: givenProduct.image.srcSet,
-        title: givenProduct.image.title,
-      }
-      : {
-        sourceUrl: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
-        srcSet: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
-        title: givenProduct.name,
-      };
-    totalProductsCount += givenProducts[Number(i)].quantity;
-    // Push each item into the products array.
-    formattedCart.products.push(product);
-    i++;
-  });
-  formattedCart.totalProductsCount = totalProductsCount;
-  formattedCart.totalProductsPrice = data.cart.total;
-  return formattedCart;
-};
-export const createCheckoutData = (order: ICheckoutDataProps) => ({
-  clientMutationId: uuidv4(),
-  billing: {
-    firstName: order.firstName,
-    lastName: order.lastName,
-    address1: order.address1,
-    address2: order.address2,
-    city: order.city,
-    country: order.country,
-    state: order.state,
-    postcode: order.postcode,
-    email: order.email,
-    phone: order.phone,
-    company: order.company,
-  },
-  shipping: {
-    firstName: order.firstName,
-    lastName: order.lastName,
-    address1: order.address1,
-    address2: order.address2,
-    city: order.city,
-    country: order.country,
-    state: order.state,
-    postcode: order.postcode,
-    email: order.email,
-    phone: order.phone,
-    company: order.company,
-  },
-  shipToDifferentAddress: false,
-  paymentMethod: order.paymentMethod,
-  isPaid: false,
-  transactionId: 'fhggdfjgfi',
-});
-/**
- * Get the updated items in the below format required for mutation input.
- *
- * Creates an array in above format with the newQty (updated Qty ).
- *
- */
-export const getUpdatedItems = (
-  products: IProductRootObject[],
-  newQty: number,
-  cartKey: string,
-) => {
-  // Create an empty array.
-  const updatedItems: TUpdatedItems = [];
-  // Loop through the product array.
-  products.forEach((cartItem) => {
-    // If you find the cart key of the product user is trying to update, push the key and new qty.
-    if (cartItem.key === cartKey) {
-      updatedItems.push({
-        key: cartItem.key,
-        quantity: newQty,
-      });
-      // Otherwise just push the existing qty without updating.
-    } else {
-      updatedItems.push({
-        key: cartItem.key,
-        quantity: cartItem.quantity,
-      });
-    }
-  });
-  // Return the updatedItems array with new Qtys.
-  return updatedItems;
-};
-/*
- * When user changes the quantity, update the cart in localStorage
- * Also update the cart in the global Context
- */
-export const handleQuantityChange = (
-  event: ChangeEvent<HTMLInputElement>,
-  cartKey: string,
-  cart: IProductRootObject[],
-  updateCart: (variables: IUpdateCartRootObject) => void,
-  updateCartProcessing: boolean,
-) => {
-  if (process.browser) {
-    event.stopPropagation();
-    // Return if the previous update cart mutation request is still processing
-    if (updateCartProcessing || !cart) {
-      return;
-    }
-    // If the user tries to delete the count of product, set that to 1 by default ( This will not allow him to reduce it less than zero )
-    const newQty = event.target.value ? parseInt(event.target.value, 10) : 1;
-    if (cart.length) {
-      const updatedItems = getUpdatedItems(cart, newQty, cartKey);
-      updateCart({
-        variables: {
-          input: {
-            clientMutationId: uuidv4(),
-            items: updatedItems,
-          },
-        },
-      });
-    }
-  }
-};
-````
-
 ## File: src/utils/functions/productUtils.ts
 ````typescript
 import { Product, ProductCategory, ProductType } from '@/types/product';
@@ -9197,856 +8154,6 @@ export const RESET_USER_PASSWORD = gql`
       user {
         databaseId
         email
-      }
-    }
-  }
-`;
-````
-
-## File: src/utils/gql/GQL_QUERIES.ts
-````typescript
-import { gql } from '@apollo/client';
-export const GET_SINGLE_PRODUCT = gql`
-  query Product($slug: ID!) {
-    product(id: $slug, idType: SLUG) {
-      id
-      databaseId
-      averageRating
-      reviewCount
-      slug
-      description
-      shortDescription
-      onSale
-      image {
-        id
-        uri
-        title
-        srcSet
-        sourceUrl
-      }
-      galleryImages {
-        nodes {
-          id
-          sourceUrl
-          srcSet
-          title
-        }
-      }
-      productCategories {
-        nodes {
-          name
-          slug
-        }
-      }
-      productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
-        nodes {
-          name
-          slug
-        }
-      }
-      reviews {
-        nodes {
-          id
-          content
-          date
-          author {
-            node {
-              name
-            }
-          }
-        }
-      }
-      name
-      related(first: 12) {
-        nodes {
-          id
-          databaseId
-          name
-          slug
-          averageRating
-          reviewCount
-          image {
-            id
-            sourceUrl
-            srcSet
-          }
-          ... on SimpleProduct {
-            price
-            regularPrice
-            salePrice
-            stockQuantity
-            productCategories {
-              nodes {
-                name
-                slug
-              }
-            }
-            attributes {
-              nodes {
-                name
-                options
-              }
-            }
-          }
-          ... on VariableProduct {
-            price
-            regularPrice
-            salePrice
-            stockQuantity
-            productCategories {
-              nodes {
-                name
-                slug
-              }
-            }
-            attributes {
-              nodes {
-                name
-                options
-              }
-            }
-          }
-        }
-      }
-      upsell(first: 12) {
-        nodes {
-          id
-          databaseId
-          name
-          slug
-          averageRating
-          reviewCount
-          image {
-            id
-            sourceUrl
-            srcSet
-          }
-          ... on SimpleProduct {
-            price
-            regularPrice
-            salePrice
-            stockQuantity
-            productCategories {
-              nodes {
-                name
-                slug
-              }
-            }
-            attributes {
-              nodes {
-                name
-                options
-              }
-            }
-          }
-          ... on VariableProduct {
-            price
-            regularPrice
-            salePrice
-            stockQuantity
-            productCategories {
-              nodes {
-                name
-                slug
-              }
-            }
-            attributes {
-              nodes {
-                name
-                options
-              }
-            }
-          }
-        }
-      }
-      ... on SimpleProduct {
-        salePrice
-        regularPrice
-        price
-        id
-        sku
-        stockStatus
-        stockQuantity
-        crossSell(first: 12) {
-        nodes {
-          id
-          databaseId
-          name
-          slug
-          averageRating
-          reviewCount
-          image {
-            id
-            sourceUrl
-            srcSet
-          }
-          ... on SimpleProduct {
-            price
-            regularPrice
-            salePrice
-            stockQuantity
-            productCategories {
-              nodes {
-                name
-                slug
-              }
-            }
-            attributes {
-              nodes {
-                name
-                options
-              }
-            }
-          }
-          ... on VariableProduct {
-            price
-            regularPrice
-            salePrice
-            stockQuantity
-            productCategories {
-              nodes {
-                name
-                slug
-              }
-            }
-            attributes {
-              nodes {
-                name
-                options
-              }
-            }
-          }
-        }
-      }
-      attributes {
-            nodes {
-              name
-              options
-            }
-        }
-      }
-      ... on VariableProduct {
-        salePrice
-        regularPrice
-        price
-        id
-        sku
-        stockStatus
-        crossSell(first: 12) {
-        nodes {
-          id
-          databaseId
-          name
-          slug
-          averageRating
-          reviewCount
-          image {
-            id
-            sourceUrl
-            srcSet
-          }
-          ... on SimpleProduct {
-            price
-            regularPrice
-            salePrice
-            stockQuantity
-            productCategories {
-              nodes {
-                name
-                slug
-              }
-            }
-            attributes {
-              nodes {
-                name
-                options
-              }
-            }
-          }
-          ... on VariableProduct {
-            price
-            regularPrice
-            salePrice
-            stockQuantity
-            productCategories {
-              nodes {
-                name
-                slug
-              }
-            }
-            attributes {
-              nodes {
-                name
-                options
-              }
-            }
-          }
-        }
-      }
-        allPaColor {
-          nodes {
-            name
-          }
-        }
-        allPaSize {
-          nodes {
-            name
-          }
-        }
-        attributes {
-            nodes {
-              name
-              options
-            }
-          }
-        variations {
-          nodes {
-            id
-            databaseId
-            name
-            stockStatus
-            stockQuantity
-            purchasable
-            onSale
-            salePrice
-            regularPrice
-          }
-        }
-      }
-      ... on ExternalProduct {
-        price
-        id
-        externalUrl
-      }
-      ... on GroupProduct {
-        products {
-          nodes {
-            ... on SimpleProduct {
-              id
-              price
-            }
-          }
-        }
-        id
-      }
-    }
-  }
-`;
-/**
- * Fetch first 4 products from a specific category
- */
-export const FETCH_FIRST_PRODUCTS_FROM_HOODIES_QUERY = `
- query MyQuery {
-  products(first: 4, where: {category: "Hoodies"}) {
-    nodes {
-      productId
-      name
-      onSale
-      slug
-      image {
-        sourceUrl
-      }
-      ... on SimpleProduct {
-        price
-        regularPrice
-        salePrice
-      }
-      ... on VariableProduct {
-        price
-        regularPrice
-        salePrice
-      }
-    }
-  }
-}
- `;
-/**
- * Fetch first 200 Woocommerce products from GraphQL
- */
-export const FETCH_ALL_PRODUCTS_QUERY = gql`
-  query MyQuery($after: String) {
-    products(first: 100, after: $after) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        databaseId
-        name
-        onSale
-        slug
-        averageRating
-        image {
-          sourceUrl
-        }
-        ... on SimpleProduct {
-          databaseId
-          price
-          regularPrice
-          salePrice
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-        }
-        ... on VariableProduct {
-          databaseId
-          price
-          regularPrice
-          salePrice
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-          allPaColor {
-            nodes {
-              name
-              slug
-            }
-          }
-          allPaSize {
-            nodes {
-              name
-            }
-          }
-          variations {
-            nodes {
-              price
-              regularPrice
-              salePrice
-              attributes {
-                nodes {
-                  name
-                  value
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-/**
- * Fetch first 20 categories from GraphQL
- */
-export const FETCH_ALL_CATEGORIES_QUERY = gql`
-  query Categories {
-    productCategories(first: 50, where: { parent: 0 }) {
-      nodes {
-        id
-        name
-        slug
-        children(first: 20) {
-          nodes {
-            id
-            name
-            slug
-            children(first: 20) {
-              nodes {
-                id
-                name
-                slug
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-export const GET_CATEGORY_DATA_BY_SLUG = gql`
-  query CategoryData($slug: String!, $id: ID!, $after: String) {
-    productCategory(id: $id, idType: SLUG) {
-      id
-      name
-      description
-    }
-    products(first: 100, after: $after, where: { category: $slug }) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        id
-        databaseId
-        onSale
-        averageRating
-        slug
-        description
-        image {
-          id
-          uri
-          title
-          srcSet
-          sourceUrl
-        }
-        name
-        ... on SimpleProduct {
-          salePrice
-          regularPrice
-          onSale
-          price
-          id
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-          productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          stockQuantity
-          attributes {
-            nodes {
-              name
-              options
-            }
-          }
-        }
-        ... on VariableProduct {
-          salePrice
-          regularPrice
-          onSale
-          price
-          id
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-          productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          stockQuantity
-          reviewCount
-          attributes {
-            nodes {
-              name
-              options
-            }
-          }
-        }
-        ... on ExternalProduct {
-          price
-          id
-          externalUrl
-        }
-        ... on GroupProduct {
-          products {
-            nodes {
-              ... on SimpleProduct {
-                id
-                price
-              }
-            }
-          }
-          id
-        }
-      }
-    }
-  }
-`;
-export const GET_CART = gql`
-  query GET_CART {
-    cart {
-      contents {
-        nodes {
-          key
-          product {
-            node {
-              id
-              databaseId
-              name
-              description
-              type
-              onSale
-              slug
-              averageRating
-              reviewCount
-              image {
-                id
-                sourceUrl
-                srcSet
-                altText
-                title
-              }
-              galleryImages {
-                nodes {
-                  id
-                  sourceUrl
-                  srcSet
-                  altText
-                  title
-                }
-              }
-            }
-          }
-          variation {
-            node {
-              id
-              databaseId
-              name
-              description
-              type
-              onSale
-              price
-              regularPrice
-              salePrice
-              image {
-                id
-                sourceUrl
-                srcSet
-                altText
-                title
-              }
-              attributes {
-                nodes {
-                  id
-                  name
-                  value
-                }
-              }
-            }
-          }
-          quantity
-          total
-          subtotal
-          subtotalTax
-        }
-      }
-      subtotal
-      subtotalTax
-      shippingTax
-      shippingTotal
-      total
-      totalTax
-      feeTax
-      feeTotal
-      discountTax
-      discountTotal
-      availableShippingMethods {
-        packageDetails
-        supportsShippingCalculator
-        rates {
-          id
-          methodId
-          label
-          cost
-        }
-      }
-      chosenShippingMethods
-    }
-  }
-`;
-export const GET_CURRENT_USER = gql`
-  query GET_CURRENT_USER {
-    customer {
-      id
-      firstName
-      lastName
-      email
-    }
-  }
-`;
-export const GET_CUSTOMER_ORDERS = gql`
-  query GET_CUSTOMER_ORDERS {
-    customer {
-      orders {
-        nodes {
-          id
-          orderNumber
-          status
-          total
-          date
-        }
-      }
-    }
-  }
-`;
-export const GET_CUSTOMER_DASHBOARD_DATA = gql`
-  query GET_CUSTOMER_DASHBOARD_DATA {
-    customer {
-      id
-      firstName
-      lastName
-      email
-      username
-      billing {
-        firstName
-        lastName
-        address1
-        address2
-        city
-        country
-        state
-        postcode
-        email
-        phone
-      }
-      shipping {
-        firstName
-        lastName
-        address1
-        address2
-        city
-        country
-        state
-        postcode
-      }
-      orders(first: 10) {
-        nodes {
-          id
-          orderNumber
-          status
-          total
-          date
-        }
-      }
-    }
-  }
-`;
-export const FETCH_ALL_LOCATIONS_QUERY = gql`
-  query Locations {
-    productLocations(first: 100) {
-      nodes {
-        id
-        name
-        slug
-      }
-    }
-  }
-`;
-export const GET_PAYMENT_GATEWAYS = gql`
-  query GET_PAYMENT_GATEWAYS {
-    paymentGateways {
-      nodes {
-        id
-        title
-        description
-        icon
-      }
-    }
-  }
-`;
-export const GET_ALLOWED_COUNTRIES = gql`
-  query GET_ALLOWED_COUNTRIES {
-    wooCommerce {
-      countries {
-        code
-        name
-        states {
-          code
-          name
-        }
-      }
-    }
-  }
-`;
-export const SEARCH_PRODUCTS_QUERY = gql`
-  query SearchProducts($search: String!, $first: Int = 20, $after: String) {
-    products(first: $first, after: $after, where: { search: $search }) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        databaseId
-        id
-        name
-        onSale
-        slug
-        averageRating
-        reviewCount
-        image {
-          sourceUrl
-        }
-        ... on SimpleProduct {
-          databaseId
-          price
-          regularPrice
-          salePrice
-          stockQuantity
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-           attributes {
-            nodes {
-              name
-              options
-            }
-          }
-        }
-        ... on VariableProduct {
-          databaseId
-          price
-          regularPrice
-          salePrice
-          stockQuantity
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-          allPaColor {
-            nodes {
-              name
-              slug
-            }
-          }
-          allPaSize {
-            nodes {
-              name
-            }
-          }
-          attributes {
-            nodes {
-              name
-              options
-            }
-          }
-          variations {
-            nodes {
-              price
-              regularPrice
-              salePrice
-              attributes {
-                nodes {
-                  name
-                  value
-                }
-              }
-            }
-          }
-        }
       }
     }
   }
@@ -12041,6 +10148,127 @@ const CartInitializer = () => {
 export default CartInitializer;
 ````
 
+## File: src/components/Checkout/Billing.component.tsx
+````typescript
+// Imports
+import {
+  SubmitHandler,
+  useForm,
+  useFormContext,
+  FormProvider,
+} from 'react-hook-form';
+import { useEffect } from 'react';
+// Components
+import { InputField } from '@/components/Input/InputField.component';
+import AddressAutocomplete from '@/components/Input/AddressAutocomplete.component';
+import Button from '../UI/Button.component';
+// Constants
+import { INPUT_FIELDS } from '@/utils/constants/INPUT_FIELDS';
+import { ICheckoutDataProps } from '@/utils/functions/functions';
+interface IBillingProps {
+  handleFormSubmit: SubmitHandler<ICheckoutDataProps>;
+  isLoading?: boolean;
+  buttonLabel?: string;
+  initialCity?: string | null;
+}
+import { useQuery } from '@apollo/client';
+import { GET_ALLOWED_COUNTRIES } from '@/utils/gql/GQL_QUERIES';
+const CountrySelect = ({ label, name, customValidation }: { label: string, name: string, customValidation: any }) => {
+  const { register } = useFormContext();
+  const { data } = useQuery(GET_ALLOWED_COUNTRIES);
+  const allowedCountries = data?.wooCommerce?.countries || [];
+  return (
+    <div className="w-full">
+      <label htmlFor={name} className="block mb-1 text-xs font-bold text-gray-700">
+        {label}
+      </label>
+      <select
+        id={name}
+        {...register(name, customValidation)}
+        className="bg-white border border-gray-300 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
+      >
+        {allowedCountries.length > 0 ? (
+          allowedCountries.map((c: any) => (
+            <option key={c.code} value={c.code}>{c.name}</option>
+          ))
+        ) : (
+          <option value="GH">Ghana (Default)</option>
+        )}
+      </select>
+    </div>
+  );
+};
+const OrderButton = ({ isLoading, label }: { isLoading: boolean; label: string }) => {
+  return (
+    <div className="w-full p-2">
+      <div className="mt-4 flex justify-center">
+        <Button buttonDisabled={isLoading}>
+          {isLoading ? 'Processing...' : label}
+        </Button>
+      </div>
+    </div>
+  );
+};
+const Billing = ({ handleFormSubmit, isLoading = false, buttonLabel = 'PLACE ORDER', initialCity }: IBillingProps) => {
+  const methods = useForm<ICheckoutDataProps>();
+  useEffect(() => {
+    if (initialCity) {
+      // Logic: Only fill if empty to avoid overwriting user input
+      // OR force fill on first mount (but this useEffect runs on update too)
+      // Best approach: Check if "city" is empty or untouched.
+      // Since useForm is uncontrolled mostly, we just setVlaue.
+      // We can also just setValue unconditionally if we assume this component
+      // remounts or we want the store to drive it.
+      // Let's check current value first.
+      const currentCity = methods.getValues('city');
+      const currentState = methods.getValues('address1'); // Using address1 for State/Region as per previous conversation? No, previous conv said "Region" field... wait.
+      // INPUT_FIELDS says 'city' is city.
+      // INPUT_FIELDS says 'state' is Region?
+      // Let's check INPUT_FIELDS content if possible. I recall viewing it.
+      // Ah, previous conversation said "Renamed 'State/County' label to 'Region'".
+      // Usually 'state' is the name for Region.
+      if (!currentCity) {
+        methods.setValue('city', initialCity);
+        // Also set State/Region to the same value? 
+        // The prompt says "store location ... sync ... to the laddress on the chedckout"
+        // "Detected City" usually maps to what the user considers their location.
+        // Often in Ghana, City and Region can be used interchangeably or specifically.
+        // Let's set both or just City. The locationStore has {name: "Accra", slug: "accra"}.
+        // If name is "Accra", we can set City = Accra.
+        methods.setValue('state', initialCity); // Assuming 'state' is the field name for Region
+      }
+    }
+  }, [initialCity, methods]);
+  return (
+    <section className="w-full">
+      <FormProvider {...methods}>
+        <form onSubmit={methods.handleSubmit(handleFormSubmit)}>
+          <div className="flex flex-wrap -mx-1">
+            {INPUT_FIELDS.map(({ id, label, name, customValidation }) => (
+              <div key={id} className="w-full md:w-1/2 px-1 mb-2">
+                {name === 'address1' ? (
+                  <AddressAutocomplete label={label} name={name} />
+                ) : name === 'country' ? (
+                  <CountrySelect label={label} name={name} customValidation={customValidation} />
+                ) : (
+                  <InputField
+                    inputLabel={label}
+                    inputName={name}
+                    customValidation={customValidation}
+                  />
+                )}
+              </div>
+            ))}
+            <OrderButton isLoading={isLoading} label={buttonLabel} />
+          </div>
+        </form>
+      </FormProvider>
+    </section>
+  );
+};
+export default Billing;
+````
+
 ## File: src/components/Header/Navbar.component.tsx
 ````typescript
 import Link from 'next/link';
@@ -12344,208 +10572,200 @@ const AddressAutocomplete = (props: IAddressAutocompleteProps) => {
 export default AddressAutocomplete;
 ````
 
-## File: src/components/Product/AddToCart.component.tsx
+## File: src/components/Product/DeliveryInfo.component.tsx
 ````typescript
-// Imports
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { useQuery, useMutation } from '@apollo/client';
-import { v4 as uuidv4 } from 'uuid';
-// Components
-import Button from '@/components/UI/Button.component';
-// State
-import { useCartStore } from '@/stores/cartStore';
-// Utils
-import { getFormattedCart } from '@/utils/functions/functions';
-// GraphQL
-import { GET_CART } from '@/utils/gql/GQL_QUERIES';
-import { ADD_TO_CART } from '@/utils/gql/GQL_MUTATIONS';
-interface IImage {
-  __typename: string;
-  id: string;
-  uri: string;
-  title: string;
-  srcSet: string;
-  sourceUrl: string;
-}
-interface IVariationNode {
-  __typename: string;
-  name: string;
-}
-interface IAllPaColor {
-  __typename: string;
-  nodes: IVariationNode[];
-}
-interface IAllPaSize {
-  __typename: string;
-  nodes: IVariationNode[];
-}
-export interface IVariationNodes {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  stockStatus: string;
-  stockQuantity: number;
-  purchasable: boolean;
-  onSale: boolean;
-  salePrice?: string;
-  regularPrice: string;
-  sku?: string;
-}
-interface IVariations {
-  __typename: string;
-  nodes: IVariationNodes[];
-}
-export interface IProduct {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  averageRating: number;
-  slug: string;
-  description: string;
-  onSale: boolean;
-  image: IImage;
-  name: string;
-  salePrice?: string;
-  regularPrice: string;
-  price: string;
-  stockQuantity: number;
-  sku?: string;
-  stockStatus?: string;
-  related?: {
-    nodes: IProduct[];
-  };
-  upsell?: {
-    nodes: IProduct[];
-  };
-  crossSell?: {
-    nodes: IProduct[];
-  };
-  featured?: boolean;
-  shortDescription?: string;
-  reviewCount?: number;
-  allPaColor?: IAllPaColor;
-  allPaSize?: IAllPaSize;
-  variations?: IVariations;
-  productCategories?: {
-    nodes: Array<{ name: string; slug: string }>;
-  };
-  productBrand?: {
-    nodes: Array<{ name: string; slug: string }>;
-  };
-  galleryImages?: {
-    nodes: IImage[];
-  };
-  reviews?: {
-    nodes: Array<{
-      id: string;
-      content: string;
-      date: string;
-      rating: number;
-      author: {
-        node: {
-          name: string;
-        }
-      }
-    }>;
-  };
-  attributes?: {
-    nodes: Array<{ name: string; options: string[] }>;
-  };
-}
-export interface IProductRootObject {
-  product: IProduct;
-  variationId?: number;
-  fullWidth?: boolean;
-  buyNow?: boolean;
-  quantity?: number;
-}
-/**
- * Handles the Add to cart functionality.
- * Uses GraphQL for product data
- * @param {IAddToCartProps} product // Product data
- * @param {number} variationId // Variation ID
- * @param {boolean} fullWidth // Whether the button should be full-width
- */
-const AddToCart = ({
-  product,
-  variationId,
-  fullWidth = false,
-  buyNow = false,
-  quantity = 1,
-}: IProductRootObject) => {
-  const router = useRouter();
-  const { syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
-  const [requestError, setRequestError] = useState<boolean>(false);
-  const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const productId = product?.databaseId ? product?.databaseId : variationId;
-  const productQueryInput = {
-    clientMutationId: uuidv4(), // Generate a unique id.
-    productId,
-    quantity,
-  };
-  // Get cart data query
-  const { data, refetch } = useQuery(GET_CART, {
-    notifyOnNetworkStatusChange: true,
-  });
-  useEffect(() => {
-    if (data) {
-      const updatedCart = getFormattedCart(data);
-      if (updatedCart) {
-        syncWithWooCommerce(updatedCart);
-      }
-    }
-  }, [data, syncWithWooCommerce]);
-  // Add to cart mutation
-  const [addToCart, { loading: addToCartLoading, data: addToCartData, error: addToCartError }] = useMutation(ADD_TO_CART, {
-    variables: {
-      input: productQueryInput,
-    },
-    // Refetch all GET_CART queries to update cart across all components
-    refetchQueries: [{ query: GET_CART }],
-    awaitRefetchQueries: true,
-  });
-  useEffect(() => {
-    if (addToCartData) {
-      // Update the cart with new values in React context.
-      setIsSuccess(true);
-      const timer = setTimeout(() => setIsSuccess(false), 2000);
-      if (buyNow) {
-        router.push('/checkout');
-      }
-      return () => clearTimeout(timer);
-    }
-  }, [addToCartData, buyNow, router]);
-  useEffect(() => {
-    if (addToCartError) {
-      console.log('Add to cart error:', addToCartError);
-      setRequestError(true);
-    }
-  }, [addToCartError]);
-  const handleAddToCart = () => {
-    addToCart();
-  };
-  return (
-    <>
-      <Button
-        handleButtonClick={() => handleAddToCart()}
-        buttonDisabled={addToCartLoading || requestError || isCartLoading || isSuccess}
-        fullWidth={fullWidth}
-        className={
-          isSuccess
-            ? 'bg-green-600 hover:bg-green-700'
-            : buyNow
-              ? 'bg-orange-600 hover:bg-orange-700'
-              : ''
-        }
-      >
-        {isCartLoading ? 'Loading...' : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
-      </Button>
-    </>
-  );
+import React, { useState, useEffect } from 'react';
+const DeliveryInfo = () => {
+    const [deliveryData, setDeliveryData] = useState<{
+        text: React.ReactNode;
+        showTimer: boolean;
+        isActive: boolean;
+    } | null>(null);
+    const [timeLeft, setTimeLeft] = useState<string>('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    useEffect(() => {
+        // 1. Calculate Delivery Status
+        const calculateStatus = () => {
+            // Create a date object for the current time in Accra (GMT)
+            // Since Accra is GMT+0, we can use UTC methods directly which is safer than relying on local machine time offset
+            const now = new Date();
+            const day = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
+            const hour = now.getUTCHours();
+            const minute = now.getUTCMinutes();
+            let text: React.ReactNode = '';
+            let showTimer = false;
+            let isActive = false;
+            // Logic from PHP:
+            // 1. SAT 4:01 PM to SUN (Monday Delivery)
+            //    (Day == 6 && Time >= 16:01) OR (Day == 0)
+            if ((day === 6 && (hour > 16 || (hour === 16 && minute >= 1))) || day === 0) {
+                text = (
+                    <>
+                        Order it now and get it on <strong>Monday</strong>
+                    </>
+                );
+            }
+            // 2. MON-FRI EARLY MORNING (Get it Today)
+            //    Day != 6 && Day != 0 && Time >= 00:01 && Time <= 07:59
+            else if (
+                day !== 6 &&
+                day !== 0 &&
+                (hour === 0 && minute >= 1 || (hour > 0 && hour < 8)) // 00:01 to 07:59
+            ) {
+                text = (
+                    <>
+                        <span className="text-[#27ae60]">Order it now and get it <strong>today</strong></span>
+                    </>
+                );
+            }
+            // 3. WORKING HOURS: THE "3 HOURS" WINDOW
+            //    Day != 0 && Time >= 08:00 && Time <= 16:00
+            else if (
+                day !== 0 &&
+                (hour >= 8 && (hour < 16 || (hour === 16 && minute === 0)))
+            ) {
+                text = (
+                    <>
+                        <span className="text-[#27ae60]">Order it now and get it in the <strong>next 3 hours</strong></span>
+                    </>
+                );
+                showTimer = true;
+                isActive = true;
+            }
+            // 4. EVENING (Deliver Tomorrow)
+            else {
+                text = (
+                    <>
+                        <span className="text-[#e67e22]">Order it now and get it tomorrow</span>
+                    </>
+                );
+            }
+            setDeliveryData({ text, showTimer, isActive });
+        };
+        calculateStatus();
+        const statusInterval = setInterval(calculateStatus, 60000); // Update status every minute
+        return () => clearInterval(statusInterval);
+    }, []);
+    // 2. Countdown Timer Logic
+    useEffect(() => {
+        if (!deliveryData?.showTimer) return;
+        const tick = () => {
+            const now = new Date();
+            // Target is today at 16:00 UTC (Accra)
+            const target = new Date();
+            target.setUTCHours(16, 0, 0, 0);
+            const diff = target.getTime() - now.getTime();
+            if (diff <= 0) {
+                setTimeLeft('0h 0m 0s');
+                return;
+            }
+            const sec = Math.floor(diff / 1000);
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            setTimeLeft(`${h}h ${m}m ${s}s`);
+        };
+        tick(); // Initial call
+        const timerInterval = setInterval(tick, 1000);
+        return () => clearInterval(timerInterval);
+    }, [deliveryData?.showTimer]);
+    if (!deliveryData) return null;
+    return (
+        <>
+            <style jsx>{`
+                @keyframes pulse-green {
+                    0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.4); }
+                    70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+                }
+                .accra-delivery-active {
+                    animation: pulse-green 2s infinite;
+                }
+            `}</style>
+            <div className={`py-2 mb-2 border-b border-gray-200 ${deliveryData.isActive ? 'accra-delivery-active' : ''}`}>
+                <div className="flex items-start justify-between gap-2">
+                    <div className="text-xs text-gray-600 leading-relaxed flex-1">
+                        <strong>Greater Accra:</strong> {deliveryData.text}
+                    </div>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="text-blue-600 text-xs font-semibold hover:underline focus:outline-none flex-shrink-0"
+                        aria-label="Learn more about shipping"
+                    >
+                        Details
+                    </button>
+                </div>
+                {deliveryData.showTimer && (
+                    <div className="text-[11px] text-[#d32f2f] mt-2 font-bold">
+                        Order within <span className="font-mono">{timeLeft}</span> for this window!
+                    </div>
+                )}
+            </div>
+            {/* Shipping Information Modal */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
+                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold text-gray-900">Shipping Information</h3>
+                                <button
+                                    onClick={() => setIsModalOpen(false)}
+                                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                                    aria-label="Close modal"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <h4 className="font-semibold text-gray-900 mb-3">Delivery Windows (Accra, Tema, Kasoa, Amasaman, Adenta)</h4>
+                                <div className="space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">🚀</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Same-Day Delivery</p>
+                                            <p className="text-xs text-gray-600">Orders within these hours Mon-Fri: 12:01 AM - 7:59 AM, qualifies for same day delivery</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">⚡</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">3-Hour Express</p>
+                                            <p className="text-xs text-gray-600">Order between these hours: Mon-Sat: 8:00 AM - 4:00 PM qualifies for express sharp delivery.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">📅</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Next Business Day</p>
+                                            <p className="text-xs text-gray-600">Orders made from Mon-Fri: After 4:00 PM automatically qualify for standard next day delivery</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">🚚</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Monday Delivery</p>
+                                            <p className="text-xs text-gray-600">Orders made on Sat (After 4:01 PM) - Sunday automatically qualify for Monday delivery.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                                <p className="text-xs text-blue-900">
+                                    <strong>Note:</strong> This delivery times apply to Greater Accra region only and Kasoa only. Other regions have different delivery schedules. Please learn more from our delivery page.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
 };
-export default AddToCart;
+export default DeliveryInfo;
 ````
 
 ## File: src/components/Product/ProductFilters.component.tsx
@@ -12855,6 +11075,1190 @@ export const INPUT_FIELDS = [
     customValidation: { required: true, minLength: 8, pattern: /^[+0-9]{8,12}$/ },
   },
 ];
+````
+
+## File: src/utils/functions/functions.tsx
+````typescript
+/*eslint complexity: ["error", 20]*/
+import { v4 as uuidv4 } from 'uuid';
+import type { Product } from '@/stores/cartStore';
+interface RootObject {
+  products: Product[];
+  totalProductsCount: number;
+  totalProductsPrice: number;
+}
+import { ChangeEvent } from 'react';
+import { IVariationNodes } from '@/components/Product/AddToCart.component';
+/* Interface for products*/
+export interface IImage {
+  __typename: string;
+  id: string;
+  sourceUrl?: string;
+  srcSet?: string;
+  altText: string;
+  title: string;
+}
+export interface IGalleryImages {
+  __typename: string;
+  nodes: IImage[];
+}
+interface IProductNode {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  description: string;
+  stockStatus: string;
+  type: string;
+  onSale: boolean;
+  slug: string;
+  averageRating: number;
+  reviewCount: number;
+  image: IImage;
+  galleryImages: IGalleryImages;
+  productId: number;
+}
+interface IProduct {
+  __typename: string;
+  node: IProductNode;
+}
+interface IVariationNode {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  description: string;
+  type: string;
+  onSale: boolean;
+  price: string;
+  regularPrice: string;
+  salePrice: string;
+  image: IImage;
+  attributes: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      value: string;
+    }>;
+  };
+}
+interface IVariation {
+  __typename: string;
+  node: IVariationNode;
+}
+export interface IProductRootObject {
+  __typename: string;
+  key: string;
+  product: IProduct;
+  variation?: IVariation;
+  quantity: number;
+  total: string;
+  subtotal: string;
+  subtotalTax: string;
+}
+type TUpdatedItems = { key: string; quantity: number }[];
+export interface IUpdateCartItem {
+  key: string;
+  quantity: number;
+}
+export interface IUpdateCartInput {
+  clientMutationId: string;
+  items: IUpdateCartItem[];
+}
+export interface IUpdateCartVariables {
+  input: IUpdateCartInput;
+}
+export interface IUpdateCartRootObject {
+  variables: IUpdateCartVariables;
+}
+/* Interface for props */
+interface IFormattedCartProps {
+  cart: { contents: { nodes: IProductRootObject[] }; total: number };
+}
+export interface ICheckoutDataProps {
+  firstName: string;
+  lastName: string;
+  address1: string;
+  address2: string;
+  city: string;
+  country: string;
+  state: string;
+  postcode: string;
+  email: string;
+  phone: string;
+  company: string;
+  paymentMethod: string;
+}
+/**
+ * Add empty character after currency symbol
+ * @param {string} price The price string that we input
+ * @param {string} symbol Currency symbol to add empty character/padding after
+ */
+export const paddedPrice = (price: string, symbol: string) => {
+  if (!price) return '';
+  return price.split(symbol).join(`${symbol} `);
+};
+/**
+ * Shorten inputted string (usually product description) to a maximum of length
+ * @param {string} input The string that we input
+ * @param {number} length The length that we want to shorten the text to
+ */
+export const trimmedStringToLength = (input: string, length: number) => {
+  if (input.length > length) {
+    const subStr = input.substring(0, length);
+    return `${subStr}...`;
+  }
+  return input;
+};
+/**
+ * Filter variant price. Changes "kr198.00 - kr299.00" to kr299.00 or kr198 depending on the side variable
+ * @param {String} side Which side of the string to return (which side of the "-" symbol)
+ * @param {String} price The inputted price that we need to convert
+ */
+export const filteredVariantPrice = (price: string, side: string) => {
+  if (!price) {
+    return '';
+  }
+  const dashIndex = price.indexOf('-');
+  if (dashIndex === -1) {
+    // If no dash, it's a single price.
+    // If asking for 'right' (regular/high), return empty or same?
+    // Usually 'right' is used for struck-through regular price in the context of a range.
+    // But in SingleProduct, 'right' is used for regular price.
+    // If there's no range, there's only one price.
+    // Let's assume if side is 'right', we might not want to show it if it's the same as left?
+    // But the current logic returned the WHOLE string for 'right' (due to substring(length, -1)) and EMPTY for 'left'.
+    // We want 'left' (sale/main) to show the price.
+    if (side === 'right') {
+      return ''; // Don't show a "regular" price if there's no range? Or handle in component?
+      // Actually, if we return empty for right, the component might hide the struck-through price.
+      // Let's see SingleProduct usage:
+      // {product.variations ? filteredVariantPrice(price, 'right') : regularPrice}
+      // If we return '', it shows nothing.
+      // {product.variations ? filteredVariantPrice(price, '') : salePrice}
+      // If we return 'GH₵100', it shows 'GH₵100'.
+      // This seems correct for a single price variable product.
+    }
+    return price;
+  }
+  if ('right' === side) {
+    return price.substring(dashIndex + 1).trim();
+  }
+  return price.substring(0, dashIndex).trim();
+};
+/**
+ * Returns cart data in the required format.
+ * @param {String} data Cart data
+ */
+export const getFormattedCart = (data: IFormattedCartProps) => {
+  const formattedCart: RootObject = {
+    products: [],
+    totalProductsCount: 0,
+    totalProductsPrice: 0,
+  };
+  if (!data) {
+    return;
+  }
+  const givenProducts = data.cart.contents.nodes;
+  // Create an empty object.
+  formattedCart.products = [];
+  const product: Product = {
+    productId: 0,
+    cartKey: '',
+    name: '',
+    qty: 0,
+    price: 0,
+    totalPrice: '0',
+    image: { sourceUrl: '', srcSet: '', title: '' },
+  };
+  let totalProductsCount = 0;
+  let i = 0;
+  if (!givenProducts.length) {
+    return;
+  }
+  givenProducts.forEach(() => {
+    const givenProduct = givenProducts[Number(i)].product.node;
+    // Convert price to a float value
+    const convertedCurrency = givenProducts[Number(i)].total.replace(
+      /[^0-9.-]+/g,
+      '',
+    );
+    product.productId = givenProduct.productId;
+    product.cartKey = givenProducts[Number(i)].key;
+    product.name = givenProduct.name;
+    product.qty = givenProducts[Number(i)].quantity;
+    product.price = Number(convertedCurrency) / product.qty;
+    product.totalPrice = givenProducts[Number(i)].total;
+    // Ensure we can add products without images to the cart
+    product.image = givenProduct.image.sourceUrl
+      ? {
+        sourceUrl: givenProduct.image.sourceUrl,
+        srcSet: givenProduct.image.srcSet,
+        title: givenProduct.image.title,
+      }
+      : {
+        sourceUrl: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+        srcSet: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+        title: givenProduct.name,
+      };
+    totalProductsCount += givenProducts[Number(i)].quantity;
+    // Push each item into the products array.
+    formattedCart.products.push(product);
+    i++;
+  });
+  formattedCart.totalProductsCount = totalProductsCount;
+  formattedCart.totalProductsPrice = data.cart.total;
+  return formattedCart;
+};
+export const createCheckoutData = (order: ICheckoutDataProps) => ({
+  clientMutationId: uuidv4(),
+  billing: {
+    firstName: order.firstName,
+    lastName: order.lastName,
+    address1: order.address1,
+    address2: order.address2,
+    city: order.city,
+    country: order.country,
+    state: order.state,
+    postcode: order.postcode,
+    email: order.email,
+    phone: order.phone,
+    company: order.company,
+  },
+  shipping: {
+    firstName: order.firstName,
+    lastName: order.lastName,
+    address1: order.address1,
+    address2: order.address2,
+    city: order.city,
+    country: order.country,
+    state: order.state,
+    postcode: order.postcode,
+    email: order.email,
+    phone: order.phone,
+    company: order.company,
+  },
+  shipToDifferentAddress: false,
+  paymentMethod: order.paymentMethod,
+  isPaid: false,
+  transactionId: 'fhggdfjgfi',
+});
+/**
+ * Get the updated items in the below format required for mutation input.
+ *
+ * Creates an array in above format with the newQty (updated Qty ).
+ *
+ */
+export const getUpdatedItems = (
+  products: IProductRootObject[],
+  newQty: number,
+  cartKey: string,
+) => {
+  // Create an empty array.
+  const updatedItems: TUpdatedItems = [];
+  // Loop through the product array.
+  products.forEach((cartItem) => {
+    // If you find the cart key of the product user is trying to update, push the key and new qty.
+    if (cartItem.key === cartKey) {
+      updatedItems.push({
+        key: cartItem.key,
+        quantity: newQty,
+      });
+      // Otherwise just push the existing qty without updating.
+    } else {
+      updatedItems.push({
+        key: cartItem.key,
+        quantity: cartItem.quantity,
+      });
+    }
+  });
+  // Return the updatedItems array with new Qtys.
+  return updatedItems;
+};
+/*
+ * When user changes the quantity, update the cart in localStorage
+ * Also update the cart in the global Context
+ */
+export const handleQuantityChange = (
+  event: ChangeEvent<HTMLInputElement>,
+  cartKey: string,
+  cart: IProductRootObject[],
+  updateCart: (variables: IUpdateCartRootObject) => void,
+  updateCartProcessing: boolean,
+) => {
+  if (process.browser) {
+    event.stopPropagation();
+    // Return if the previous update cart mutation request is still processing
+    if (updateCartProcessing || !cart) {
+      return;
+    }
+    // If the user tries to delete the count of product, set that to 1 by default ( This will not allow him to reduce it less than zero )
+    const newQty = event.target.value ? parseInt(event.target.value, 10) : 1;
+    if (cart.length) {
+      const updatedItems = getUpdatedItems(cart, newQty, cartKey);
+      updateCart({
+        variables: {
+          input: {
+            clientMutationId: uuidv4(),
+            items: updatedItems,
+          },
+        },
+      });
+    }
+  }
+};
+````
+
+## File: src/utils/gql/GQL_QUERIES.ts
+````typescript
+import { gql } from '@apollo/client';
+export const GET_SINGLE_PRODUCT = gql`
+  query Product($slug: ID!) {
+    product(id: $slug, idType: SLUG) {
+      id
+      databaseId
+      averageRating
+      reviewCount
+      slug
+      description
+      shortDescription
+      onSale
+      image {
+        id
+        uri
+        title
+        srcSet
+        sourceUrl
+      }
+      galleryImages {
+        nodes {
+          id
+          sourceUrl
+          srcSet
+          title
+        }
+      }
+      productCategories {
+        nodes {
+          name
+          slug
+        }
+      }
+      productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
+        nodes {
+          name
+          slug
+        }
+      }
+      reviews {
+        nodes {
+          id
+          content
+          date
+          author {
+            node {
+              name
+            }
+          }
+        }
+      }
+      name
+      related(first: 12) {
+        nodes {
+          id
+          databaseId
+          name
+          slug
+          averageRating
+          reviewCount
+          image {
+            id
+            sourceUrl
+            srcSet
+          }
+          ... on SimpleProduct {
+            price
+            regularPrice
+            salePrice
+            stockQuantity
+            productCategories {
+              nodes {
+                name
+                slug
+              }
+            }
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+          ... on VariableProduct {
+            price
+            regularPrice
+            salePrice
+            stockQuantity
+            productCategories {
+              nodes {
+                name
+                slug
+              }
+            }
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+        }
+      }
+      upsell(first: 12) {
+        nodes {
+          id
+          databaseId
+          name
+          slug
+          averageRating
+          reviewCount
+          image {
+            id
+            sourceUrl
+            srcSet
+          }
+          ... on SimpleProduct {
+            price
+            regularPrice
+            salePrice
+            stockQuantity
+            productCategories {
+              nodes {
+                name
+                slug
+              }
+            }
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+          ... on VariableProduct {
+            price
+            regularPrice
+            salePrice
+            stockQuantity
+            productCategories {
+              nodes {
+                name
+                slug
+              }
+            }
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+        }
+      }
+      ... on SimpleProduct {
+        salePrice
+        regularPrice
+        price
+        id
+        sku
+        stockStatus
+        stockQuantity
+        totalSales
+        crossSell(first: 12) {
+        nodes {
+          id
+          databaseId
+          name
+          slug
+          averageRating
+          reviewCount
+          image {
+            id
+            sourceUrl
+            srcSet
+          }
+          ... on SimpleProduct {
+            price
+            regularPrice
+            salePrice
+            stockQuantity
+            productCategories {
+              nodes {
+                name
+                slug
+              }
+            }
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+          ... on VariableProduct {
+            price
+            regularPrice
+            salePrice
+            stockQuantity
+            productCategories {
+              nodes {
+                name
+                slug
+              }
+            }
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+        }
+      }
+      attributes {
+            nodes {
+              name
+              options
+            }
+        }
+      }
+      ... on VariableProduct {
+        salePrice
+        regularPrice
+        price
+        id
+        sku
+        stockStatus
+        totalSales
+        crossSell(first: 12) {
+        nodes {
+          id
+          databaseId
+          name
+          slug
+          averageRating
+          reviewCount
+          image {
+            id
+            sourceUrl
+            srcSet
+          }
+          ... on SimpleProduct {
+            price
+            regularPrice
+            salePrice
+            stockQuantity
+            productCategories {
+              nodes {
+                name
+                slug
+              }
+            }
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+          ... on VariableProduct {
+            price
+            regularPrice
+            salePrice
+            stockQuantity
+            productCategories {
+              nodes {
+                name
+                slug
+              }
+            }
+            attributes {
+              nodes {
+                name
+                options
+              }
+            }
+          }
+        }
+      }
+        allPaColor {
+          nodes {
+            name
+          }
+        }
+        allPaSize {
+          nodes {
+            name
+          }
+        }
+        attributes {
+            nodes {
+              name
+              options
+            }
+          }
+        variations {
+          nodes {
+            id
+            databaseId
+            name
+            stockStatus
+            stockQuantity
+            purchasable
+            onSale
+            salePrice
+            regularPrice
+          }
+        }
+      }
+      ... on ExternalProduct {
+        price
+        id
+        externalUrl
+      }
+      ... on GroupProduct {
+        products {
+          nodes {
+            ... on SimpleProduct {
+              id
+              price
+            }
+          }
+        }
+        id
+      }
+    }
+  }
+`;
+/**
+ * Fetch first 4 products from a specific category
+ */
+export const FETCH_FIRST_PRODUCTS_FROM_HOODIES_QUERY = `
+ query MyQuery {
+  products(first: 4, where: {category: "Hoodies"}) {
+    nodes {
+      productId
+      name
+      onSale
+      slug
+      image {
+        sourceUrl
+      }
+      ... on SimpleProduct {
+        price
+        regularPrice
+        salePrice
+      }
+      ... on VariableProduct {
+        price
+        regularPrice
+        salePrice
+      }
+    }
+  }
+}
+ `;
+/**
+ * Fetch first 200 Woocommerce products from GraphQL
+ */
+export const FETCH_ALL_PRODUCTS_QUERY = gql`
+  query MyQuery($after: String) {
+    products(first: 100, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        databaseId
+        name
+        onSale
+        slug
+        averageRating
+        image {
+          sourceUrl
+        }
+        ... on SimpleProduct {
+          databaseId
+          price
+          regularPrice
+          salePrice
+          productCategories {
+            nodes {
+              name
+              slug
+            }
+          }
+        }
+        ... on VariableProduct {
+          databaseId
+          price
+          regularPrice
+          salePrice
+          productCategories {
+            nodes {
+              name
+              slug
+            }
+          }
+          allPaColor {
+            nodes {
+              name
+              slug
+            }
+          }
+          allPaSize {
+            nodes {
+              name
+            }
+          }
+          variations {
+            nodes {
+              price
+              regularPrice
+              salePrice
+              attributes {
+                nodes {
+                  name
+                  value
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+/**
+ * Fetch first 20 categories from GraphQL
+ */
+export const FETCH_ALL_CATEGORIES_QUERY = gql`
+  query Categories {
+    productCategories(first: 50, where: { parent: 0 }) {
+      nodes {
+        id
+        name
+        slug
+        children(first: 20) {
+          nodes {
+            id
+            name
+            slug
+            children(first: 20) {
+              nodes {
+                id
+                name
+                slug
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+export const GET_CATEGORY_DATA_BY_SLUG = gql`
+  query CategoryData($slug: String!, $id: ID!, $after: String) {
+    productCategory(id: $id, idType: SLUG) {
+      id
+      name
+      description
+    }
+    products(first: 100, after: $after, where: { category: $slug }) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        id
+        databaseId
+        onSale
+        averageRating
+        slug
+        description
+        image {
+          id
+          uri
+          title
+          srcSet
+          sourceUrl
+        }
+        name
+        ... on SimpleProduct {
+          salePrice
+          regularPrice
+          onSale
+          price
+          id
+          productCategories {
+            nodes {
+              name
+              slug
+            }
+          }
+          productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
+            nodes {
+              name
+              slug
+            }
+          }
+          productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
+            nodes {
+              name
+              slug
+            }
+          }
+          stockQuantity
+          attributes {
+            nodes {
+              name
+              options
+            }
+          }
+        }
+        ... on VariableProduct {
+          salePrice
+          regularPrice
+          onSale
+          price
+          id
+          productCategories {
+            nodes {
+              name
+              slug
+            }
+          }
+          productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
+            nodes {
+              name
+              slug
+            }
+          }
+          productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
+            nodes {
+              name
+              slug
+            }
+          }
+          stockQuantity
+          reviewCount
+          attributes {
+            nodes {
+              name
+              options
+            }
+          }
+        }
+        ... on ExternalProduct {
+          price
+          id
+          externalUrl
+        }
+        ... on GroupProduct {
+          products {
+            nodes {
+              ... on SimpleProduct {
+                id
+                price
+              }
+            }
+          }
+          id
+        }
+      }
+    }
+  }
+`;
+export const GET_CART = gql`
+  query GET_CART {
+    cart {
+      contents {
+        nodes {
+          key
+          product {
+            node {
+              id
+              databaseId
+              name
+              description
+              type
+              onSale
+              slug
+              averageRating
+              reviewCount
+              image {
+                id
+                sourceUrl
+                srcSet
+                altText
+                title
+              }
+              galleryImages {
+                nodes {
+                  id
+                  sourceUrl
+                  srcSet
+                  altText
+                  title
+                }
+              }
+            }
+          }
+          variation {
+            node {
+              id
+              databaseId
+              name
+              description
+              type
+              onSale
+              price
+              regularPrice
+              salePrice
+              image {
+                id
+                sourceUrl
+                srcSet
+                altText
+                title
+              }
+              attributes {
+                nodes {
+                  id
+                  name
+                  value
+                }
+              }
+            }
+          }
+          quantity
+          total
+          subtotal
+          subtotalTax
+        }
+      }
+      subtotal
+      subtotalTax
+      shippingTax
+      shippingTotal
+      total
+      totalTax
+      feeTax
+      feeTotal
+      discountTax
+      discountTotal
+      availableShippingMethods {
+        packageDetails
+        supportsShippingCalculator
+        rates {
+          id
+          methodId
+          label
+          cost
+        }
+      }
+      chosenShippingMethods
+    }
+  }
+`;
+export const GET_CURRENT_USER = gql`
+  query GET_CURRENT_USER {
+    customer {
+      id
+      firstName
+      lastName
+      email
+    }
+  }
+`;
+export const GET_CUSTOMER_ORDERS = gql`
+  query GET_CUSTOMER_ORDERS {
+    customer {
+      orders {
+        nodes {
+          id
+          orderNumber
+          status
+          total
+          date
+        }
+      }
+    }
+  }
+`;
+export const GET_CUSTOMER_DASHBOARD_DATA = gql`
+  query GET_CUSTOMER_DASHBOARD_DATA {
+    customer {
+      id
+      firstName
+      lastName
+      email
+      username
+      billing {
+        firstName
+        lastName
+        address1
+        address2
+        city
+        country
+        state
+        postcode
+        email
+        phone
+      }
+      shipping {
+        firstName
+        lastName
+        address1
+        address2
+        city
+        country
+        state
+        postcode
+      }
+      orders(first: 10) {
+        nodes {
+          id
+          orderNumber
+          status
+          total
+          date
+        }
+      }
+    }
+  }
+`;
+export const FETCH_ALL_LOCATIONS_QUERY = gql`
+  query Locations {
+    productLocations(first: 100) {
+      nodes {
+        id
+        name
+        slug
+      }
+    }
+  }
+`;
+export const GET_PAYMENT_GATEWAYS = gql`
+  query GET_PAYMENT_GATEWAYS {
+    paymentGateways {
+      nodes {
+        id
+        title
+        description
+        icon
+      }
+    }
+  }
+`;
+export const GET_ALLOWED_COUNTRIES = gql`
+  query GET_ALLOWED_COUNTRIES {
+    wooCommerce {
+      countries {
+        code
+        name
+        states {
+          code
+          name
+        }
+      }
+    }
+  }
+`;
+export const SEARCH_PRODUCTS_QUERY = gql`
+  query SearchProducts($search: String!, $first: Int = 20, $after: String) {
+    products(first: $first, after: $after, where: { search: $search }) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        databaseId
+        id
+        name
+        onSale
+        slug
+        averageRating
+        reviewCount
+        image {
+          sourceUrl
+        }
+        ... on SimpleProduct {
+          databaseId
+          price
+          regularPrice
+          salePrice
+          stockQuantity
+          productCategories {
+            nodes {
+              name
+              slug
+            }
+          }
+           attributes {
+            nodes {
+              name
+              options
+            }
+          }
+        }
+        ... on VariableProduct {
+          databaseId
+          price
+          regularPrice
+          salePrice
+          stockQuantity
+          productCategories {
+            nodes {
+              name
+              slug
+            }
+          }
+          allPaColor {
+            nodes {
+              name
+              slug
+            }
+          }
+          allPaSize {
+            nodes {
+              name
+            }
+          }
+          attributes {
+            nodes {
+              name
+              options
+            }
+          }
+          variations {
+            nodes {
+              price
+              regularPrice
+              salePrice
+              attributes {
+                nodes {
+                  name
+                  value
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
 ````
 
 ## File: .gitignore
@@ -13211,6 +12615,244 @@ const CartContents = () => {
 export default CartContents;
 ````
 
+## File: src/components/Product/AddToCart.component.tsx
+````typescript
+// Imports
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useQuery, useMutation } from '@apollo/client';
+import { v4 as uuidv4 } from 'uuid';
+// Components
+import Button from '@/components/UI/Button.component';
+// State
+import { useCartStore } from '@/stores/cartStore';
+// Utils
+import { getFormattedCart } from '@/utils/functions/functions';
+// GraphQL
+import { GET_CART } from '@/utils/gql/GQL_QUERIES';
+import { ADD_TO_CART } from '@/utils/gql/GQL_MUTATIONS';
+interface IImage {
+  __typename: string;
+  id: string;
+  uri: string;
+  title: string;
+  srcSet: string;
+  sourceUrl: string;
+}
+interface IVariationNode {
+  __typename: string;
+  name: string;
+}
+interface IAllPaColor {
+  __typename: string;
+  nodes: IVariationNode[];
+}
+interface IAllPaSize {
+  __typename: string;
+  nodes: IVariationNode[];
+}
+export interface IVariationNodes {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  stockStatus: string;
+  stockQuantity: number;
+  purchasable: boolean;
+  onSale: boolean;
+  salePrice?: string;
+  regularPrice: string;
+  sku?: string;
+}
+interface IVariations {
+  __typename: string;
+  nodes: IVariationNodes[];
+}
+export interface IProduct {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  averageRating: number;
+  slug: string;
+  description: string;
+  onSale: boolean;
+  image: IImage;
+  name: string;
+  salePrice?: string;
+  regularPrice: string;
+  price: string;
+  stockQuantity: number;
+  sku?: string;
+  stockStatus?: string;
+  totalSales?: number;
+  related?: {
+    nodes: IProduct[];
+  };
+  upsell?: {
+    nodes: IProduct[];
+  };
+  crossSell?: {
+    nodes: IProduct[];
+  };
+  featured?: boolean;
+  shortDescription?: string;
+  reviewCount?: number;
+  allPaColor?: IAllPaColor;
+  allPaSize?: IAllPaSize;
+  variations?: IVariations;
+  productCategories?: {
+    nodes: Array<{ name: string; slug: string }>;
+  };
+  productBrand?: {
+    nodes: Array<{ name: string; slug: string }>;
+  };
+  galleryImages?: {
+    nodes: IImage[];
+  };
+  reviews?: {
+    nodes: Array<{
+      id: string;
+      content: string;
+      date: string;
+      rating: number;
+      author: {
+        node: {
+          name: string;
+        }
+      }
+    }>;
+  };
+  attributes?: {
+    nodes: Array<{ name: string; options: string[] }>;
+  };
+}
+export interface IProductRootObject {
+  product: IProduct;
+  variationId?: number;
+  fullWidth?: boolean;
+  buyNow?: boolean;
+  quantity?: number;
+}
+/**
+ * Handles the Add to cart functionality.
+ * Uses GraphQL for product data
+ * @param {IAddToCartProps} product // Product data
+ * @param {number} variationId // Variation ID
+ * @param {boolean} fullWidth // Whether the button should be full-width
+ */
+const AddToCart = ({
+  product,
+  variationId,
+  fullWidth = false,
+  buyNow = false,
+  quantity = 1,
+}: IProductRootObject) => {
+  const router = useRouter();
+  const { syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
+  const [requestError, setRequestError] = useState<boolean>(false);
+  const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const productId = product?.databaseId ? product?.databaseId : variationId;
+  const productQueryInput = {
+    clientMutationId: uuidv4(), // Generate a unique id.
+    productId,
+    quantity,
+  };
+  // Get cart data query
+  const { data, refetch } = useQuery(GET_CART, {
+    notifyOnNetworkStatusChange: true,
+  });
+  useEffect(() => {
+    if (data) {
+      const updatedCart = getFormattedCart(data);
+      if (updatedCart) {
+        syncWithWooCommerce(updatedCart);
+      }
+    }
+  }, [data, syncWithWooCommerce]);
+  // Add to cart mutation
+  const [addToCart, { loading: addToCartLoading, data: addToCartData, error: addToCartError }] = useMutation(ADD_TO_CART, {
+    variables: {
+      input: productQueryInput,
+    },
+    // Refetch all GET_CART queries to update cart across all components
+    refetchQueries: [{ query: GET_CART }],
+    awaitRefetchQueries: true,
+  });
+  useEffect(() => {
+    if (addToCartData) {
+      // Update the cart with new values in React context.
+      setIsSuccess(true);
+      const timer = setTimeout(() => setIsSuccess(false), 2000);
+      if (buyNow) {
+        router.push('/checkout');
+      }
+      return () => clearTimeout(timer);
+    }
+  }, [addToCartData, buyNow, router]);
+  useEffect(() => {
+    if (addToCartError) {
+      console.log('Add to cart error:', addToCartError);
+      setRequestError(true);
+    }
+  }, [addToCartError]);
+  const handleAddToCart = () => {
+    addToCart();
+  };
+  return (
+    <>
+      <Button
+        handleButtonClick={() => handleAddToCart()}
+        buttonDisabled={addToCartLoading || requestError || isCartLoading || isSuccess}
+        fullWidth={fullWidth}
+        className={
+          isSuccess
+            ? 'bg-green-600 hover:bg-green-700'
+            : buyNow
+              ? 'bg-orange-600 hover:bg-orange-700'
+              : ''
+        }
+      >
+        {isCartLoading ? 'Loading...' : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
+      </Button>
+    </>
+  );
+};
+export default AddToCart;
+````
+
+## File: deploy.sh
+````bash
+#!/bin/bash
+# Deployment Fix Script for Vultr/CloudPanel
+# Usage: ./deploy.sh
+echo ">>> Stopping all Node processes to clear ports..."
+pkill -f node
+pm2 delete all
+echo ">>> Pulling latest code..."
+git pull origin main
+echo ">>> Rebuilding project..."
+npm ci --include=dev
+npm run build
+echo ">>> Copying static assets to standalone folder..."
+mkdir -p .next/standalone/.next
+# Clean old assets to prevent nesting issues
+rm -rf .next/standalone/public
+rm -rf .next/standalone/.next/static
+# Copy public folder (images, favicon, etc)
+cp -r public .next/standalone/
+# Copy static assets (CSS, JS chunks)
+cp -r .next/static .next/standalone/.next/
+# Copy environment variables usually needed if not loaded by system
+cp .env.production .next/standalone/.env.production 2>/dev/null || cp .env .next/standalone/.env 2>/dev/null || echo "No .env file copied"
+echo ">>> Checking PM2 Config..."
+cat ecosystem.config.js
+echo ">>> Starting Server with PM2..."
+pm2 start ecosystem.config.js
+pm2 save
+echo ">>> Done! Server should be running on Port 3001."
+pm2 list
+````
+
 ## File: src/components/Checkout/CheckoutForm.component.tsx
 ````typescript
 /*eslint complexity: ["error", 20]*/
@@ -13227,6 +12869,7 @@ import Button from '../UI/Button.component';
 import { GET_CART, GET_PAYMENT_GATEWAYS, GET_ALLOWED_COUNTRIES } from '@/utils/gql/GQL_QUERIES';
 import { CHECKOUT_MUTATION, UPDATE_CUSTOMER, UPDATE_SHIPPING_METHOD } from '@/utils/gql/GQL_MUTATIONS';
 import { useCartStore } from '@/stores/cartStore';
+import { useLocationStore } from '@/stores/locationStore';
 // Utils
 import {
   getFormattedCart,
@@ -13408,46 +13051,16 @@ const CheckoutForm = () => {
     }
   };
   const availableShippingMethods = data?.cart?.availableShippingMethods?.[0]?.rates || [];
+  // Get Location from Store
+  const { selectedLocation } = useLocationStore();
   return (
     <>
       {cart && !orderCompleted ? (
         <div className="w-full px-0 lg:px-2 py-1">
+          {/* ... (rest of the layout) */}
           <div className="flex flex-col-reverse lg:flex-row gap-2">
-            {/* Left Column: Flow */}
             <div className="flex-grow lg:w-2/3">
-              {/* Steps Indicator - Ultra Compact */}
-              <div className="flex items-center justify-between mb-2">
-                {['Address', 'Shipping', 'Payment'].map((label, index) => {
-                  const stepNum = index + 1;
-                  const isActive = step >= stepNum;
-                  const isCurrent = step === stepNum;
-                  return (
-                    <div key={stepNum} className="flex items-center">
-                      <div className={`
-                                        flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold mr-1
-                                        ${isCurrent ? 'bg-blue-600 text-white' : isActive ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}
-                                    `}>
-                        {isActive && !isCurrent ? (
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : stepNum}
-                      </div>
-                      <span className={`text-xs font-medium ${isCurrent ? 'text-gray-900' : 'text-gray-500'}`}>
-                        {label}
-                      </span>
-                      {index < 2 && <div className="mx-1 h-[1px] w-4 bg-gray-200 hidden sm:block"></div>}
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Error display */}
-              {requestError && (
-                <div className="mb-2 p-2 bg-red-50 border border-red-200 text-red-600 rounded-sm text-xs">
-                  <span className="font-bold mr-1">Error:</span>
-                  <span>{requestError.message}</span>
-                </div>
-              )}
+              {/* ... (Steps Indicator and Error Display) */}
               {/* Step 1: Address */}
               {step === 1 && (
                 <div className="bg-white rounded border border-gray-200 p-2 animate-fade-in text-[#2c3338]">
@@ -13456,6 +13069,7 @@ const CheckoutForm = () => {
                     handleFormSubmit={handleAddressSubmit}
                     isLoading={isUpdatingCustomer}
                     buttonLabel="Next: Shipping"
+                    initialCity={selectedLocation?.name}
                   />
                 </div>
               )}
@@ -13637,35 +13251,760 @@ const CheckoutForm = () => {
 export default CheckoutForm;
 ````
 
-## File: deploy.sh
-````bash
-#!/bin/bash
-# Deployment Fix Script for Vultr/CloudPanel
-# Usage: ./deploy.sh
-echo ">>> Stopping all Node processes to clear ports..."
-pkill -f node
-pm2 delete all
-echo ">>> Pulling latest code..."
-git pull origin main
-echo ">>> Rebuilding project..."
-npm ci --include=dev
-npm run build
-echo ">>> Copying static assets to standalone folder..."
-mkdir -p .next/standalone/.next
-# Clean old assets to prevent nesting issues
-rm -rf .next/standalone/public
-rm -rf .next/standalone/.next/static
-# Copy public folder (images, favicon, etc)
-cp -r public .next/standalone/
-# Copy static assets (CSS, JS chunks)
-cp -r .next/static .next/standalone/.next/
-# Copy environment variables usually needed if not loaded by system
-cp .env.production .next/standalone/.env.production 2>/dev/null || cp .env .next/standalone/.env 2>/dev/null || echo "No .env file copied"
-echo ">>> Checking PM2 Config..."
-cat ecosystem.config.js
-echo ">>> Starting Server with PM2..."
-pm2 start ecosystem.config.js
-pm2 save
-echo ">>> Done! Server should be running on Port 3001."
-pm2 list
+## File: src/components/Product/ProductActions.component.tsx
+````typescript
+import { useState, useEffect } from 'react';
+interface ProductActionsProps {
+    productName: string;
+    productUrl: string; // Should be full URL if possible, or relative
+    productId: number;
+}
+const ProductActions = ({ productName, productUrl, productId }: ProductActionsProps) => {
+    const [isWishlisted, setIsWishlisted] = useState(false);
+    const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    useEffect(() => {
+        // Check local storage for wishlist status
+        try {
+            const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+            if (wishlist.includes(productId)) {
+                setIsWishlisted(true);
+            }
+        } catch (e) {
+            console.error("Error reading wishlist", e);
+        }
+    }, [productId]);
+    const handleWishlistToggle = () => {
+        try {
+            const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+            let newWishlist;
+            if (wishlist.includes(productId)) {
+                newWishlist = wishlist.filter((id: number) => id !== productId);
+                setIsWishlisted(false);
+            } else {
+                newWishlist = [...wishlist, productId];
+                setIsWishlisted(true);
+            }
+            localStorage.setItem('wishlist', JSON.stringify(newWishlist));
+            // Dispatch a custom event so other components can react if needed
+            window.dispatchEvent(new Event('wishlist-updated'));
+        } catch (e) {
+            console.error("Error updating wishlist", e);
+        }
+    };
+    const handleShare = async () => {
+        const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl;
+        // Try native share first if available
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: productName,
+                    text: `Check out ${productName} on Shopwice!`,
+                    url: fullUrl,
+                });
+                return;
+            } catch (error) {
+                console.log('Native share failed or cancelled, falling back to modal', error);
+            }
+        }
+        // Open custom modal if native share not available or failed
+        setIsShareModalOpen(true);
+    };
+    const copyToClipboard = async () => {
+        const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl;
+        try {
+            await navigator.clipboard.writeText(fullUrl);
+            setShareFeedback('Copied!');
+            setTimeout(() => setShareFeedback(null), 2000);
+        } catch (err) {
+            // Fallback for older browsers
+            const textArea = document.createElement("textarea");
+            textArea.value = fullUrl;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                setShareFeedback('Copied!');
+                setTimeout(() => setShareFeedback(null), 2000);
+            } catch (err) {
+                setShareFeedback('Failed');
+                setTimeout(() => setShareFeedback(null), 2000);
+            }
+            document.body.removeChild(textArea);
+        }
+    };
+    const shareLinks = [
+        {
+            name: 'WhatsApp',
+            getUrl: (url: string, text: string) => `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`
+        },
+        {
+            name: 'Facebook',
+            getUrl: (url: string, text: string) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
+        },
+        {
+            name: 'Twitter',
+            getUrl: (url: string, text: string) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
+        },
+        {
+            name: 'Gmail',
+            getUrl: (url: string, text: string) => `mailto:?subject=${encodeURIComponent(text)}&body=${encodeURIComponent(url)}`
+        }
+    ];
+    return (
+        <>
+            <div className="flex flex-col gap-3">
+                {/* Share Button */}
+                <button
+                    onClick={handleShare}
+                    className="flex flex-col items-center justify-center w-10 h-10 bg-white rounded-full shadow-md hover:bg-gray-50 text-gray-700 transition-all active:scale-95 group relative border border-gray-100 z-30 cursor-pointer"
+                    aria-label="Share this product"
+                    title="Share"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+                    </svg>
+                    {shareFeedback && !isShareModalOpen && (
+                        <div className="absolute right-12 top-1 bg-black text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap animate-fade-in z-10 font-bold">
+                            {shareFeedback}
+                        </div>
+                    )}
+                </button>
+                {/* Wishlist Button */}
+                <button
+                    onClick={handleWishlistToggle}
+                    className="flex flex-col items-center justify-center w-10 h-10 bg-white rounded-full shadow-md hover:bg-gray-50 transition-all active:scale-95 border border-gray-100 z-30 cursor-pointer"
+                    aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                    title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill={isWishlisted ? "#ef4444" : "none"}
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke={isWishlisted ? "#ef4444" : "currentColor"}
+                        className={`w-5 h-5 transition-colors ${isWishlisted ? 'text-red-500' : 'text-gray-700'}`}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                    </svg>
+                </button>
+            </div>
+            {/* Share Modal - Refined Minimal Design */}
+            {isShareModalOpen && (
+                <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm" onClick={() => setIsShareModalOpen(false)}>
+                    <div className="bg-white rounded-xl w-full max-w-[280px] shadow-2xl overflow-hidden animate-scale-up" onClick={e => e.stopPropagation()}>
+                        <div className="p-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <h3 className="text-sm font-bold text-gray-900">Share via</h3>
+                            <button onClick={() => setIsShareModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors bg-white rounded-full p-1 shadow-sm border border-gray-100">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div className="py-1">
+                            {shareLinks.map((link) => (
+                                <a
+                                    key={link.name}
+                                    href={link.getUrl(typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl, `Check out ${productName} on Shopwice!`)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-sm text-gray-700 font-medium group"
+                                >
+                                    <span className="group-hover:text-gray-900">{link.name}</span>
+                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                </a>
+                            ))}
+                            {/* Copy Link Option */}
+                            <button
+                                onClick={copyToClipboard}
+                                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-sm text-gray-700 font-medium border-t border-gray-100 group"
+                            >
+                                <span className="group-hover:text-gray-900">Copy Link</span>
+                                {shareFeedback === 'Copied!' ? (
+                                    <span className="text-green-600 text-xs font-bold bg-green-50 px-2 py-0.5 rounded border border-green-100">Copied!</span>
+                                ) : (
+                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+export default ProductActions;
+````
+
+## File: src/components/Product/SingleProduct.component.tsx
+````typescript
+// Imports
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
+// Utils
+import { filteredVariantPrice, paddedPrice } from '@/utils/functions/functions';
+// Components
+import AddToCart, { IProductRootObject } from './AddToCart.component';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
+import Breadcrumbs from '@/components/UI/Breadcrumbs.component';
+import StarRating from '@/components/UI/StarRating.component';
+import ProductGallery from './ProductGallery.component';
+import ProductCard from './ProductCard.component';
+import Accordion from '../UI/Accordion.component';
+import DOMPurify from 'isomorphic-dompurify';
+import DeliveryInfo from './DeliveryInfo.component';
+import PaymentInfo from './PaymentInfo.component';
+import ProductLocationDisplay from './ProductLocationDisplay.component';
+import ProductActions from './ProductActions.component';
+// Dynamic Imports for Performance
+const ProductReviews = dynamic(() => import('./ProductReviews.component'), {
+  loading: () => <p className="p-4 text-center text-gray-500">Loading reviews...</p>
+});
+const ComparePriceModal = dynamic(() => import('./ComparePriceModal.component'), { ssr: false });
+const WhatIsRefurbishedModal = dynamic(() => import('./WhatIsRefurbishedModal.component'), { ssr: false });
+import QuantityControl from '@/components/Cart/QuantityControl.component';
+const SingleProduct = ({ product }: IProductRootObject) => {
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [selectedVariation, setSelectedVariation] = useState<number>();
+  const [quantity, setQuantity] = useState<number>(1);
+  const [isShortDescriptionExpanded, setIsShortDescriptionExpanded] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [showWhatIsRefurbishedModal, setShowWhatIsRefurbishedModal] = useState(false);
+  const reviewsRef = useRef<HTMLDivElement>(null);
+  const placeholderFallBack = 'https://via.placeholder.com/600';
+  useEffect(() => {
+    setIsLoading(false);
+    if (product.variations && product.variations.nodes && product.variations.nodes.length > 0) {
+      const firstVariant = product.variations.nodes[0].databaseId;
+      setSelectedVariation(firstVariant);
+    }
+  }, [product.variations]);
+  let { description, shortDescription, image, name, onSale, price, regularPrice, salePrice, productCategories, productBrand, averageRating, reviewCount, galleryImages, reviews, attributes, sku, stockStatus, stockQuantity, totalSales } =
+    product;
+  useEffect(() => {
+    console.log('Product Data:', product);
+    console.log('Related:', product.related);
+    console.log('Upsell:', product.upsell);
+    console.log('CrossSell:', product.crossSell);
+  }, [product]);
+  // Add padding/empty character after currency symbol here
+  if (price) {
+    price = paddedPrice(price, 'GH₵');
+  }
+  if (regularPrice) {
+    regularPrice = paddedPrice(regularPrice, 'GH₵');
+  }
+  if (salePrice) {
+    salePrice = paddedPrice(salePrice, 'GH₵');
+  }
+  // Check if product is in "Mobile Phones" category
+  const isMobilePhone = productCategories?.nodes?.some(
+    (cat) => cat.name.toLowerCase() === 'mobile phones' || cat.slug === 'mobile-phones'
+  );
+  // Check if product has ANY attribute with an option containing "Refurbish"
+  const isRefurbished = attributes?.nodes?.some(
+    (attr) => attr.options?.some((opt) => opt.toLowerCase().includes('refurbish'))
+  );
+  const showRefurbishedBadge = isMobilePhone && isRefurbished;
+  const showWarrantyBadge = isMobilePhone && isRefurbished;
+  const scrollToReviews = () => {
+    reviewsRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  const getStockStatusColor = (status: string | undefined, quantity: number) => {
+    if (status === 'OUT_OF_STOCK') return 'text-red-600 bg-red-50 border-red-100';
+    if (status === 'ON_BACKORDER') return 'text-orange-600 bg-orange-50 border-orange-100';
+    return 'text-green-700 bg-green-50 border-green-100';
+  };
+  const selectedVariationNode = product.variations?.nodes.find(
+    (node) => node.databaseId === selectedVariation,
+  );
+  const currentStockQuantity = selectedVariationNode
+    ? selectedVariationNode.stockQuantity
+    : stockQuantity;
+  const currentStockStatus = selectedVariationNode
+    ? selectedVariationNode.stockStatus
+    : stockStatus;
+  const currentSku = selectedVariationNode && selectedVariationNode.sku
+    ? selectedVariationNode.sku
+    : sku;
+  const currentFormattedStockStatus = currentStockStatus?.replace(/_/g, ' ').toLowerCase();
+  return (
+    <section className="bg-white mb-[8rem] md:mb-12">
+      {isLoading ? (
+        <div className="h-56 mt-20">
+          <p className="text-xl font-bold text-center">Loading product...</p>
+          <br />
+          <LoadingSpinner />
+        </div>
+      ) : (
+        <div className="w-full md:container md:mx-auto md:px-4 py-0 md:py-2 max-w-3xl md:max-w-5xl lg:max-w-6xl">
+          {/* Top Row: Breadcrumbs & Header Info */}
+          <div className="px-4 md:px-0">
+            <Breadcrumbs categories={productCategories} productName={name} />
+            {/* Second Row: Ratings & Brand */}
+            <div className="flex justify-between items-center mb-1">
+              <div
+                className="flex items-center gap-2 cursor-pointer hover:opacity-75 transition-opacity"
+                onClick={scrollToReviews}
+              >
+                <StarRating rating={averageRating || 0} size={16} />
+                <span className="text-sm text-gray-500 font-medium">
+                  {reviewCount || 0} Reviews
+                </span>
+              </div>
+              {productBrand?.nodes?.[0] && (
+                <Link href={`/brand/${productBrand.nodes[0].slug}`} className="text-sm font-semibold text-blue-600 hover:underline hover:text-blue-800 transition-colors uppercase tracking-wide">
+                  {productBrand.nodes[0].name}
+                </Link>
+              )}
+            </div>
+            {/* Third Row: Product Title */}
+            <h1 className="text-[19px] font-medium text-gray-900 leading-tight">
+              {name}
+            </h1>
+            {showRefurbishedBadge && (
+              <div className="flex items-center gap-2 mb-3 mt-1">
+                <p className="text-sm text-green-700 font-medium whitespace-nowrap">Refurbished - Excellent Condition</p>
+              </div>
+            )}
+          </div>
+          {/* Fourth Row: Gallery */}
+          <div className="mb-4 relative group">
+            <ProductGallery mainImage={image} galleryImages={galleryImages} />
+            <div className="absolute bottom-4 right-4 z-[20]">
+              <ProductActions productName={name} productUrl={`/product/${product.slug}`} productId={product.databaseId} />
+            </div>
+          </div>
+          {/* Fifth Row: Action Cards Section */}
+          <div className="bg-gray-50 rounded-none md:rounded-xl p-4 mb-4 border-y md:border border-gray-100 shadow-sm mx-0">
+            <div className="flex flex-col gap-3">
+              {/* Price and Stock */}
+              <div className="flex justify-between items-start">
+                <div>
+                  {onSale ? (
+                    <div className="flex flex-col items-start gap-1">
+                      <div className="flex flex-row items-end gap-4">
+                        <div className="flex flex-col">
+                          {isRefurbished && (
+                            <span className="text-[10px] uppercase font-extrabold text-blue-700 mb-0.5">Refurbished Price</span>
+                          )}
+                          <p className="text-2xl font-bold text-gray-900 leading-none">
+                            {product.variations
+                              ? filteredVariantPrice(price, '')
+                              : salePrice}
+                          </p>
+                        </div>
+                        <div className="flex flex-col">
+                          {isRefurbished && (
+                            <span className="text-[10px] uppercase font-extrabold text-gray-400 mb-0.5">Brand New Price</span>
+                          )}
+                          <p className="text-lg text-gray-500 line-through leading-none">
+                            {product.variations
+                              ? filteredVariantPrice(price, 'right')
+                              : regularPrice}
+                          </p>
+                        </div>
+                      </div>
+                      {(() => {
+                        const currentSale = product.variations ? filteredVariantPrice(price, '') : salePrice;
+                        const currentReg = product.variations ? filteredVariantPrice(price, 'right') : regularPrice;
+                        if (currentSale && currentReg) {
+                          const saleVal = parseFloat(currentSale.replace(/[^0-9.]/g, ''));
+                          const regVal = parseFloat(currentReg.replace(/[^0-9.]/g, ''));
+                          if (!isNaN(saleVal) && !isNaN(regVal) && regVal > saleVal) {
+                            const savings = regVal - saleVal;
+                            const savingsFormatted = savings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            return (
+                              <p className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-md inline-block mt-1">
+                                You Save: GH₵{savingsFormatted}
+                              </p>
+                            );
+                          }
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  ) : (
+                    <p className="text-2xl font-bold text-gray-900">{price}</p>
+                  )}
+                  {isRefurbished && (
+                    <div className="mt-4 flex flex-col gap-2">
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span className="font-medium">6 months warranty included</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span className="font-medium">100% performance. Battery is always 100</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span className="font-medium">Fresh in Box</span>
+                      </div>
+                    </div>
+                  )}
+                  {isRefurbished && (
+                    <div className="mt-4 pt-3 border-t border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                          </svg>
+                          What's in the Box
+                        </h4>
+                        <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                          Fresh in Box
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {[
+                          { name: 'Device', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
+                          { name: 'User Manual', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+                          { name: 'Charging Cable', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+                          { name: 'SIM Ejector', icon: 'M15 7a2 2 0 012 2m-2 4a2 2 0 012 2m-8-3a2 2 0 012-2m-2 4a2 2 0 012 2' }
+                        ].map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-[12px] text-gray-600 font-medium bg-gray-50/50 p-1 rounded-lg border border-gray-100/50">
+                            <div className="p-1 bg-white rounded shadow-sm shrink-0 border border-gray-100">
+                              <svg className="w-3 h-3 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon}></path>
+                              </svg>
+                            </div>
+                            {item.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Stock Status Badge */}
+                  <div className="mt-2 flex flex-col gap-2">
+                    {(() => {
+                      const showEmergencyStock = isRefurbished && currentStockQuantity !== undefined && currentStockQuantity !== null && currentStockQuantity > 0 && currentStockQuantity < 5;
+                      return (
+                        <>
+                          <div className="flex items-center gap-3">
+                            {!showEmergencyStock && (
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStockStatusColor(currentStockStatus, currentStockQuantity || 0)} capitalized`}
+                              >
+                                {currentStockQuantity ? `${currentStockQuantity} in stock` : (currentFormattedStockStatus || 'In Stock')}
+                              </span>
+                            )}
+                            {currentSku && (
+                              <span className="text-xs text-gray-500 font-mono">
+                                SKU: {currentSku}
+                              </span>
+                            )}
+                            {/* Units Sold Display */}
+                            {product.totalSales !== undefined && product.totalSales !== null && (
+                              <span className="text-xs text-gray-500 font-medium">
+                                {product.totalSales} Units Sold
+                              </span>
+                            )}
+                          </div>
+                          {/* Stock Warning - Only for Refurbished */}
+                          {showEmergencyStock && (
+                            <div className="text-red-600 text-xs font-bold animate-pulse">
+                              Only {currentStockQuantity} left in stock!
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    {showWarrantyBadge && (
+                      <div className="flex items-center gap-3 mt-1">
+                        <button
+                          onClick={() => setShowCompareModal(true)}
+                          className="text-xs text-blue-600 underline hover:text-blue-800 transition-colors"
+                        >
+                          Compare vs New
+                        </button>
+                        <div className="w-px h-3 bg-gray-300"></div>
+                        <button
+                          onClick={() => setShowWhatIsRefurbishedModal(true)}
+                          className="text-xs text-gray-500 underline hover:text-gray-700 transition-colors flex items-center gap-1"
+                        >
+                          What is refurbished?
+                        </button>
+                      </div>
+                    )}
+                    {/* Compare modal render */}
+                    {(() => {
+                      const currentSale = product.variations ? filteredVariantPrice(price, '') : salePrice;
+                      const currentReg = product.variations ? filteredVariantPrice(price, 'right') : regularPrice;
+                      const saleVal = parseFloat((currentSale || '').replace(/[^0-9.]/g, ''));
+                      const regVal = parseFloat((currentReg || '').replace(/[^0-9.]/g, ''));
+                      const savings = regVal - saleVal;
+                      const savingsFormatted = savings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                      return (
+                        <>
+                          <ComparePriceModal
+                            isOpen={showCompareModal}
+                            onClose={() => setShowCompareModal(false)}
+                            newPrice={currentReg || ''}
+                            refurbPrice={currentSale || ''}
+                            productName={name}
+                            savings={savingsFormatted}
+                          />
+                          <WhatIsRefurbishedModal
+                            isOpen={showWhatIsRefurbishedModal}
+                            onClose={() => setShowWhatIsRefurbishedModal(false)}
+                          />
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+                {/* Valuation / Rating Badge (Optional visual reinforcement) */}
+                {averageRating && averageRating > 4 && (
+                  <div className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+                    Top Rated
+                  </div>
+                )}
+              </div>
+              {/* Short Description with Read More */}
+              {shortDescription && (
+                <div className="mb-4">
+                  <div
+                    className={`text-gray-600 text-xs leading-relaxed ${!isShortDescriptionExpanded ? 'line-clamp-3' : ''}`}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(shortDescription) }}
+                  />
+                  <button
+                    onClick={() => setIsShortDescriptionExpanded(!isShortDescriptionExpanded)}
+                    className="text-blue-600 text-xs font-semibold mt-1 hover:underline flex items-center gap-1 focus:outline-none"
+                  >
+                    {isShortDescriptionExpanded ? 'Read Less' : 'Read More'}
+                    <svg className={`w-3 h-3 transform transition-transform ${isShortDescriptionExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </button>
+                </div>
+              )}
+              <style jsx>{`
+                .no-scrollbar::-webkit-scrollbar {
+                  display: none;
+                }
+                .no-scrollbar {
+                  -ms-overflow-style: none;
+                  scrollbar-width: none;
+                }
+              `}</style>
+              {/* Variations & Add to Cart */}
+              <div className="pt-1">
+                <DeliveryInfo />
+                <PaymentInfo />
+                <ProductLocationDisplay />
+                {/* ProductActions moved to Image Gallery Overlay */}
+                {product.variations && (
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-2 text-gray-700">
+                      Select Option
+                    </label>
+                    <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar scroll-smooth">
+                      {product.variations.nodes.map(
+                        ({ id, name, databaseId, stockQuantity, stockStatus }) => {
+                          const isOutOfStock = stockStatus === 'OUT_OF_STOCK' || (stockQuantity !== null && stockQuantity === 0);
+                          const isSelected = selectedVariation === databaseId;
+                          const variantName = name.split('- ').pop();
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => !isOutOfStock && setSelectedVariation(databaseId)}
+                              disabled={isOutOfStock}
+                              className={`
+                                flex-shrink-0 min-w-fit px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                                ${isSelected && !isOutOfStock
+                                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                  : isOutOfStock
+                                    ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
+                                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                                }
+                              `}
+                            >
+                              <div className={isOutOfStock ? 'line-through' : ''}>
+                                {variantName}
+                              </div>
+                              <div className="text-[10px] mt-0.5 font-normal">
+                                {isOutOfStock
+                                  ? 'Out of Stock'
+                                  : stockQuantity !== null
+                                    ? `${stockQuantity} in stock`
+                                    : 'In Stock'
+                                }
+                              </div>
+                            </button>
+                          );
+                        }
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-col gap-3 mb-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-gray-700">Quantity</label>
+                    <div className="w-32">
+                      <QuantityControl
+                        quantity={quantity}
+                        onIncrease={() => setQuantity(prev => prev + 1)}
+                        onDecrease={() => setQuantity(prev => Math.max(1, prev - 1))}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {product.variations ? (
+                    <>
+                      <AddToCart
+                        product={product}
+                        variationId={selectedVariation}
+                        fullWidth={true}
+                        quantity={quantity}
+                      />
+                      <AddToCart
+                        product={product}
+                        variationId={selectedVariation}
+                        fullWidth={true}
+                        buyNow={true}
+                        quantity={quantity}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <AddToCart product={product} fullWidth={true} quantity={quantity} />
+                      <AddToCart product={product} fullWidth={true} buyNow={true} quantity={quantity} />
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Product Information Accordions */}
+          <div className="mb-6 px-4 md:px-0">
+            {/* Full Description */}
+            {description && (
+              <Accordion title="Product Details" defaultOpen={false}>
+                <div className="prose prose-sm max-w-none text-gray-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: description }} />
+              </Accordion>
+            )}
+            {/* Specifications */}
+            {attributes && attributes.nodes && attributes.nodes.length > 0 && (
+              <Accordion title="Specifications">
+                <div className="bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <tbody className="divide-y divide-gray-200">
+                      {attributes.nodes.map((attr: { name: string; options: string[] }, index: number) => (
+                        <tr key={index} className="bg-white">
+                          <td className="px-4 py-2 text-sm font-medium text-gray-900 w-1/3 bg-gray-50">
+                            {attr.name}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-500">
+                            {attr.options ? attr.options.join(', ') : ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Accordion>
+            )}
+            {/* Reviews */}
+            <div ref={reviewsRef} className="scroll-mt-24">
+              <Accordion title={`Reviews (${reviewCount || 0})`}>
+                <ProductReviews reviews={reviews?.nodes || []} />
+              </Accordion>
+            </div>
+            {/* Categories & Meta */}
+            {((productCategories?.nodes && productCategories.nodes.length > 0) || sku) && (
+              <Accordion title="More Information">
+                <div className="flex flex-col gap-2">
+                  {sku && (
+                    <p><span className="font-semibold text-gray-900">SKU:</span> {sku}</p>
+                  )}
+                  {productCategories?.nodes && productCategories.nodes.length > 0 && (
+                    <p>
+                      <span className="font-semibold text-gray-900">Categories: </span>
+                      {productCategories.nodes.map((cat, index) => (
+                        <span key={cat.slug}>
+                          {index > 0 && ', '}
+                          <Link href={`/product-category/${cat.slug}`} className="text-blue-600 hover:underline">
+                            {cat.name}
+                          </Link>
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                </div>
+              </Accordion>
+            )}
+            {/* Short Description relocated under accordions */}
+          </div>
+          {/* Related Products */}
+          {product.related?.nodes && product.related.nodes.length > 0 && (
+            <div className="mb-6 border-t border-gray-100 pt-6">
+              <h3 className="text-xl font-bold mb-4 text-gray-900 px-4 md:px-0">Related Products</h3>
+              <div className="flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar px-4 md:px-0">
+                {product.related.nodes.map((relatedProduct) => (
+                  <div key={relatedProduct.id} className="min-w-[160px] md:min-w-[220px] snap-start">
+                    <ProductCard
+                      {...relatedProduct}
+                      stockQuantity={relatedProduct.stockQuantity}
+                      reviewCount={relatedProduct.reviewCount}
+                      productCategories={relatedProduct.productCategories}
+                      attributes={relatedProduct.attributes}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Upsell Products */}
+          {product.upsell?.nodes && product.upsell.nodes.length > 0 && (
+            <div className="mb-6 border-t border-gray-100 pt-6">
+              <h3 className="text-xl font-bold mb-4 text-gray-900 px-4 md:px-0">You May Also Like</h3>
+              <div className="flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar px-4 md:px-0">
+                {product.upsell.nodes.map((upsellProduct) => (
+                  <div key={upsellProduct.id} className="min-w-[160px] md:min-w-[220px] snap-start">
+                    <ProductCard
+                      {...upsellProduct}
+                      stockQuantity={upsellProduct.stockQuantity}
+                      reviewCount={upsellProduct.reviewCount}
+                      productCategories={upsellProduct.productCategories}
+                      attributes={upsellProduct.attributes}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Cross-Sell Products */}
+          {product.crossSell?.nodes && product.crossSell.nodes.length > 0 && (
+            <div className="mb-6 border-t border-gray-100 pt-6">
+              <h3 className="text-xl font-bold mb-4 text-gray-900 px-4 md:px-0">Mostly Bought Together</h3>
+              <div className="flex gap-4 overflow-x-auto pb-2 snap-x hide-scrollbar px-4 md:px-0">
+                {product.crossSell.nodes.map((crossSellProduct) => (
+                  <div key={crossSellProduct.id} className="min-w-[160px] md:min-w-[220px] snap-start">
+                    <ProductCard
+                      {...crossSellProduct}
+                      stockQuantity={crossSellProduct.stockQuantity}
+                      reviewCount={crossSellProduct.reviewCount}
+                      productCategories={crossSellProduct.productCategories}
+                      attributes={crossSellProduct.attributes}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )
+      }
+    </section >
+  );
+};
+export default SingleProduct;
 ````
