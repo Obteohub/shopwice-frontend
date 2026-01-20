@@ -15,8 +15,11 @@ npm ci
 npm run build
 
 echo ">>> Copying static assets to standalone folder..."
-# Create necessary directories if they don't exist (though build usually creates them structure)
 mkdir -p .next/standalone/.next
+
+# Clean old assets to prevent nesting issues
+rm -rf .next/standalone/public
+rm -rf .next/standalone/.next/static
 
 # Copy public folder (images, favicon, etc)
 cp -r public .next/standalone/
