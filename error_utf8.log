@@ -1,0 +1,28 @@
+﻿src/components/Product/SingleProduct.component.tsx(44,7): error TS2552: Cannot find name 'setSelectedVariation'. Did you mean 'selectedVariationNode'?
+src/components/Product/SingleProduct.component.tsx(85,5): error TS2552: Cannot find name 'reviewsRef'. Did you mean 'reviews'?
+src/components/Product/SingleProduct.component.tsx(95,35): error TS2552: Cannot find name 'selectedVariation'. Did you mean 'selectedVariationNode'?
+src/components/Product/SingleProduct.component.tsx(316,40): error TS2304: Cannot find name 'setShowCompareModal'.
+src/components/Product/SingleProduct.component.tsx(323,40): error TS2304: Cannot find name 'setShowWhatIsRefurbishedModal'.
+src/components/Product/SingleProduct.component.tsx(343,35): error TS2304: Cannot find name 'showCompareModal'.
+src/components/Product/SingleProduct.component.tsx(344,42): error TS2304: Cannot find name 'setShowCompareModal'.
+src/components/Product/SingleProduct.component.tsx(351,35): error TS2304: Cannot find name 'showWhatIsRefurbishedModal'.
+src/components/Product/SingleProduct.component.tsx(352,42): error TS2304: Cannot find name 'setShowWhatIsRefurbishedModal'.
+src/components/Product/SingleProduct.component.tsx(374,72): error TS2304: Cannot find name 'isShortDescriptionExpanded'.
+src/components/Product/SingleProduct.component.tsx(378,34): error TS2304: Cannot find name 'setIsShortDescriptionExpanded'.
+src/components/Product/SingleProduct.component.tsx(378,65): error TS2304: Cannot find name 'isShortDescriptionExpanded'.
+src/components/Product/SingleProduct.component.tsx(381,20): error TS2304: Cannot find name 'isShortDescriptionExpanded'.
+src/components/Product/SingleProduct.component.tsx(382,77): error TS2304: Cannot find name 'isShortDescriptionExpanded'.
+src/components/Product/SingleProduct.component.tsx(415,44): error TS2304: Cannot find name 'selectedVariation'.
+src/components/Product/SingleProduct.component.tsx(422,61): error TS2304: Cannot find name 'setSelectedVariation'.
+src/components/Product/SingleProduct.component.tsx(457,33): error TS2304: Cannot find name 'quantity'.
+src/components/Product/SingleProduct.component.tsx(458,41): error TS2304: Cannot find name 'setQuantity'.
+src/components/Product/SingleProduct.component.tsx(458,53): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/components/Product/SingleProduct.component.tsx(459,41): error TS2304: Cannot find name 'setQuantity'.
+src/components/Product/SingleProduct.component.tsx(459,53): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/components/Product/SingleProduct.component.tsx(470,36): error TS2552: Cannot find name 'selectedVariation'. Did you mean 'selectedVariationNode'?
+src/components/Product/SingleProduct.component.tsx(472,33): error TS2304: Cannot find name 'quantity'.
+src/components/Product/SingleProduct.component.tsx(476,36): error TS2304: Cannot find name 'selectedVariation'.
+src/components/Product/SingleProduct.component.tsx(479,33): error TS2304: Cannot find name 'quantity'.
+src/components/Product/SingleProduct.component.tsx(484,77): error TS2304: Cannot find name 'quantity'.
+src/components/Product/SingleProduct.component.tsx(485,91): error TS2304: Cannot find name 'quantity'.
+src/components/Product/SingleProduct.component.tsx(526,21): error TS2552: Cannot find name 'reviewsRef'. Did you mean 'reviews'?
