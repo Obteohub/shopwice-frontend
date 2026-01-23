@@ -5321,75 +5321,6 @@ export const getServerSideProps: GetServerSideProps = async ({
 };
 ````
 
-## File: src/pages/product-category/[slug].tsx
-````typescript
-import React from 'react';
-import { GetServerSideProps } from 'next';
-import Layout from '@/components/Layout/Layout.component';
-import ProductList from '@/components/Product/ProductList.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
-interface CategoryPageProps {
-    category: any;
-    products: any[];
-    pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string | null;
-    };
-    slug: string;
-}
-import BackButton from '@/components/UI/BackButton.component';
-const CategoryPage = ({ category, products, pageInfo, slug }: CategoryPageProps) => {
-    return (
-        <Layout title={category?.name || 'Category'} fullWidth={true}>
-            <div className="px-2 md:px-4 pt-1 pb-1">
-                <BackButton />
-                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
-                    {category?.name?.toLowerCase()}
-                </h1>
-                {category?.description && (
-                    <div
-                        className="mb-10 text-gray-500 max-w-3xl"
-                        dangerouslySetInnerHTML={{ __html: category.description }}
-                    />
-                )}
-                <ProductList
-                    products={products}
-                    title={category?.name}
-                    pageInfo={pageInfo}
-                    slug={slug}
-                    query={GET_CATEGORY_DATA_BY_SLUG}
-                    queryVariables={{ slug, id: slug }}
-                />
-            </div>
-        </Layout>
-    );
-};
-export default CategoryPage;
-export const getServerSideProps: GetServerSideProps = async ({ params }) => {
-    const slug = params?.slug as string;
-    try {
-        const { data } = await client.query({
-            query: GET_CATEGORY_DATA_BY_SLUG,
-            variables: { slug, id: slug },
-        });
-        return {
-            props: {
-                category: data.productCategory,
-                products: data.products.nodes,
-                pageInfo: data.products.pageInfo,
-                slug,
-            },
-        };
-    } catch (error) {
-        console.error('Error fetching category data:', error);
-        return {
-            notFound: true,
-        };
-    }
-};
-````
-
 ## File: src/pages/cart.tsx
 ````typescript
 // Components
@@ -8357,22 +8288,6 @@ module.exports = {
 </body></html>
 ````
 
-## File: public/sitemap-0.xml
-````xml
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
-<url><loc>https://shopwice.com</loc><lastmod>2026-01-23T14:29:34.145Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://shopwice.com/categories</loc><lastmod>2026-01-23T14:29:34.146Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://shopwice.com/forgot-password</loc><lastmod>2026-01-23T14:29:34.146Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://shopwice.com/login</loc><lastmod>2026-01-23T14:29:34.146Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://shopwice.com/products</loc><lastmod>2026-01-23T14:29:34.146Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://shopwice.com/refurbished-policy</loc><lastmod>2026-01-23T14:29:34.146Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://shopwice.com/register</loc><lastmod>2026-01-23T14:29:34.146Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://shopwice.com/reset-password</loc><lastmod>2026-01-23T14:29:34.146Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-<url><loc>https://shopwice.com/search</loc><lastmod>2026-01-23T14:29:34.146Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
-</urlset>
-````
-
 ## File: src/components/Cart/CartInitializer.component.tsx
 ````typescript
 import { useEffect } from 'react';
@@ -10381,6 +10296,85 @@ export const getStaticProps: GetStaticProps = async ({
 };
 ````
 
+## File: src/pages/product-category/[slug].tsx
+````typescript
+import React from 'react';
+import { GetStaticProps, GetStaticPaths } from 'next';
+import Layout from '@/components/Layout/Layout.component';
+import ProductList from '@/components/Product/ProductList.component';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
+interface CategoryPageProps {
+    category: any;
+    products: any[];
+    pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string | null;
+    };
+    slug: string;
+}
+import BackButton from '@/components/UI/BackButton.component';
+const CategoryPage = ({ category, products, pageInfo, slug }: CategoryPageProps) => {
+    return (
+        <Layout title={category?.name || 'Category'} fullWidth={true}>
+            <div className="px-2 md:px-4 pt-1 pb-1">
+                <BackButton />
+                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
+                    {category?.name?.toLowerCase()}
+                </h1>
+                {category?.description && (
+                    <div
+                        className="mb-10 text-gray-500 max-w-3xl"
+                        dangerouslySetInnerHTML={{ __html: category.description }}
+                    />
+                )}
+                <ProductList
+                    products={products}
+                    title={category?.name}
+                    pageInfo={pageInfo}
+                    slug={slug}
+                    query={GET_CATEGORY_DATA_BY_SLUG}
+                    queryVariables={{ slug, id: slug }}
+                />
+            </div>
+        </Layout>
+    );
+};
+export default CategoryPage;
+export const getStaticPaths: GetStaticPaths = async () => {
+    return {
+        paths: [],
+        fallback: 'blocking',
+    };
+};
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+    const slug = params?.slug as string;
+    try {
+        const { data } = await client.query({
+            query: GET_CATEGORY_DATA_BY_SLUG,
+            variables: { slug, id: slug },
+        });
+        if (!data?.productCategory) {
+            return { notFound: true };
+        }
+        return {
+            props: {
+                category: data.productCategory,
+                products: data.products.nodes,
+                pageInfo: data.products.pageInfo,
+                slug,
+            },
+            revalidate: 60,
+        };
+    } catch (error) {
+        console.error('Error fetching category data:', error);
+        return {
+            notFound: true,
+        };
+    }
+};
+````
+
 ## File: src/pages/_document.tsx
 ````typescript
 import { Html, Head, Main, NextScript } from 'next/document';
@@ -10941,6 +10935,22 @@ module.exports = {
     "node_modules"
   ]
 }
+````
+
+## File: public/sitemap-0.xml
+````xml
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+<url><loc>https://shopwice.com</loc><lastmod>2026-01-23T14:56:32.256Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://shopwice.com/categories</loc><lastmod>2026-01-23T14:56:32.258Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://shopwice.com/forgot-password</loc><lastmod>2026-01-23T14:56:32.258Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://shopwice.com/login</loc><lastmod>2026-01-23T14:56:32.258Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://shopwice.com/products</loc><lastmod>2026-01-23T14:56:32.258Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://shopwice.com/refurbished-policy</loc><lastmod>2026-01-23T14:56:32.258Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://shopwice.com/register</loc><lastmod>2026-01-23T14:56:32.258Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://shopwice.com/reset-password</loc><lastmod>2026-01-23T14:56:32.258Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://shopwice.com/search</loc><lastmod>2026-01-23T14:56:32.258Z</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+</urlset>
 ````
 
 ## File: src/components/Cart/CartContents.component.tsx
@@ -12665,140 +12675,6 @@ const CheckoutForm = () => {
 export default CheckoutForm;
 ````
 
-## File: src/components/Header/Navbar.component.tsx
-````typescript
-import Link from 'next/link';
-import Image from 'next/image';
-import dynamic from 'next/dynamic';
-import { useState } from 'react';
-import Cart from './Cart.component';
-import NativeSearchBox from '../Search/NativeSearchBox.component';
-import MobileNativeSearch from '../Search/MobileNativeSearch.component';
-import MegaMenu from './MegaMenu.component';
-import CategorySidebar from './CategorySidebar.component';
-import LocationPicker from './LocationPicker.component';
-// const CategorySidebar = dynamic(() => import('./CategorySidebar.component'), { ssr: false });
-// const LocationPicker = dynamic(() => import('./LocationPicker.component'), { ssr: false });
-/**
- * Navigation for the application.
- * Includes mobile menu.
- */
-const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  return (
-    <header className="w-full">
-      <nav id="header" className="z-50 w-full bg-white">
-        <LocationPicker variant="headless" />
-        {/* Mobile Navbar */}
-        <div className="flex flex-col md:hidden w-full border-b border-gray-100">
-          <div className="flex items-center justify-between px-4 py-3 bg-white">
-            <button
-              aria-label="Menu"
-              className="p-1"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-7 h-7 text-[#2c3338]"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                />
-              </svg>
-            </button>
-            <Link href="/" className="ml-2">
-              <Image
-                src="/logo.png"
-                alt="Shopwice"
-                width={120}
-                height={35}
-                className="h-8 w-auto object-contain"
-                priority
-              />
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/my-account" aria-label="Account">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#2c3338]">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                </svg>
-              </Link>
-              <Cart />
-            </div>
-          </div>
-          <div className="w-full bg-[#0C6DC9] px-4 py-3">
-            <MobileNativeSearch />
-          </div>
-        </div>
-        {/* Desktop Navbar - Top Bar */}
-        <div className="hidden md:block border-b border-gray-100 py-4">
-          <div className="w-full px-8 flex items-center justify-between gap-12">
-            {/* Logo */}
-            <div className="flex-shrink-0">
-              <Link href="/">
-                <Image
-                  src="/logo.png"
-                  alt="Shopwice"
-                  width={150}
-                  height={45}
-                  className="h-10 w-auto object-contain"
-                  priority
-                />
-              </Link>
-            </div>
-            {/* Search Bar (Expanded) */}
-            <div className="flex-grow max-w-4xl">
-              <NativeSearchBox />
-            </div>
-            {/* Location Picker */}
-            <div className="block">
-              <LocationPicker />
-            </div>
-            {/* Icons */}
-            <div className="flex items-center space-x-10">
-              {/* Account */}
-              <Link href="/my-account" className="flex items-center gap-2.5 group transition-colors">
-                <div className="transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#0C6DC9] group-hover:text-[#0a59a4]">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                  </svg>
-                </div>
-                <div className="hidden lg:flex flex-col">
-                  <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Welcome</span>
-                  <span className="text-sm font-bold text-[#0C6DC9] group-hover:text-[#0a59a4] whitespace-nowrap">My Account</span>
-                </div>
-              </Link>
-              {/* Cart */}
-              <div className="relative group">
-                <div className="flex items-center gap-2.5">
-                  <div className="transition-colors">
-                    <Cart />
-                  </div>
-                  <div className="hidden lg:flex flex-col">
-                    <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Shopping</span>
-                    <span className="text-sm font-bold text-[#0C6DC9] whitespace-nowrap">My Basket</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Desktop Navbar - Mega Menu (Row 2) */}
-        <MegaMenu />
-        {/* Mobile Menu Drawer */}
-        <CategorySidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
-      </nav>
-    </header>
-  );
-};
-export default Navbar;
-````
-
 ## File: src/utils/gql/GQL_QUERIES.ts
 ````typescript
 import { gql } from '@apollo/client';
@@ -13662,6 +13538,140 @@ export const SEARCH_PRODUCTS_QUERY = gql`
 `;
 ````
 
+## File: src/components/Header/Navbar.component.tsx
+````typescript
+import Link from 'next/link';
+import Image from 'next/image';
+import dynamic from 'next/dynamic';
+import { useState } from 'react';
+import Cart from './Cart.component';
+import NativeSearchBox from '../Search/NativeSearchBox.component';
+import MobileNativeSearch from '../Search/MobileNativeSearch.component';
+import MegaMenu from './MegaMenu.component';
+import CategorySidebar from './CategorySidebar.component';
+import LocationPicker from './LocationPicker.component';
+// const CategorySidebar = dynamic(() => import('./CategorySidebar.component'), { ssr: false });
+// const LocationPicker = dynamic(() => import('./LocationPicker.component'), { ssr: false });
+/**
+ * Navigation for the application.
+ * Includes mobile menu.
+ */
+const Navbar = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  return (
+    <header className="w-full">
+      <nav id="header" className="z-50 w-full bg-white">
+        <LocationPicker variant="headless" />
+        {/* Mobile Navbar */}
+        <div className="flex flex-col md:hidden w-full border-b border-gray-100">
+          <div className="flex items-center justify-between px-4 py-3 bg-white">
+            <button
+              aria-label="Menu"
+              className="p-1"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-7 h-7 text-[#2c3338]"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                />
+              </svg>
+            </button>
+            <Link href="/" className="ml-2">
+              <Image
+                src="/logo.png"
+                alt="Shopwice"
+                width={120}
+                height={35}
+                className="object-contain"
+                priority
+              />
+            </Link>
+            <div className="flex items-center space-x-4">
+              <Link href="/my-account" aria-label="Account">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#2c3338]">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                </svg>
+              </Link>
+              <Cart />
+            </div>
+          </div>
+          <div className="w-full bg-[#0C6DC9] px-4 py-3">
+            <MobileNativeSearch />
+          </div>
+        </div>
+        {/* Desktop Navbar - Top Bar */}
+        <div className="hidden md:block border-b border-gray-100 py-4">
+          <div className="w-full px-8 flex items-center justify-between gap-12">
+            {/* Logo */}
+            <div className="flex-shrink-0">
+              <Link href="/">
+                <Image
+                  src="/logo.png"
+                  alt="Shopwice"
+                  width={150}
+                  height={45}
+                  className="object-contain"
+                  priority
+                />
+              </Link>
+            </div>
+            {/* Search Bar (Expanded) */}
+            <div className="flex-grow max-w-4xl">
+              <NativeSearchBox />
+            </div>
+            {/* Location Picker */}
+            <div className="block">
+              <LocationPicker />
+            </div>
+            {/* Icons */}
+            <div className="flex items-center space-x-10">
+              {/* Account */}
+              <Link href="/my-account" className="flex items-center gap-2.5 group transition-colors">
+                <div className="transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#0C6DC9] group-hover:text-[#0a59a4]">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                  </svg>
+                </div>
+                <div className="hidden lg:flex flex-col">
+                  <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Welcome</span>
+                  <span className="text-sm font-bold text-[#0C6DC9] group-hover:text-[#0a59a4] whitespace-nowrap">My Account</span>
+                </div>
+              </Link>
+              {/* Cart */}
+              <div className="relative group">
+                <div className="flex items-center gap-2.5">
+                  <div className="transition-colors">
+                    <Cart />
+                  </div>
+                  <div className="hidden lg:flex flex-col">
+                    <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Shopping</span>
+                    <span className="text-sm font-bold text-[#0C6DC9] whitespace-nowrap">My Basket</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Desktop Navbar - Mega Menu (Row 2) */}
+        <MegaMenu />
+        {/* Mobile Menu Drawer */}
+        <CategorySidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      </nav>
+    </header>
+  );
+};
+export default Navbar;
+````
+
 ## File: deploy.sh
 ````bash
 #!/bin/bash
@@ -13976,7 +13986,7 @@ const SingleProduct = ({ product }: IProductRootObject) => {
   return (
     <section className="bg-white mb-[8rem] md:mb-12">
       {isLoading ? (
-        <div className="h-56 mt-20">
+        <div className="min-h-[60vh] flex flex-col items-center justify-center">
           <p className="text-xl font-bold text-center">Loading product...</p>
           <br />
           <LoadingSpinner />
