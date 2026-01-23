@@ -4,7 +4,12 @@ import { useQuery, useMutation } from '@apollo/client';
 import { GET_CUSTOMER_DASHBOARD_DATA } from '../../utils/gql/GQL_QUERIES';
 import { UPDATE_CUSTOMER } from '../../utils/gql/GQL_MUTATIONS';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
-import AddressManager from './AddressManager.component';
+import dynamic from 'next/dynamic';
+
+const AddressManager = dynamic(() => import('./AddressManager.component'), {
+  loading: () => <LoadingSpinner />,
+  ssr: false
+});
 import { useRouter } from 'next/router';
 import { useForm, FormProvider } from 'react-hook-form';
 import { InputField } from '../Input/InputField.component';
