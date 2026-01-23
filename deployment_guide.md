@@ -13,6 +13,10 @@ Ensure your server is set up with the following:
     npm install -g pm2
     ```
 4.  **Nginx/Apache**: (Optional but recommended) As a reverse proxy to forward traffic from port 80/443 to the app's port (3001).
+    *   **Recommendation**: Enable **HTTP/2** in your Nginx configuration for better performance.
+        ```nginx
+        listen 443 ssl http2;
+        ```
 
 ## Initial Setup on Server
 
