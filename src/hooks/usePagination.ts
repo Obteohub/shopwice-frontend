@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import client from '@/utils/apollo/ApolloClient';
 import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
 import { Product } from '@/types/product';
 import { DocumentNode } from '@apollo/client';
+import { print } from 'graphql';
 
-interface UseInfiniteScrollProps {
+interface UsePaginationProps {
     initialProducts: Product[];
     initialHasNextPage: boolean;
     initialEndCursor: string | null;
@@ -14,7 +15,7 @@ interface UseInfiniteScrollProps {
     context?: any;
 }
 
-export const useInfiniteScroll = ({
+export const usePagination = ({
     initialProducts,
     initialHasNextPage,
     initialEndCursor,
@@ -22,62 +23,71 @@ export const useInfiniteScroll = ({
     query,
     queryVariables = {},
     context = {},
-}: UseInfiniteScrollProps) => {
-    const observerTarget = useRef<HTMLDivElement>(null);
+}: UsePaginationProps) => {
     const [products, setProducts] = useState<Product[]>(initialProducts);
     const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
     const [endCursor, setEndCursor] = useState<string | null>(initialEndCursor);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
 
-    // Update state when initial props change (e.g. navigation)
+    // Stack of cursors for Previous navigation: [null, "cursor1", "cursor2"]
+    // Page 1 uses null. Page 2 uses cursor1.
+    const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    // Reset when slug/initial props change
     useEffect(() => {
         setProducts(initialProducts);
         setHasNextPage(initialHasNextPage);
         setEndCursor(initialEndCursor);
-    }, [initialProducts, initialHasNextPage, initialEndCursor]);
+        setCursorStack([null]);
+        setCurrentIndex(0);
+        setError(null);
+        setIsLoading(false);
+    }, [initialProducts, initialHasNextPage, initialEndCursor, slug]);
 
-    const loadMore = useCallback(async () => {
-        if (!hasNextPage || isLoading) return;
-
+    const fetchPage = useCallback(async (afterCursor: string | null) => {
         setIsLoading(true);
+        setError(null);
+
+        // Scroll to top of results
+        const resultsHeader = document.getElementById('results-header');
+        if (resultsHeader) {
+            resultsHeader.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
         try {
-            // Determine query and variables
             const activeQuery = query || GET_CATEGORY_DATA_BY_SLUG;
             const activeVariables = {
-                first: 24, // Default to 24 if not specified
+                first: 24,
                 ...queryVariables,
-                after: endCursor,
-                // Ensure slug and id are present if the query might need them
+                after: afterCursor,
                 ...(slug && !queryVariables.slug ? { slug } : {}),
                 ...(slug && !queryVariables.id ? { id: slug } : {}),
             };
 
-            console.log('LoadMore sending variables:', activeVariables);
-
             let data;
 
             if (context?.useDirectFetch) {
-                // Direct fetch fallback to bypass Apollo Client middleware
                 const fetchOptions = context?.fetchOptions || {};
                 const response = await fetch(process.env.NEXT_PUBLIC_GRAPHQL_URL as string, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'omit',
-                    cache: 'no-store', // Ensure we don't get cached stale pages
+                    cache: 'no-store',
                     ...fetchOptions,
                     body: JSON.stringify({
-                        query: require('graphql').print(activeQuery),
+                        query: print(activeQuery),
                         variables: activeVariables
                     }),
                 });
 
                 const json = await response.json();
                 if (json.errors) throw new Error(json.errors[0].message);
-
-                // Mock the data structure expected below
                 data = json.data;
             } else {
-                // Standard Apollo Client query
                 const result = await client.query({
                     query: activeQuery,
                     variables: activeVariables,
@@ -87,13 +97,10 @@ export const useInfiniteScroll = ({
                 data = result.data;
             }
 
-            console.log('LoadMore Context:', context);
-            console.log('LoadMore Data:', data);
-
-            // Handle different response structures
             let newProducts: Product[] = [];
             let newPageInfo = { hasNextPage: false, endCursor: null };
 
+            // Parse response (same logic as before)
             if (data?.productBrand?.products) {
                 newProducts = data.productBrand.products.nodes;
                 newPageInfo = data.productBrand.products.pageInfo;
@@ -101,61 +108,64 @@ export const useInfiniteScroll = ({
                 newProducts = data.productLocation.products.nodes;
                 newPageInfo = data.productLocation.products.pageInfo;
             } else if (data?.productCategory?.products) {
-                // Some queries might be nested under category
                 newProducts = data.productCategory.products.nodes;
                 newPageInfo = data.productCategory.products.pageInfo;
             } else if (data?.products) {
-                // Standard structure or fallback
                 newProducts = data.products.nodes;
                 newPageInfo = data.products.pageInfo;
             }
 
-            console.log('New Products Count:', newProducts.length);
-            console.log('Next Page Info:', newPageInfo);
+            setProducts(newProducts);
+            setHasNextPage(newPageInfo.hasNextPage);
+            setEndCursor(newPageInfo.endCursor);
 
-            if (newProducts.length > 0) {
-                setProducts((prev) => [...prev, ...newProducts]);
-                setHasNextPage(newPageInfo.hasNextPage);
-                setEndCursor(newPageInfo.endCursor);
-            } else {
-                setHasNextPage(false);
-            }
-        } catch (error) {
-            console.error('Error loading more products:', error);
+        } catch (err: any) {
+            console.error('Pagination Error:', err);
+            setError(err);
         } finally {
             setIsLoading(false);
         }
-    }, [hasNextPage, isLoading, endCursor, slug, query, queryVariables, context]);
+    }, [query, queryVariables, slug, context]);
 
-    // Intersection Observer effect
-    useEffect(() => {
-        const element = observerTarget.current;
-        if (!element || !hasNextPage) return;
+    const loadNext = () => {
+        if (!hasNextPage || isLoading) return;
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting && !isLoading) {
-                    loadMore();
-                }
-            },
-            {
-                threshold: 0.1,
-                rootMargin: '100px', // Trigger slightly before the element is fully in view
-            }
-        );
+        // Push current endCursor to stack relative to current index
+        // We are moving TO index + 1
+        // The cursor for index + 1 is the current `endCursor`
 
-        observer.observe(element);
+        // Wait, logic check:
+        // Stack: [null] (Page 1). Current Index: 0.
+        // We have `endCursor` 'A' from Page 1 data.
+        // Click Next.
+        // We want to fetch with `after: 'A'`.
+        // New Stack should be [null, 'A']. New Index: 1.
 
-        return () => {
-            if (element) observer.unobserve(element);
-        };
-    }, [loadMore, hasNextPage, isLoading]);
+        const newStack = [...cursorStack.slice(0, currentIndex + 1), endCursor];
+        setCursorStack(newStack);
+        setCurrentIndex(currentIndex + 1);
+
+        fetchPage(endCursor);
+    };
+
+    const loadPrevious = () => {
+        if (currentIndex === 0 || isLoading) return;
+
+        const prevIndex = currentIndex - 1;
+        const prevCursor = cursorStack[prevIndex];
+
+        setCurrentIndex(prevIndex);
+        fetchPage(prevCursor);
+    };
 
     return {
         products,
         hasNextPage,
+        hasPreviousPage: currentIndex > 0,
         isLoading,
-        loadMore,
-        observerTarget, // Return the ref to be attached to a sentinel element
+        error,
+        loadNext,
+        loadPrevious,
+        currentPage: currentIndex + 1,
     };
 };

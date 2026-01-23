@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Product } from '@/types/product';
 import { useProductFilters } from '@/hooks/useProductFilters';
-import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { usePagination } from '@/hooks/usePagination';
 import ProductCard from './ProductCard.component';
 import ProductFilters from './ProductFilters.component';
 
@@ -13,7 +13,7 @@ interface ProductListProps {
     endCursor: string | null;
   };
   slug?: string;
-  query?: any; // GraphQL AST is complex to type without import, any is safe here or DocumentNode
+  query?: any;
   queryVariables?: Record<string, any>;
   context?: any;
 }
@@ -30,8 +30,17 @@ const ProductList = ({
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
 
-  // Infinite scroll hook (only if pageInfo and slug are provided)
-  const { products: allProducts, hasNextPage, isLoading, observerTarget } = useInfiniteScroll({
+  // Pagination hook
+  const {
+    products: allProducts,
+    hasNextPage,
+    hasPreviousPage,
+    isLoading,
+    error,
+    loadNext,
+    loadPrevious,
+    currentPage
+  } = usePagination({
     initialProducts,
     initialHasNextPage: pageInfo?.hasNextPage || false,
     initialEndCursor: pageInfo?.endCursor || null,
@@ -67,7 +76,7 @@ const ProductList = ({
   const filteredProducts = filterProducts(allProducts);
 
   return (
-    <div className="w-full px-1 md:px-4 lg:grid lg:grid-cols-[240px_1fr] lg:gap-4 py-1">
+    <div className="w-full px-1 md:px-4 lg:grid lg:grid-cols-[240px_1fr] lg:gap-4 py-1" id="results-header">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block">
         <div className="sticky top-20">
@@ -249,21 +258,68 @@ const ProductList = ({
 
         {/* Loading Indicator */}
         {isLoading && (
-          <div className="flex justify-center items-center py-8">
-            <div className="text-lg text-orange-500">Loading products...</div>
+          <div className="flex justify-center items-center py-12">
+            <div className="text-lg text-gray-500 font-medium animate-pulse">Loading products...</div>
           </div>
         )}
 
-        {/* Sentinel for Infinite Scroll - Only render if we have a next page and aren't loading */}
-        {/* We keep it rendered but invisible to allow observer to trigger */}
-        {hasNextPage && !isLoading && (
-          <div ref={observerTarget} className="h-4 w-full" />
+        {/* Error State */}
+        {error && (
+          <div className="flex flex-col justify-center items-center py-8 gap-2">
+            <p className="text-red-500">Failed to load products</p>
+            <div className="flex gap-2">
+              <button
+                onClick={loadPrevious}
+                disabled={!hasPreviousPage}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+              >
+                Try Previous
+              </button>
+              <button
+                onClick={loadNext}
+                disabled={!hasNextPage}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                Try Next
+              </button>
+            </div>
+          </div>
         )}
 
-        {/* End of Results */}
-        {!hasNextPage && !isLoading && filteredProducts.length > 0 && (
-          <div className="text-center py-8 text-gray-500">
-            You've reached the end of the results
+        {/* Pagination Controls */}
+        {!isLoading && !error && (
+          <div className="flex justify-center items-center gap-4 py-8 mt-4 border-t border-gray-100">
+            <button
+              onClick={loadPrevious}
+              disabled={!hasPreviousPage}
+              className={`px-6 py-2.5 rounded-lg font-medium transition-all ${hasPreviousPage
+                  ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                  : 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-100'
+                }`}
+            >
+              Previous
+            </button>
+
+            <span className="text-sm font-medium text-gray-600">
+              Page {currentPage}
+            </span>
+
+            <button
+              onClick={loadNext}
+              disabled={!hasNextPage}
+              className={`px-6 py-2.5 rounded-lg font-medium transition-all ${hasNextPage
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-200'
+                  : 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-100'
+                }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
+
+        {!hasNextPage && !isLoading && !error && filteredProducts.length > 0 && (
+          <div className="text-center pb-8 text-xs text-gray-400">
+            End of results
           </div>
         )}
       </div>
