@@ -75,3 +75,11 @@ pm2 logs shopwice
 If PM2 shows the app as "errored" or it restarts incorrectly:
 1.  Check logs: `pm2 logs shopwice --lines 100`
 2.  Ensure `.env.production` exists in the root (the script copies it to the standalone folder automatically).
+
+### 404 Errors / Broken Styles after Deploy
+If you see `404 Not Found` errors for JS/CSS files or the site looks broken after a deployment:
+*   **Cause**: Cloudflare is caching the old `index.html` which points to old filenames that no longer exist.
+*   **Fix**:
+    1.  Go to **Cloudflare Dashboard > Caching > Configuration**.
+    2.  Click **Purge Everything**.
+    3.  **Disable Rocket Loader**: Go to **Speed > Optimization** and turn off "Rocket Loader". It often breaks Next.js hydration.
