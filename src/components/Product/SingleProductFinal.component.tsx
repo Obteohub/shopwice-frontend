@@ -71,10 +71,10 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
         (cat) => cat.name.toLowerCase() === 'mobile phones' || cat.slug === 'mobile-phones'
     );
 
-    // Check if product has ANY attribute with an option containing "Refurbish"
+    // Check if product has ANY attribute with an option containing "Refurbish" or name contains it
     const isRefurbished = attributes?.nodes?.some(
         (attr) => attr.options?.some((opt) => opt.toLowerCase().includes('refurbish'))
-    );
+    ) || name.toLowerCase().includes('refurbish');
 
     const showRefurbishedBadge = isRefurbished;
     const showWarrantyBadge = isRefurbished;
@@ -316,6 +316,15 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                                     }
                                                     return null;
                                                 })()}
+
+                                                {isRefurbished && (
+                                                    <button
+                                                        onClick={() => setShowCompareModal(true)}
+                                                        className="text-xs font-semibold text-blue-600 underline mt-2 hover:text-blue-800 text-left"
+                                                    >
+                                                        Compare with Brand New
+                                                    </button>
+                                                )}
                                             </div>
                                         ) : (
                                             <p className="text-3xl font-bold text-blue-600">{price}</p>
