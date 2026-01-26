@@ -3,7 +3,7 @@ import { withRouter } from 'next/router';
 import { useRouter } from 'next/router';
 
 // Components
-import SingleProduct from '@/components/Product/SingleProduct.component';
+import SingleProduct from '@/components/Product/SingleProductFinal.component';
 import Layout from '@/components/Layout/Layout.component';
 
 // Utilities

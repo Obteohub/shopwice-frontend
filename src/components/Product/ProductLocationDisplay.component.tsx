@@ -7,17 +7,19 @@ const ProductLocationDisplay = () => {
     const { selectedLocation, setSelectedLocation } = useLocationStore();
     const [isDetecting, setIsDetecting] = useState(false);
     const [geoError, setGeoError] = useState<string | null>(null);
+    const [hasMounted, setHasMounted] = useState(false);
     const { data } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
 
-    // Auto-detect on first load if no location is selected? 
-    // The user requested "fetch the users current location"
-    // We should probably only do it if they click or if it's not set. 
-    // But the prompt said "after the payment information ... show the location ... fetch the users current location"
-    // Let's stick to showing what's selected, and offering a way to change/detect.
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
+
+    // ... (rest of logic) ...
 
     const locations = data?.productLocations?.nodes || [];
 
     const handleDetectLocation = () => {
+        // ... same logic ...
         setIsDetecting(true);
         setGeoError(null);
 
@@ -31,6 +33,7 @@ const ProductLocationDisplay = () => {
             async (position) => {
                 try {
                     const { latitude, longitude } = position.coords;
+                    // ... fetch logic ...
                     const response = await fetch(
                         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
                     );
@@ -73,10 +76,10 @@ const ProductLocationDisplay = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
                 </svg>
                 <span className="text-xs text-gray-600">
-                    Deliver to: <span className="text-gray-600">{selectedLocation ? selectedLocation.name : 'Select Location'}</span>
+                    Deliver to: <span className="text-gray-600">{hasMounted && selectedLocation ? selectedLocation.name : 'Select Location'}</span>
                 </span>
 
-                {!selectedLocation && !isDetecting && (
+                {(!hasMounted || !selectedLocation) && !isDetecting && (
                     <button
                         onClick={handleDetectLocation}
                         className="text-xs text-blue-600 hover:underline ml-2 font-medium"
@@ -84,7 +87,7 @@ const ProductLocationDisplay = () => {
                         Auto-detect
                     </button>
                 )}
-                {selectedLocation && !isDetecting && (
+                {hasMounted && selectedLocation && !isDetecting && (
                     <button
                         onClick={() => window.dispatchEvent(new Event('open-location-picker'))}
                         className="text-xs text-blue-600 hover:underline ml-2 font-medium"

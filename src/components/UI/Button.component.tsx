@@ -54,7 +54,7 @@ const Button = ({
     }
   };
 
-  const classes = `${getVariantClasses(variant)} ease-in-out transition-all duration-300 disabled:opacity-50 ${fullWidth ? 'w-full md:w-auto' : ''
+  const classes = `${getVariantClasses(variant)} ease-in-out transition-all duration-300 disabled:opacity-50 ${fullWidth ? 'w-full' : ''
     } ${props.className || ''}`;
 
   if (href) {
