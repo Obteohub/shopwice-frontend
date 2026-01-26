@@ -15,14 +15,12 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
     useEffect(() => {
         setMounted(true);
         const handleResize = () => {
-            if (window.innerWidth >= 1280) {
-                setSlidesPerView(6);
-            } else if (window.innerWidth >= 1024) {
-                setSlidesPerView(5);
+            if (window.innerWidth >= 1024) {
+                setSlidesPerView(8);
             } else if (window.innerWidth >= 768) {
-                setSlidesPerView(3);
+                setSlidesPerView(5);
             } else {
-                setSlidesPerView(1); // Mobile uses native scroll
+                setSlidesPerView(2.5); // Mobile uses native scroll
             }
         };
 
@@ -57,7 +55,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
                 {/* Mobile View: Horizontal Scroll */}
                 <div className="md:hidden flex overflow-x-auto snap-x snap-mandatory gap-1 pb-4 no-scrollbar">
                     {products.map((product) => (
-                        <div key={`mob-best-${product.databaseId}`} className="snap-center shrink-0 w-[50vw]">
+                        <div key={`mob-best-${product.databaseId}`} className="snap-start shrink-0" style={{ width: '40vw' }}>
                             <ProductCard
                                 databaseId={product.databaseId}
                                 name={product.name}

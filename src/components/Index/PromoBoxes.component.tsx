@@ -66,7 +66,7 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
                     </div>
 
                     {/* Box 2: iPhone 2x2 Grid */}
-                    <div className="bg-white p-6 rounded-none border border-gray-100 flex flex-col justify-between group">
+                    <div className="bg-white p-6 rounded-none border border-gray-100 flex flex-col justify-between group overflow-hidden">
                         <h3 className="text-lg font-extrabold text-[#2c3338] mb-4">Apple iPhone <br /> Shop</h3>
                         <div className="grid grid-cols-2 gap-2 mb-4">
                             {[1, 2, 3, 4].map((i) => (
@@ -83,7 +83,7 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
                     </div>
 
                     {/* Box 3: Electronics 2x2 Grid */}
-                    <div className="bg-white p-6 rounded-none border border-gray-100 flex flex-col justify-between group">
+                    <div className="bg-white p-6 rounded-none border border-gray-100 flex flex-col justify-between group overflow-hidden">
                         <h3 className="text-lg font-extrabold text-[#2c3338] mb-4">Household <br /> Essentials</h3>
                         <div className="grid grid-cols-2 gap-2 mb-4">
                             {[
@@ -105,7 +105,7 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
                     </div>
 
                     {/* Box 4: Lifestyle/Sneakers */}
-                    <div className="bg-[#EEEBFD] p-6 rounded-none border border-gray-100 flex flex-col justify-between group">
+                    <div className="bg-[#EEEBFD] p-6 rounded-none border border-gray-100 flex flex-col justify-between group overflow-hidden">
                         <div>
                             <h3 className="text-lg font-extrabold text-[#2c3338] mb-2">Trendy <br /> Sneakers</h3>
                             <p className="text-[#EE7E02] font-bold text-sm">New Collection Arrival</p>

@@ -83,8 +83,8 @@ const ProductCard = ({
   const showStockWarning = stockQuantity !== undefined && stockQuantity !== null && stockQuantity > 0 && stockQuantity < 5;
 
   return (
-    <div className="group relative">
-      <div className="aspect-square overflow-hidden bg-gray-100 relative">
+    <div className="group relative h-full flex flex-col w-full overflow-hidden bg-white">
+      <div className="aspect-square overflow-hidden bg-gray-100 relative shrink-0">
         <Link href={`/product/${slug}`} className="relative block w-full h-full">
           {image?.sourceUrl ? (
             <Image
@@ -122,38 +122,40 @@ const ProductCard = ({
         )}
       </div>
 
-      <Link href={`/product/${slug}`}>
-        <div className="mt-1">
-          <p
-            className="text-sm font-normal text-left cursor-pointer hover:text-gray-600 transition-colors leading-[1.2] tracking-tighter min-h-[34px]"
-            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-          >
-            {name}
-          </p>
-          <div className="flex justify-start items-center gap-1 mt-0.5">
-            <StarRating rating={averageRating} size={14} />
-            {reviewCount !== undefined && reviewCount > 0 && (
-              <span className="text-xs text-gray-500">({reviewCount})</span>
-            )}
-          </div>
-        </div>
-      </Link>
-      <div className="mt-1 text-left">
-        {onSale ? (
-          <div className="flex flex-col items-start gap-0.5">
-            <div className="flex items-center justify-start gap-1.5">
-              <span className="text-xs font-bold text-blue-600 tracking-tighter">{formattedSalePrice}</span>
-              <span className="text-xs text-gray-500 line-through tracking-tighter">{formattedRegularPrice}</span>
+      <div className="flex flex-col flex-grow mt-2 justify-between">
+        <Link href={`/product/${slug}`}>
+          <div>
+            <p
+              className="text-sm font-normal text-left cursor-pointer hover:text-gray-600 transition-colors leading-[1.2] tracking-tighter min-h-[34px] break-words"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineClamp: 2 }}
+            >
+              {name}
+            </p>
+            <div className="flex justify-start items-center gap-1 mt-0.5">
+              <StarRating rating={averageRating} size={14} />
+              {reviewCount !== undefined && reviewCount > 0 && (
+                <span className="text-xs text-gray-500">({reviewCount})</span>
+              )}
             </div>
-            {savingsAmount && (
-              <span className="text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded tracking-tighter inline-block mt-0.5">
-                Save - {savingsAmount}
-              </span>
-            )}
           </div>
-        ) : (
-          <span className="text-sm font-bold text-blue-600">{formattedPrice}</span>
-        )}
+        </Link>
+        <div className="mt-1 text-left">
+          {onSale ? (
+            <div className="flex flex-col items-start gap-0.5">
+              <div className="flex items-center justify-start gap-1.5">
+                <span className="text-xs font-bold text-blue-600 tracking-tighter">{formattedSalePrice}</span>
+                <span className="text-xs text-gray-500 line-through tracking-tighter">{formattedRegularPrice}</span>
+              </div>
+              {savingsAmount && (
+                <span className="text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded tracking-tighter inline-block mt-0.5">
+                  Save - {savingsAmount}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm font-bold text-blue-600">{formattedPrice}</span>
+          )}
+        </div>
       </div>
     </div>
   );

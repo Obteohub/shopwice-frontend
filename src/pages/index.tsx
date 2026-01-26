@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
-const Hero = dynamic(() => import('@/components/Index/Hero.component'), { ssr: false });
+import Hero from '@/components/Index/Hero.component';
 import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
 
 // Dynamic Imports for below-the-fold content
@@ -47,7 +47,6 @@ import {
  */
 
 const Index: NextPage = ({
-  products,
   topRatedProducts,
   bestSellingProducts,
   airConditionerProducts,
@@ -56,7 +55,6 @@ const Index: NextPage = ({
   speakersProducts,
   televisionsProducts,
   promoProduct,
-  pageInfo,
 }: InferGetStaticPropsType<typeof getStaticProps>) => (
   <Layout title="Shop Online In Ghana | Shopwice" fullWidth={true}>
     <div className="bg-[#F8F8F8]">
@@ -85,9 +83,8 @@ const Index: NextPage = ({
 export default Index;
 
 export const getStaticProps: GetStaticProps = async () => {
-  const { data: productsData, loading, networkStatus } = await client.query({
-    query: FETCH_ALL_PRODUCTS_QUERY,
-  });
+  /* Removed unused products query */
+  /* const { data: productsData } = await client.query({ query: FETCH_ALL_PRODUCTS_QUERY }); */
 
   const { data: topRatedData } = await client.query({
     query: FETCH_TOP_RATED_PRODUCTS_QUERY,
@@ -124,7 +121,6 @@ export const getStaticProps: GetStaticProps = async () => {
 
   return {
     props: {
-      products: productsData.products.nodes,
       topRatedProducts: topRatedData?.products?.nodes || [],
       bestSellingProducts: bestSellingData?.products?.nodes || [],
       airConditionerProducts: airConditionerData?.products?.nodes || [],
@@ -133,9 +129,6 @@ export const getStaticProps: GetStaticProps = async () => {
       speakersProducts: speakersData?.products?.nodes || [],
       televisionsProducts: televisionsData?.products?.nodes || [],
       promoProduct: promoProductData?.product || null,
-      pageInfo: productsData.products.pageInfo,
-      loading,
-      networkStatus,
     },
     revalidate: 60,
   };

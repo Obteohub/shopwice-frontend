@@ -77,9 +77,9 @@ const Hero = () => {
     const handleResize = () => {
       // Update Slides Per View for Desktop Carousel Mode
       if (window.innerWidth >= 1024) {
-        setSlidesPerView(4);
+        setSlidesPerView(3.7);
       } else if (window.innerWidth >= 768) {
-        setSlidesPerView(3);
+        setSlidesPerView(2.5);
       }
     };
 
@@ -146,7 +146,7 @@ const Hero = () => {
           style={{
             display: 'flex',
             // Avoid hydration mismatch by waiting for mount or using suppression
-            transform: mounted ? `translateX(-${(currentIndex * (100 / slidesPerView)).toFixed(4)}%)` : 'translateX(0%)',
+            transform: mounted ? `translateX(-${(currentIndex * (100 / allSlides.length)).toFixed(4)}%)` : 'translateX(0%)',
             width: mounted ? `${(allSlides.length / slidesPerView) * 100}%` : '100%'
           }}
         >
@@ -155,7 +155,7 @@ const Hero = () => {
               key={`desk-${slide.id}-${index}`}
               className="relative h-full flex-shrink-0 px-2"
               style={{
-                width: mounted ? `${100 / slidesPerView}%` : '100%',
+                width: mounted ? `${100 / allSlides.length}%` : '100%',
               }}
             >
               <Link href={slide.link || '#'} className={`block w-full h-full relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow`}>
