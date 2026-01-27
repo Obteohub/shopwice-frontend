@@ -134,7 +134,9 @@ src/
       ProductList.component.tsx
       ProductLocationDisplay.component.tsx
       ProductReviews.component.tsx
+      ProductReviewsREST.component.tsx
       RecentRefurbishedReviews.component.tsx
+      RecentRefurbishedReviewsREST.component.tsx
       SingleProductFinal.component.tsx
       WhatIsRefurbishedModal.component.tsx
     Search/
@@ -3096,6 +3098,211 @@ const PageTitle = ({ title }: IPageTitleProps) => (
   </section>
 );
 export default PageTitle;
+````
+
+## File: src/components/Product/AddToCart.component.tsx
+````typescript
+// Imports
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useQuery, useMutation } from '@apollo/client';
+import { v4 as uuidv4 } from 'uuid';
+// Components
+import Button from '@/components/UI/Button.component';
+// State
+import { useCartStore } from '@/stores/cartStore';
+// Utils
+import { getFormattedCart } from '@/utils/functions/functions';
+// GraphQL
+import { GET_CART } from '@/utils/gql/GQL_QUERIES';
+import { ADD_TO_CART } from '@/utils/gql/GQL_MUTATIONS';
+interface IImage {
+  __typename: string;
+  id: string;
+  uri: string;
+  title: string;
+  srcSet: string;
+  sourceUrl: string;
+}
+interface IVariationNode {
+  __typename: string;
+  name: string;
+}
+interface IAllPaColor {
+  __typename: string;
+  nodes: IVariationNode[];
+}
+interface IAllPaSize {
+  __typename: string;
+  nodes: IVariationNode[];
+}
+export interface IVariationNodes {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  stockStatus: string;
+  stockQuantity: number;
+  purchasable: boolean;
+  onSale: boolean;
+  salePrice?: string;
+  regularPrice: string;
+  sku?: string;
+}
+interface IVariations {
+  __typename: string;
+  nodes: IVariationNodes[];
+}
+export interface IProduct {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  averageRating: number;
+  slug: string;
+  description: string;
+  onSale: boolean;
+  image: IImage;
+  name: string;
+  salePrice?: string;
+  regularPrice: string;
+  price: string;
+  stockQuantity: number;
+  sku?: string;
+  stockStatus?: string;
+  totalSales?: number;
+  related?: {
+    nodes: IProduct[];
+  };
+  upsell?: {
+    nodes: IProduct[];
+  };
+  crossSell?: {
+    nodes: IProduct[];
+  };
+  featured?: boolean;
+  shortDescription?: string;
+  reviewCount?: number;
+  allPaColor?: IAllPaColor;
+  allPaSize?: IAllPaSize;
+  variations?: IVariations;
+  productCategories?: {
+    nodes: Array<{ name: string; slug: string }>;
+  };
+  productBrand?: {
+    nodes: Array<{ name: string; slug: string }>;
+  };
+  galleryImages?: {
+    nodes: IImage[];
+  };
+  reviews?: {
+    nodes: Array<{
+      id: string;
+      content: string;
+      date: string;
+      rating: number;
+      author: {
+        node: {
+          name: string;
+        }
+      }
+    }>;
+  };
+  attributes?: {
+    nodes: Array<{ name: string; options: string[] }>;
+  };
+}
+export interface IProductRootObject {
+  product: IProduct;
+  variationId?: number;
+  fullWidth?: boolean;
+  buyNow?: boolean;
+  quantity?: number;
+}
+/**
+ * Handles the Add to cart functionality.
+ * Uses GraphQL for product data
+ * @param {IAddToCartProps} product // Product data
+ * @param {number} variationId // Variation ID
+ * @param {boolean} fullWidth // Whether the button should be full-width
+ */
+const AddToCart = ({
+  product,
+  variationId,
+  fullWidth = false,
+  buyNow = false,
+  quantity = 1,
+}: IProductRootObject) => {
+  const router = useRouter();
+  const { syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
+  const [requestError, setRequestError] = useState<boolean>(false);
+  const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const productId = product?.databaseId ? product?.databaseId : variationId;
+  const productQueryInput = {
+    clientMutationId: uuidv4(), // Generate a unique id.
+    productId,
+    quantity,
+  };
+  // Get cart data query
+  const { data, refetch } = useQuery(GET_CART, {
+    notifyOnNetworkStatusChange: true,
+  });
+  useEffect(() => {
+    if (data) {
+      const updatedCart = getFormattedCart(data);
+      if (updatedCart) {
+        syncWithWooCommerce(updatedCart);
+      }
+    }
+  }, [data, syncWithWooCommerce]);
+  // Add to cart mutation
+  const [addToCart, { loading: addToCartLoading, data: addToCartData, error: addToCartError }] = useMutation(ADD_TO_CART, {
+    variables: {
+      input: productQueryInput,
+    },
+    // Refetch all GET_CART queries to update cart across all components
+    refetchQueries: [{ query: GET_CART }],
+    awaitRefetchQueries: true,
+  });
+  useEffect(() => {
+    if (addToCartData) {
+      // Update the cart with new values in React context.
+      setIsSuccess(true);
+      const timer = setTimeout(() => setIsSuccess(false), 2000);
+      if (buyNow) {
+        router.push('/checkout');
+      }
+      return () => clearTimeout(timer);
+    }
+  }, [addToCartData, buyNow, router]);
+  useEffect(() => {
+    if (addToCartError) {
+      console.log('Add to cart error:', addToCartError);
+      setRequestError(true);
+    }
+  }, [addToCartError]);
+  const handleAddToCart = () => {
+    addToCart();
+  };
+  return (
+    <>
+      <Button
+        handleButtonClick={() => handleAddToCart()}
+        buttonDisabled={addToCartLoading || requestError || isCartLoading || isSuccess}
+        fullWidth={fullWidth}
+        className={
+          isSuccess
+            ? 'bg-green-600 hover:bg-green-700'
+            : buyNow
+              ? 'bg-orange-600 hover:bg-orange-700'
+              : ''
+        }
+      >
+        {isCartLoading ? 'Loading...' : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
+      </Button>
+    </>
+  );
+};
+export default AddToCart;
 ````
 
 ## File: src/components/Product/DisplayProducts.component.tsx
@@ -7882,211 +8089,6 @@ const LoadingSpinner = () => (
 export default LoadingSpinner;
 ````
 
-## File: src/components/Product/AddToCart.component.tsx
-````typescript
-// Imports
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { useQuery, useMutation } from '@apollo/client';
-import { v4 as uuidv4 } from 'uuid';
-// Components
-import Button from '@/components/UI/Button.component';
-// State
-import { useCartStore } from '@/stores/cartStore';
-// Utils
-import { getFormattedCart } from '@/utils/functions/functions';
-// GraphQL
-import { GET_CART } from '@/utils/gql/GQL_QUERIES';
-import { ADD_TO_CART } from '@/utils/gql/GQL_MUTATIONS';
-interface IImage {
-  __typename: string;
-  id: string;
-  uri: string;
-  title: string;
-  srcSet: string;
-  sourceUrl: string;
-}
-interface IVariationNode {
-  __typename: string;
-  name: string;
-}
-interface IAllPaColor {
-  __typename: string;
-  nodes: IVariationNode[];
-}
-interface IAllPaSize {
-  __typename: string;
-  nodes: IVariationNode[];
-}
-export interface IVariationNodes {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  stockStatus: string;
-  stockQuantity: number;
-  purchasable: boolean;
-  onSale: boolean;
-  salePrice?: string;
-  regularPrice: string;
-  sku?: string;
-}
-interface IVariations {
-  __typename: string;
-  nodes: IVariationNodes[];
-}
-export interface IProduct {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  averageRating: number;
-  slug: string;
-  description: string;
-  onSale: boolean;
-  image: IImage;
-  name: string;
-  salePrice?: string;
-  regularPrice: string;
-  price: string;
-  stockQuantity: number;
-  sku?: string;
-  stockStatus?: string;
-  totalSales?: number;
-  related?: {
-    nodes: IProduct[];
-  };
-  upsell?: {
-    nodes: IProduct[];
-  };
-  crossSell?: {
-    nodes: IProduct[];
-  };
-  featured?: boolean;
-  shortDescription?: string;
-  reviewCount?: number;
-  allPaColor?: IAllPaColor;
-  allPaSize?: IAllPaSize;
-  variations?: IVariations;
-  productCategories?: {
-    nodes: Array<{ name: string; slug: string }>;
-  };
-  productBrand?: {
-    nodes: Array<{ name: string; slug: string }>;
-  };
-  galleryImages?: {
-    nodes: IImage[];
-  };
-  reviews?: {
-    nodes: Array<{
-      id: string;
-      content: string;
-      date: string;
-      rating: number;
-      author: {
-        node: {
-          name: string;
-        }
-      }
-    }>;
-  };
-  attributes?: {
-    nodes: Array<{ name: string; options: string[] }>;
-  };
-}
-export interface IProductRootObject {
-  product: IProduct;
-  variationId?: number;
-  fullWidth?: boolean;
-  buyNow?: boolean;
-  quantity?: number;
-}
-/**
- * Handles the Add to cart functionality.
- * Uses GraphQL for product data
- * @param {IAddToCartProps} product // Product data
- * @param {number} variationId // Variation ID
- * @param {boolean} fullWidth // Whether the button should be full-width
- */
-const AddToCart = ({
-  product,
-  variationId,
-  fullWidth = false,
-  buyNow = false,
-  quantity = 1,
-}: IProductRootObject) => {
-  const router = useRouter();
-  const { syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
-  const [requestError, setRequestError] = useState<boolean>(false);
-  const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const productId = product?.databaseId ? product?.databaseId : variationId;
-  const productQueryInput = {
-    clientMutationId: uuidv4(), // Generate a unique id.
-    productId,
-    quantity,
-  };
-  // Get cart data query
-  const { data, refetch } = useQuery(GET_CART, {
-    notifyOnNetworkStatusChange: true,
-  });
-  useEffect(() => {
-    if (data) {
-      const updatedCart = getFormattedCart(data);
-      if (updatedCart) {
-        syncWithWooCommerce(updatedCart);
-      }
-    }
-  }, [data, syncWithWooCommerce]);
-  // Add to cart mutation
-  const [addToCart, { loading: addToCartLoading, data: addToCartData, error: addToCartError }] = useMutation(ADD_TO_CART, {
-    variables: {
-      input: productQueryInput,
-    },
-    // Refetch all GET_CART queries to update cart across all components
-    refetchQueries: [{ query: GET_CART }],
-    awaitRefetchQueries: true,
-  });
-  useEffect(() => {
-    if (addToCartData) {
-      // Update the cart with new values in React context.
-      setIsSuccess(true);
-      const timer = setTimeout(() => setIsSuccess(false), 2000);
-      if (buyNow) {
-        router.push('/checkout');
-      }
-      return () => clearTimeout(timer);
-    }
-  }, [addToCartData, buyNow, router]);
-  useEffect(() => {
-    if (addToCartError) {
-      console.log('Add to cart error:', addToCartError);
-      setRequestError(true);
-    }
-  }, [addToCartError]);
-  const handleAddToCart = () => {
-    addToCart();
-  };
-  return (
-    <>
-      <Button
-        handleButtonClick={() => handleAddToCart()}
-        buttonDisabled={addToCartLoading || requestError || isCartLoading || isSuccess}
-        fullWidth={fullWidth}
-        className={
-          isSuccess
-            ? 'bg-green-600 hover:bg-green-700'
-            : buyNow
-              ? 'bg-orange-600 hover:bg-orange-700'
-              : ''
-        }
-      >
-        {isCartLoading ? 'Loading...' : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
-      </Button>
-    </>
-  );
-};
-export default AddToCart;
-````
-
 ## File: src/components/Product/ComparePriceModal.component.tsx
 ````typescript
 import { Fragment } from 'react';
@@ -8490,6 +8492,225 @@ const ProductGalleryVertical: React.FC<ProductGalleryProps> = ({ mainImage, gall
     );
 };
 export default ProductGalleryVertical;
+````
+
+## File: src/components/Product/ProductReviewsREST.component.tsx
+````typescript
+import React, { useEffect, useState } from 'react';
+import StarRating from '../UI/StarRating.component';
+interface Review {
+    id: number;
+    product_id: number;
+    status: string;
+    reviewer: string;
+    reviewer_email: string;
+    review: string;
+    rating: number;
+    verified: boolean;
+    date_created: string;
+}
+interface ProductReviewsRESTProps {
+    productId: number;
+}
+const ProductReviewsREST: React.FC<ProductReviewsRESTProps> = ({ productId }) => {
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    useEffect(() => {
+        const fetchReviews = async () => {
+            try {
+                setLoading(true);
+                const response = await fetch(
+                    `https://api.shopwice.com/wp-json/wc/v3/products/reviews?product=${productId}&status=approved&per_page=100`,
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    }
+                );
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                setReviews(data);
+            } catch (err) {
+                console.error('Error fetching reviews:', err);
+                setError(err instanceof Error ? err.message : 'Failed to load reviews');
+            } finally {
+                setLoading(false);
+            }
+        };
+        if (productId) {
+            fetchReviews();
+        }
+    }, [productId]);
+    if (loading) {
+        return (
+            <div className="py-8 bg-gray-50 rounded-lg text-center">
+                <p className="text-gray-500">Loading reviews...</p>
+            </div>
+        );
+    }
+    if (error) {
+        return (
+            <div className="py-8 bg-gray-50 rounded-lg text-center">
+                <p className="text-gray-500 mb-2">Unable to load reviews</p>
+                <p className="text-sm text-gray-400">{error}</p>
+            </div>
+        );
+    }
+    if (!reviews || reviews.length === 0) {
+        return (
+            <div className="py-8 bg-gray-100 rounded-lg text-center">
+                <p className="text-gray-500 mb-2">No reviews yet</p>
+                <p className="text-sm text-gray-500">Only customers who have purchased this product may leave a review</p>
+            </div>
+        );
+    }
+    return (
+        <div className="space-y-6">
+            <h3 className="text-xl font-bold mb-4">Customer Reviews</h3>
+            {reviews.map((review) => (
+                <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0">
+                    <div className="flex items-left justify-between mb-2">
+                        <div>
+                            <h4 className="font-semibold text-sm">{review.reviewer}</h4>
+                            <div className="mt-1 flex items-center gap-2">
+                                <StarRating rating={review.rating || 0} size={14} />
+                                {review.verified && (
+                                    <span className="text-xs text-green-600 font-medium">Verified Purchase</span>
+                                )}
+                            </div>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                            {new Date(review.date_created).toLocaleDateString()}
+                        </span>
+                    </div>
+                    <div
+                        className="text-gray-600 text-sm leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: review.review }}
+                    />
+                </div>
+            ))}
+        </div>
+    );
+};
+export default ProductReviewsREST;
+````
+
+## File: src/components/Product/RecentRefurbishedReviewsREST.component.tsx
+````typescript
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+interface Review {
+    id: number;
+    product_id: number;
+    product_name: string;
+    product_permalink: string;
+    status: string;
+    reviewer: string;
+    reviewer_email: string;
+    review: string;
+    rating: number;
+    verified: boolean;
+    date_created: string;
+}
+const RecentRefurbishedReviewsREST = () => {
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+    useEffect(() => {
+        const fetchReviews = async () => {
+            if (!mounted) return;
+            try {
+                setLoading(true);
+                // Fetch recent approved reviews
+                const response = await fetch(
+                    'https://api.shopwice.com/wp-json/wc/v3/products/reviews?status=approved&per_page=20',
+                    {
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    }
+                );
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                // Filter for refurbished products (check if product name contains "refurbish")
+                const refurbishedReviews = data.filter((review: Review) =>
+                    review.product_name?.toLowerCase().includes('refurbish')
+                );
+                // Sort by date and take top 5
+                const sortedReviews = refurbishedReviews
+                    .sort((a: Review, b: Review) =>
+                        new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
+                    )
+                    .slice(0, 5);
+                setReviews(sortedReviews);
+            } catch (err) {
+                console.error('Error fetching refurbished reviews:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        if (mounted) {
+            fetchReviews();
+        }
+    }, [mounted]);
+    if (!mounted) return null;
+    if (loading) return <div className="p-4 text-xs text-center text-gray-400">Loading reviews...</div>;
+    if (reviews.length === 0) return null;
+    return (
+        <div className="mt-6 border-t border-gray-100 pt-4">
+            <h4 className="text-sm font-bold text-gray-900 mb-3">Recent Refurbished Reviews</h4>
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {reviews.map((review) => (
+                    <div key={review.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-xs">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-gray-800">{review.reviewer || 'Customer'}</span>
+                                {review.rating && (
+                                    <div className="flex text-yellow-400">
+                                        {[...Array(5)].map((_, i) => (
+                                            <svg
+                                                key={i}
+                                                className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-300'}`}
+                                                viewBox="0 0 20 20"
+                                                fill="currentColor"
+                                            >
+                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                            </svg>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <span className="text-gray-400 text-[10px] whitespace-nowrap">
+                                {new Date(review.date_created).toLocaleDateString()}
+                            </span>
+                        </div>
+                        <div
+                            className="text-gray-600 mb-2 leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: review.review }}
+                        />
+                        {review.product_permalink && review.product_name && (
+                            <Link
+                                href={review.product_permalink.replace('https://shopwice.com', '')}
+                                className="text-[10px] text-blue-600 hover:underline block border-t border-gray-200 pt-1 mt-1 font-medium"
+                            >
+                                {review.verified && 'Verified Purchase: '}{review.product_name}
+                            </Link>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+export default RecentRefurbishedReviewsREST;
 ````
 
 ## File: src/components/Product/WhatIsRefurbishedModal.component.tsx
@@ -19979,6 +20200,120 @@ export const getStaticProps: GetStaticProps = async () => {
 };
 ````
 
+## File: deploy.sh
+````bash
+#!/bin/bash
+set -e # Exit on error
+# Deployment Fix Script for Vultr/CloudPanel
+# Usage: ./deploy.sh
+echo ">>> Stopping shopwice process..."
+# Using || true to prevent script failure if app doesn't exist yet
+pm2 delete shopwice || true
+echo ">>> Stashing any local changes (e.g. generated sitemaps)..."
+git stash
+echo ">>> Pulling latest code..."
+git pull origin main
+echo ">>> Rebuilding project..."
+npm ci --include=dev
+npm run build
+echo ">>> Checking PM2 Config..."
+cat ecosystem.config.js
+echo ">>> Starting Server with PM2..."
+pm2 start ecosystem.config.js
+pm2 save
+echo ">>> Done! Server should be running on Port 3001."
+pm2 list
+````
+
+## File: deployment_guide.md
+````markdown
+# Deployment Guide for Shopwice Web
+
+This guide outlines the steps to deploy the Next.js WooCommerce application to a VPS (Virtual Private Server) like Vultr, DigitalOcean, or AWS, specifically tailored for environments managed with CloudPanel or similar tools using PM2.
+
+## Prerequisites
+
+Ensure your server is set up with the following:
+
+1.  **Node.js**: Version 18.x or later (matches your project requirements).
+2.  **Git**: To pull the latest code.
+3.  **PM2**: Process manager for Node.js.
+    ```bash
+    npm install -g pm2
+    ```
+4.  **Nginx/Apache**: (Optional but recommended) As a reverse proxy to forward traffic from port 80/443 to the app's port (3001).
+    *   **Recommendation**: Enable **HTTP/2** in your Nginx configuration for better performance.
+        ```nginx
+        listen 443 ssl http2;
+        ```
+
+## Initial Setup on Server
+
+1.  **Clone the Repository**:
+    ```bash
+    git clone <your-repo-url> shopwice
+    cd shopwice
+    ```
+
+2.  **Environment Variables**:
+    Create a `.env.production` file with your live credentials.
+    ```bash
+    cp .env.example .env.production
+    nano .env.production
+    ```
+    *Update the values in `.env.production` to match your production keys.*
+
+3.  **Make Script Executable**:
+    ```bash
+    chmod +x deploy.sh
+    ```
+
+## Deploying
+
+To deploy or update the application, simply run the deployment script from the project root:
+
+```bash
+./deploy.sh
+```
+
+### What the script does:
+1.  **Stops existing instance**: Safely stops the `shopwice` service if running.
+2.  **Updates Code**: Pulls the latest changes from the `main` branch.
+3.  **Rebuilds**: Installs dependencies and builds the Next.js application.
+4.  **Prepares Standalone**: Copies necessary assets (public folder, static files) to the standalone build directory.
+5.  **Restarts**: Starts the application using PM2 in cluster mode.
+
+## Troubleshooting
+
+### Port Conflicts
+If you see `EADDRINUSE: address already in use`, it means another process is using port 3001.
+- Check running ports: `netstat -nlp | grep :3001`
+- Kill specific process: `kill <PID>`
+
+### Permission Denied
+If you encounter permission errors during the script execution:
+- Ensure you own the directory: `chown -R $USER:$USER .`
+
+### Logs
+To view the application logs:
+```bash
+pm2 logs shopwice
+```
+
+### App Not Starting
+If PM2 shows the app as "errored" or it restarts incorrectly:
+1.  Check logs: `pm2 logs shopwice --lines 100`
+2.  Ensure `.env.production` exists in the root (the script copies it to the standalone folder automatically).
+
+### 404 Errors / Broken Styles after Deploy
+If you see `404 Not Found` errors for JS/CSS files or the site looks broken after a deployment:
+*   **Cause**: Cloudflare is caching the old `index.html` which points to old filenames that no longer exist.
+*   **Fix**:
+    1.  Go to **Cloudflare Dashboard > Caching > Configuration**.
+    2.  Click **Purge Everything**.
+    3.  **Disable Rocket Loader**: Go to **Speed > Optimization** and turn off "Rocket Loader". It often breaks Next.js hydration.
+````
+
 ## File: ecosystem.config.js
 ````javascript
 module.exports = {
@@ -20744,120 +21079,6 @@ const RecentRefurbishedReviews = () => {
     );
 };
 export default RecentRefurbishedReviews;
-````
-
-## File: deploy.sh
-````bash
-#!/bin/bash
-set -e # Exit on error
-# Deployment Fix Script for Vultr/CloudPanel
-# Usage: ./deploy.sh
-echo ">>> Stopping shopwice process..."
-# Using || true to prevent script failure if app doesn't exist yet
-pm2 delete shopwice || true
-echo ">>> Stashing any local changes (e.g. generated sitemaps)..."
-git stash
-echo ">>> Pulling latest code..."
-git pull origin main
-echo ">>> Rebuilding project..."
-npm ci --include=dev
-npm run build
-echo ">>> Checking PM2 Config..."
-cat ecosystem.config.js
-echo ">>> Starting Server with PM2..."
-pm2 start ecosystem.config.js
-pm2 save
-echo ">>> Done! Server should be running on Port 3001."
-pm2 list
-````
-
-## File: deployment_guide.md
-````markdown
-# Deployment Guide for Shopwice Web
-
-This guide outlines the steps to deploy the Next.js WooCommerce application to a VPS (Virtual Private Server) like Vultr, DigitalOcean, or AWS, specifically tailored for environments managed with CloudPanel or similar tools using PM2.
-
-## Prerequisites
-
-Ensure your server is set up with the following:
-
-1.  **Node.js**: Version 18.x or later (matches your project requirements).
-2.  **Git**: To pull the latest code.
-3.  **PM2**: Process manager for Node.js.
-    ```bash
-    npm install -g pm2
-    ```
-4.  **Nginx/Apache**: (Optional but recommended) As a reverse proxy to forward traffic from port 80/443 to the app's port (3001).
-    *   **Recommendation**: Enable **HTTP/2** in your Nginx configuration for better performance.
-        ```nginx
-        listen 443 ssl http2;
-        ```
-
-## Initial Setup on Server
-
-1.  **Clone the Repository**:
-    ```bash
-    git clone <your-repo-url> shopwice
-    cd shopwice
-    ```
-
-2.  **Environment Variables**:
-    Create a `.env.production` file with your live credentials.
-    ```bash
-    cp .env.example .env.production
-    nano .env.production
-    ```
-    *Update the values in `.env.production` to match your production keys.*
-
-3.  **Make Script Executable**:
-    ```bash
-    chmod +x deploy.sh
-    ```
-
-## Deploying
-
-To deploy or update the application, simply run the deployment script from the project root:
-
-```bash
-./deploy.sh
-```
-
-### What the script does:
-1.  **Stops existing instance**: Safely stops the `shopwice` service if running.
-2.  **Updates Code**: Pulls the latest changes from the `main` branch.
-3.  **Rebuilds**: Installs dependencies and builds the Next.js application.
-4.  **Prepares Standalone**: Copies necessary assets (public folder, static files) to the standalone build directory.
-5.  **Restarts**: Starts the application using PM2 in cluster mode.
-
-## Troubleshooting
-
-### Port Conflicts
-If you see `EADDRINUSE: address already in use`, it means another process is using port 3001.
-- Check running ports: `netstat -nlp | grep :3001`
-- Kill specific process: `kill <PID>`
-
-### Permission Denied
-If you encounter permission errors during the script execution:
-- Ensure you own the directory: `chown -R $USER:$USER .`
-
-### Logs
-To view the application logs:
-```bash
-pm2 logs shopwice
-```
-
-### App Not Starting
-If PM2 shows the app as "errored" or it restarts incorrectly:
-1.  Check logs: `pm2 logs shopwice --lines 100`
-2.  Ensure `.env.production` exists in the root (the script copies it to the standalone folder automatically).
-
-### 404 Errors / Broken Styles after Deploy
-If you see `404 Not Found` errors for JS/CSS files or the site looks broken after a deployment:
-*   **Cause**: Cloudflare is caching the old `index.html` which points to old filenames that no longer exist.
-*   **Fix**:
-    1.  Go to **Cloudflare Dashboard > Caching > Configuration**.
-    2.  Click **Purge Everything**.
-    3.  **Disable Rocket Loader**: Go to **Speed > Optimization** and turn off "Rocket Loader". It often breaks Next.js hydration.
 ````
 
 ## File: next.config.js
@@ -22565,13 +22786,13 @@ import PaymentInfo from './PaymentInfo.component';
 import ProductLocationDisplay from './ProductLocationDisplay.component';
 import ProductActions from './ProductActions.component';
 // Dynamic Imports for Performance
-const ProductReviews = dynamic(() => import('./ProductReviews.component'), {
+const ProductReviewsREST = dynamic(() => import('./ProductReviewsREST.component'), {
     loading: () => <p className="p-4 text-center text-gray-500">Loading reviews...</p>
 });
 const ComparePriceModal = dynamic(() => import('./ComparePriceModal.component'), { ssr: false });
 const WhatIsRefurbishedModal = dynamic(() => import('./WhatIsRefurbishedModal.component'), { ssr: false });
 import QuantityControl from '@/components/Cart/QuantityControl.component';
-import RecentRefurbishedReviews from './RecentRefurbishedReviews.component';
+import RecentRefurbishedReviewsREST from './RecentRefurbishedReviewsREST.component';
 const SingleProductFinal = ({ product }: { product: any }) => {
     const [selectedVariation, setSelectedVariation] = useState<number>();
     const [quantity, setQuantity] = useState<number>(1);
@@ -22691,7 +22912,7 @@ const SingleProductFinal = ({ product }: { product: any }) => {
                             )}
                             <div ref={reviewsRef} className="scroll-mt-24">
                                 <Accordion title={`Reviews (${reviewCount || 0})`}>
-                                    <ProductReviews reviews={reviews?.nodes || []} />
+                                    <ProductReviewsREST productId={product.databaseId} />
                                 </Accordion>
                             </div>
                             {((productCategories?.nodes && productCategories.nodes.length > 0) || sku) && (
@@ -22973,7 +23194,7 @@ const SingleProductFinal = ({ product }: { product: any }) => {
                                         )}
                                     </div>
                                     {/* Global Refurbished Reviews */}
-                                    {isRefurbished && <RecentRefurbishedReviews />}
+                                    {isRefurbished && <RecentRefurbishedReviewsREST />}
                                 </div>
                             </div>
                         </div>
@@ -23009,7 +23230,7 @@ const SingleProductFinal = ({ product }: { product: any }) => {
                     {/* Reviews Mobile */}
                     <div ref={reviewsRef} className="scroll-mt-24">
                         <Accordion title={`Reviews (${reviewCount || 0})`}>
-                            <ProductReviews reviews={reviews?.nodes || []} />
+                            <ProductReviewsREST productId={product.databaseId} />
                         </Accordion>
                     </div>
                     {((productCategories?.nodes && productCategories.nodes.length > 0) || sku) && (
