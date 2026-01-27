@@ -31,8 +31,8 @@ const RecentRefurbishedReviewsREST = () => {
             try {
                 setLoading(true);
                 // Fetch recent approved reviews
-                const response = await fetch(
-                    'https://api.shopwice.com/wp-json/wc/v3/products/reviews?status=approved&per_page=20',
+                const reviewsResponse = await fetch(
+                    'https://api.shopwice.com/wp-json/wc/v3/products/reviews?status=approved&per_page=50',
                     {
                         headers: {
                             'Content-Type': 'application/json',
@@ -40,15 +40,55 @@ const RecentRefurbishedReviewsREST = () => {
                     }
                 );
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                if (!reviewsResponse.ok) {
+                    throw new Error(`HTTP error! status: ${reviewsResponse.status}`);
                 }
 
-                const data = await response.json();
+                const reviewsData = await reviewsResponse.json();
 
-                // Filter for refurbished products (check if product name contains "refurbish")
-                const refurbishedReviews = data.filter((review: Review) =>
-                    review.product_name?.toLowerCase().includes('refurbish')
+                // Get unique product IDs
+                const productIds = [...new Set(reviewsData.map((r: Review) => r.product_id))];
+
+                // Fetch product details to check if they're refurbished
+                const productDetailsPromises = productIds.slice(0, 20).map(async (productId) => {
+                    try {
+                        const response = await fetch(
+                            `https://api.shopwice.com/wp-json/wc/v3/products/${productId}`,
+                            {
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                            }
+                        );
+                        if (response.ok) {
+                            return await response.json();
+                        }
+                    } catch (err) {
+                        console.error(`Error fetching product ${productId}:`, err);
+                    }
+                    return null;
+                });
+
+                const products = (await Promise.all(productDetailsPromises)).filter(Boolean);
+
+                // Check if product is refurbished based on Condition attribute
+                const refurbishedProductIds = new Set(
+                    products
+                        .filter((product: any) => {
+                            // A refurbished product has a "Condition" attribute set to "Refurbish"
+                            const conditionAttr = product.attributes?.find(
+                                (attr: any) => attr.name?.toLowerCase() === 'condition'
+                            );
+                            return conditionAttr?.options?.some(
+                                (opt: any) => opt.toLowerCase().includes('refurbish')
+                            );
+                        })
+                        .map((product: any) => product.id)
+                );
+
+                // Filter reviews for refurbished products
+                const refurbishedReviews = reviewsData.filter((review: Review) =>
+                    refurbishedProductIds.has(review.product_id)
                 );
 
                 // Sort by date and take top 5

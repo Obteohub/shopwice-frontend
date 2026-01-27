@@ -72,10 +72,13 @@ const SingleProductFinal = ({ product }: { product: any }) => {
         (cat: any) => cat.name.toLowerCase() === 'mobile phones' || cat.slug === 'mobile-phones'
     );
 
-    // Check if product has ANY attribute with an option containing "Refurbish" or name contains it
-    const isRefurbished = attributes?.nodes?.some(
-        (attr: any) => attr.options?.some((opt: any) => opt.toLowerCase().includes('refurbish'))
-    ) || name.toLowerCase().includes('refurbish');
+    // A refurbished product has a "Condition" attribute set to "Refurbish"
+    const conditionAttr = attributes?.nodes?.find(
+        (attr: any) => attr.name?.toLowerCase() === 'condition'
+    );
+    const isRefurbished = conditionAttr?.options?.some(
+        (opt: any) => opt.toLowerCase().includes('refurbish')
+    );
 
     // Determine Box Content
     const boxContentAttr = attributes?.nodes?.find((attr: any) =>
