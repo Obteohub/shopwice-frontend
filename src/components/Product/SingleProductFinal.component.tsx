@@ -472,7 +472,7 @@ const SingleProductFinal = ({ product }: { product: any }) => {
                                     </div>
 
                                     {/* Global Refurbished Reviews */}
-                                    {isRefurbished && <RecentRefurbishedReviews />}
+                                    {/* {isRefurbished && <RecentRefurbishedReviews />} */}
                                 </div>
                             </div>
                         </div>
