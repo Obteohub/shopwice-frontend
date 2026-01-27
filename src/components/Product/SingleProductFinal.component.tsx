@@ -76,6 +76,20 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
         (attr) => attr.options?.some((opt) => opt.toLowerCase().includes('refurbish'))
     ) || name.toLowerCase().includes('refurbish');
 
+    // Determine Box Content
+    const boxContentAttr = attributes?.nodes?.find((attr: any) =>
+        ['what\'s in the box', 'box content', 'in the box', 'package contains'].includes((attr.name || '').toLowerCase())
+    );
+
+    let boxContentText: string | null = null;
+    if (boxContentAttr && boxContentAttr.options) {
+        boxContentText = boxContentAttr.options.join(', ');
+    } else if (isRefurbished) {
+        boxContentText = isMobilePhone
+            ? "Device, Charging Cable, User Manual, SIM Ejector Tool "
+            : "Device, Compatible Essential Accessories (Generic Box)";
+    }
+
     const showRefurbishedBadge = isRefurbished;
     const showWarrantyBadge = isRefurbished;
 
@@ -262,7 +276,7 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                                 <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
                                                 </svg>
-                                                <span className="font-medium">3 months warranty</span>
+                                                <span className="font-medium">12 months warranty</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs text-gray-700">
                                                 <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -299,7 +313,7 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                                         {isRefurbished && (
                                                             <span className="text-[10px] uppercase font-extrabold text-blue-700 mb-0.5">Refurbished Price</span>
                                                         )}
-                                                        <p className="text-3xl font-bold text-blue-600 leading-none">
+                                                        <p className="text-3xl font-bold text-blue-600 leading-none" suppressHydrationWarning>
                                                             {product.variations
                                                                 ? price
                                                                 : salePrice}
@@ -309,7 +323,7 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                                         {isRefurbished && (
                                                             <span className="text-[10px] uppercase font-extrabold text-gray-400 mb-0.5">Brand New Price</span>
                                                         )}
-                                                        <p className="text-xl text-gray-400 line-through leading-none">
+                                                        <p className="text-xl text-gray-400 line-through leading-none" suppressHydrationWarning>
                                                             {regularPrice}
                                                         </p>
                                                     </div>
@@ -326,7 +340,7 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                                             const savings = regVal - saleVal;
                                                             const savingsFormatted = savings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                                             return (
-                                                                <p className="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded inline-block mt-1">
+                                                                <p className="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded inline-block mt-1" suppressHydrationWarning>
                                                                     You Save: GH₵{savingsFormatted}
                                                                 </p>
                                                             );
@@ -345,7 +359,7 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                                 )}
                                             </div>
                                         ) : (
-                                            <p className="text-3xl font-bold text-gray-600">{price}</p>
+                                            <p className="text-3xl font-bold text-gray-600" suppressHydrationWarning>{price}</p>
                                         )}
                                     </div>
 
@@ -412,6 +426,21 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                             )
                                         })()}
                                     </div>
+
+                                    {/* What's in the box Section */}
+                                    {boxContentText && (
+                                        <div className="my-3 p-3 bg-gray-50 rounded-lg border border-gray-100 shadow-sm">
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m-8-4v10l8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                                </svg>
+                                                <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">What's in the box?</span>
+                                            </div>
+                                            <p className="text-xs md:text-sm text-gray-600 pl-6 leading-relaxed font-medium" suppressHydrationWarning>
+                                                {boxContentText}
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {/* Buttons */}
                                     <div className="flex flex-col gap-3 pt-2">
