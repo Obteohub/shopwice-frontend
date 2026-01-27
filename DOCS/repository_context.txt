@@ -8179,6 +8179,190 @@ const ComparePriceModal = ({ isOpen, onClose, newPrice, refurbPrice, productName
 export default ComparePriceModal;
 ````
 
+## File: src/components/Product/ProductActions.component.tsx
+````typescript
+import { useState, useEffect } from 'react';
+interface ProductActionsProps {
+    productName: string;
+    productUrl: string; // Should be full URL if possible, or relative
+    productId: number;
+    orientation?: 'row' | 'col';
+}
+const ProductActions = ({ productName, productUrl, productId, orientation = 'col' }: ProductActionsProps) => {
+    const [isWishlisted, setIsWishlisted] = useState(false);
+    const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    useEffect(() => {
+        // Check local storage for wishlist status
+        try {
+            const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+            if (wishlist.includes(productId)) {
+                setIsWishlisted(true);
+            }
+        } catch (e) {
+            console.error("Error reading wishlist", e);
+        }
+    }, [productId]);
+    const handleWishlistToggle = () => {
+        try {
+            const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+            let newWishlist;
+            if (wishlist.includes(productId)) {
+                newWishlist = wishlist.filter((id: number) => id !== productId);
+                setIsWishlisted(false);
+            } else {
+                newWishlist = [...wishlist, productId];
+                setIsWishlisted(true);
+            }
+            localStorage.setItem('wishlist', JSON.stringify(newWishlist));
+            // Dispatch a custom event so other components can react if needed
+            window.dispatchEvent(new Event('wishlist-updated'));
+        } catch (e) {
+            console.error("Error updating wishlist", e);
+        }
+    };
+    const handleShare = async () => {
+        const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl;
+        // Try native share first if available
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: productName,
+                    text: `Check out ${productName} on Shopwice!`,
+                    url: fullUrl,
+                });
+                return;
+            } catch (error) {
+                console.log('Native share failed or cancelled, falling back to modal', error);
+            }
+        }
+        // Open custom modal if native share not available or failed
+        setIsShareModalOpen(true);
+    };
+    const copyToClipboard = async () => {
+        const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl;
+        try {
+            await navigator.clipboard.writeText(fullUrl);
+            setShareFeedback('Copied!');
+            setTimeout(() => setShareFeedback(null), 2000);
+        } catch (err) {
+            // Fallback for older browsers
+            const textArea = document.createElement("textarea");
+            textArea.value = fullUrl;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                setShareFeedback('Copied!');
+                setTimeout(() => setShareFeedback(null), 2000);
+            } catch (err) {
+                setShareFeedback('Failed');
+                setTimeout(() => setShareFeedback(null), 2000);
+            }
+            document.body.removeChild(textArea);
+        }
+    };
+    const shareLinks = [
+        {
+            name: 'WhatsApp',
+            getUrl: (url: string, text: string) => `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`
+        },
+        {
+            name: 'Facebook',
+            getUrl: (url: string, text: string) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
+        },
+        {
+            name: 'Twitter',
+            getUrl: (url: string, text: string) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
+        },
+        {
+            name: 'Gmail',
+            getUrl: (url: string, text: string) => `mailto:?subject=${encodeURIComponent(text)}&body=${encodeURIComponent(url)}`
+        }
+    ];
+    return (
+        <>
+            <div className={`flex ${orientation === 'row' ? 'flex-row' : 'flex-col'} gap-3`}>
+                {/* Share Button */}
+                <button
+                    onClick={handleShare}
+                    className="flex flex-col items-center justify-center w-10 h-10 bg-white rounded-full shadow-md hover:bg-gray-50 text-gray-700 transition-all active:scale-95 group relative border border-gray-100 z-30 cursor-pointer"
+                    aria-label="Share this product"
+                    title="Share"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
+                    </svg>
+                    {shareFeedback && !isShareModalOpen && (
+                        <div className="absolute right-12 top-1 bg-black text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap animate-fade-in z-10 font-bold">
+                            {shareFeedback}
+                        </div>
+                    )}
+                </button>
+                {/* Wishlist Button */}
+                <button
+                    onClick={handleWishlistToggle}
+                    className="flex flex-col items-center justify-center w-10 h-10 bg-white rounded-full shadow-md hover:bg-gray-50 transition-all active:scale-95 border border-gray-100 z-30 cursor-pointer"
+                    aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                    title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill={isWishlisted ? "#ef4444" : "none"}
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke={isWishlisted ? "#ef4444" : "currentColor"}
+                        className={`w-5 h-5 transition-colors ${isWishlisted ? 'text-red-500' : 'text-gray-700'}`}
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                    </svg>
+                </button>
+            </div>
+            {/* Share Modal - Refined Minimal Design */}
+            {isShareModalOpen && (
+                <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm" onClick={() => setIsShareModalOpen(false)}>
+                    <div className="bg-white rounded-xl w-full max-w-[280px] shadow-2xl overflow-hidden animate-scale-up" onClick={e => e.stopPropagation()}>
+                        <div className="p-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <h3 className="text-sm font-bold text-gray-900">Share via</h3>
+                            <button onClick={() => setIsShareModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors bg-white rounded-full p-1 shadow-sm border border-gray-100">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div className="py-1">
+                            {shareLinks.map((link) => (
+                                <a
+                                    key={link.name}
+                                    href={link.getUrl(typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl, `Check out ${productName} on Shopwice!`)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-sm text-gray-700 font-medium group"
+                                >
+                                    <span className="group-hover:text-gray-900">{link.name}</span>
+                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                </a>
+                            ))}
+                            {/* Copy Link Option */}
+                            <button
+                                onClick={copyToClipboard}
+                                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-sm text-gray-700 font-medium border-t border-gray-100 group"
+                            >
+                                <span className="group-hover:text-gray-900">Copy Link</span>
+                                {shareFeedback === 'Copied!' ? (
+                                    <span className="text-green-600 text-xs font-bold bg-green-50 px-2 py-0.5 rounded border border-green-100">Copied!</span>
+                                ) : (
+                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+export default ProductActions;
+````
+
 ## File: src/components/Product/ProductGalleryVertical.component.tsx
 ````typescript
 import React, { useState, useRef } from 'react';
@@ -9787,6 +9971,339 @@ export const getStaticProps: GetStaticProps = async () => {
             }
         };
     }
+};
+````
+
+## File: src/utils/functions/functions.tsx
+````typescript
+/*eslint complexity: ["error", 20]*/
+import { v4 as uuidv4 } from 'uuid';
+import type { Product } from '@/stores/cartStore';
+interface RootObject {
+  products: Product[];
+  totalProductsCount: number;
+  totalProductsPrice: number;
+}
+import { ChangeEvent } from 'react';
+import { IVariationNodes } from '@/components/Product/AddToCart.component';
+/* Interface for products*/
+export interface IImage {
+  __typename: string;
+  id: string;
+  sourceUrl?: string;
+  srcSet?: string;
+  altText: string;
+  title: string;
+}
+export interface IGalleryImages {
+  __typename: string;
+  nodes: IImage[];
+}
+interface IProductNode {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  description: string;
+  stockStatus: string;
+  type: string;
+  onSale: boolean;
+  slug: string;
+  averageRating: number;
+  reviewCount: number;
+  image: IImage;
+  galleryImages: IGalleryImages;
+  productId: number;
+  totalSales?: number;
+}
+interface IProduct {
+  __typename: string;
+  node: IProductNode;
+}
+interface IVariationNode {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  description: string;
+  type: string;
+  onSale: boolean;
+  price: string;
+  regularPrice: string;
+  salePrice: string;
+  image: IImage;
+  attributes: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      value: string;
+    }>;
+  };
+}
+interface IVariation {
+  __typename: string;
+  node: IVariationNode;
+}
+export interface IProductRootObject {
+  __typename: string;
+  key: string;
+  product: IProduct;
+  variation?: IVariation;
+  quantity: number;
+  total: string;
+  subtotal: string;
+  subtotalTax: string;
+}
+type TUpdatedItems = { key: string; quantity: number }[];
+export interface IUpdateCartItem {
+  key: string;
+  quantity: number;
+}
+export interface IUpdateCartInput {
+  clientMutationId: string;
+  items: IUpdateCartItem[];
+}
+export interface IUpdateCartVariables {
+  input: IUpdateCartInput;
+}
+export interface IUpdateCartRootObject {
+  variables: IUpdateCartVariables;
+}
+/* Interface for props */
+interface IFormattedCartProps {
+  cart: { contents: { nodes: IProductRootObject[] }; total: number };
+}
+export interface ICheckoutDataProps {
+  firstName: string;
+  lastName: string;
+  address1: string;
+  address2: string;
+  city: string;
+  country: string;
+  state: string;
+  postcode: string;
+  email: string;
+  phone: string;
+  company: string;
+  paymentMethod: string;
+}
+/**
+ * Add empty character after currency symbol
+ * @param {string} price The price string that we input
+ * @param {string} symbol Currency symbol to add empty character/padding after
+ */
+export const paddedPrice = (price: string, symbol: string) => {
+  if (!price) return '';
+  return price.split(symbol).join(`${symbol} `);
+};
+/**
+ * Shorten inputted string (usually product description) to a maximum of length
+ * @param {string} input The string that we input
+ * @param {number} length The length that we want to shorten the text to
+ */
+export const trimmedStringToLength = (input: string, length: number) => {
+  if (input.length > length) {
+    const subStr = input.substring(0, length);
+    return `${subStr}...`;
+  }
+  return input;
+};
+/**
+ * Filter variant price. Changes "kr198.00 - kr299.00" to kr299.00 or kr198 depending on the side variable
+ * @param {String} side Which side of the string to return (which side of the "-" symbol)
+ * @param {String} price The inputted price that we need to convert
+ */
+export const filteredVariantPrice = (price: string, side: string) => {
+  if (!price) {
+    return '';
+  }
+  const dashIndex = price.indexOf('-');
+  if (dashIndex === -1) {
+    // If no dash, it's a single price.
+    // If asking for 'right' (regular/high), return empty or same?
+    // Usually 'right' is used for struck-through regular price in the context of a range.
+    // But in SingleProduct, 'right' is used for regular price.
+    // If there's no range, there's only one price.
+    // Let's assume if side is 'right', we might not want to show it if it's the same as left?
+    // But the current logic returned the WHOLE string for 'right' (due to substring(length, -1)) and EMPTY for 'left'.
+    // We want 'left' (sale/main) to show the price.
+    if (side === 'right') {
+      return ''; // Don't show a "regular" price if there's no range? Or handle in component?
+      // Actually, if we return empty for right, the component might hide the struck-through price.
+      // Let's see SingleProduct usage:
+      // {product.variations ? filteredVariantPrice(price, 'right') : regularPrice}
+      // If we return '', it shows nothing.
+      // {product.variations ? filteredVariantPrice(price, '') : salePrice}
+      // If we return 'GH₵100', it shows 'GH₵100'.
+      // This seems correct for a single price variable product.
+    }
+    return price;
+  }
+  if ('right' === side) {
+    return price.substring(dashIndex + 1).trim();
+  }
+  return price.substring(0, dashIndex).trim();
+};
+/**
+ * Returns cart data in the required format.
+ * @param {String} data Cart data
+ */
+export const getFormattedCart = (data: IFormattedCartProps) => {
+  const formattedCart: RootObject = {
+    products: [],
+    totalProductsCount: 0,
+    totalProductsPrice: 0,
+  };
+  if (!data) {
+    return;
+  }
+  const givenProducts = data.cart.contents.nodes;
+  // Create an empty object.
+  formattedCart.products = [];
+  const product: Product = {
+    productId: 0,
+    cartKey: '',
+    name: '',
+    qty: 0,
+    price: 0,
+    totalPrice: '0',
+    image: { sourceUrl: '', srcSet: '', title: '' },
+  };
+  let totalProductsCount = 0;
+  let i = 0;
+  if (!givenProducts.length) {
+    return;
+  }
+  givenProducts.forEach(() => {
+    const givenProduct = givenProducts[Number(i)].product.node;
+    // Convert price to a float value
+    const convertedCurrency = givenProducts[Number(i)].total.replace(
+      /[^0-9.-]+/g,
+      '',
+    );
+    product.productId = givenProduct.productId;
+    product.cartKey = givenProducts[Number(i)].key;
+    product.name = givenProduct.name;
+    product.qty = givenProducts[Number(i)].quantity;
+    product.price = Number(convertedCurrency) / product.qty;
+    product.totalPrice = givenProducts[Number(i)].total;
+    // Ensure we can add products without images to the cart
+    product.image = givenProduct.image.sourceUrl
+      ? {
+        sourceUrl: givenProduct.image.sourceUrl,
+        srcSet: givenProduct.image.srcSet,
+        title: givenProduct.image.title,
+      }
+      : {
+        sourceUrl: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+        srcSet: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+        title: givenProduct.name,
+      };
+    totalProductsCount += givenProducts[Number(i)].quantity;
+    // Push each item into the products array.
+    formattedCart.products.push(product);
+    i++;
+  });
+  formattedCart.totalProductsCount = totalProductsCount;
+  formattedCart.totalProductsPrice = data.cart.total;
+  return formattedCart;
+};
+export const createCheckoutData = (order: ICheckoutDataProps) => ({
+  clientMutationId: uuidv4(),
+  billing: {
+    firstName: order.firstName,
+    lastName: order.lastName,
+    address1: order.address1,
+    address2: order.address2,
+    city: order.city,
+    country: order.country,
+    state: order.state,
+    postcode: order.postcode,
+    email: order.email,
+    phone: order.phone,
+    company: order.company,
+  },
+  shipping: {
+    firstName: order.firstName,
+    lastName: order.lastName,
+    address1: order.address1,
+    address2: order.address2,
+    city: order.city,
+    country: order.country,
+    state: order.state,
+    postcode: order.postcode,
+    email: order.email,
+    phone: order.phone,
+    company: order.company,
+  },
+  shipToDifferentAddress: false,
+  paymentMethod: order.paymentMethod,
+  isPaid: false,
+  transactionId: 'fhggdfjgfi',
+});
+/**
+ * Get the updated items in the below format required for mutation input.
+ *
+ * Creates an array in above format with the newQty (updated Qty ).
+ *
+ */
+export const getUpdatedItems = (
+  products: IProductRootObject[],
+  newQty: number,
+  cartKey: string,
+) => {
+  // Create an empty array.
+  const updatedItems: TUpdatedItems = [];
+  // Loop through the product array.
+  products.forEach((cartItem) => {
+    // If you find the cart key of the product user is trying to update, push the key and new qty.
+    if (cartItem.key === cartKey) {
+      updatedItems.push({
+        key: cartItem.key,
+        quantity: newQty,
+      });
+      // Otherwise just push the existing qty without updating.
+    } else {
+      updatedItems.push({
+        key: cartItem.key,
+        quantity: cartItem.quantity,
+      });
+    }
+  });
+  // Return the updatedItems array with new Qtys.
+  return updatedItems;
+};
+/*
+ * When user changes the quantity, update the cart in localStorage
+ * Also update the cart in the global Context
+ */
+export const handleQuantityChange = (
+  event: ChangeEvent<HTMLInputElement>,
+  cartKey: string,
+  cart: IProductRootObject[],
+  updateCart: (variables: IUpdateCartRootObject) => void,
+  updateCartProcessing: boolean,
+) => {
+  if (process.browser) {
+    event.stopPropagation();
+    // Return if the previous update cart mutation request is still processing
+    if (updateCartProcessing || !cart) {
+      return;
+    }
+    // If the user tries to delete the count of product, set that to 1 by default ( This will not allow him to reduce it less than zero )
+    const newQty = event.target.value ? parseInt(event.target.value, 10) : 1;
+    if (cart.length) {
+      const updatedItems = getUpdatedItems(cart, newQty, cartKey);
+      updateCart({
+        variables: {
+          input: {
+            clientMutationId: uuidv4(),
+            items: updatedItems,
+          },
+        },
+      });
+    }
+  }
 };
 ````
 
@@ -12457,339 +12974,6 @@ const client = new ApolloClient({
   cache: new InMemoryCache(),
 });
 export default client;
-````
-
-## File: src/utils/functions/functions.tsx
-````typescript
-/*eslint complexity: ["error", 20]*/
-import { v4 as uuidv4 } from 'uuid';
-import type { Product } from '@/stores/cartStore';
-interface RootObject {
-  products: Product[];
-  totalProductsCount: number;
-  totalProductsPrice: number;
-}
-import { ChangeEvent } from 'react';
-import { IVariationNodes } from '@/components/Product/AddToCart.component';
-/* Interface for products*/
-export interface IImage {
-  __typename: string;
-  id: string;
-  sourceUrl?: string;
-  srcSet?: string;
-  altText: string;
-  title: string;
-}
-export interface IGalleryImages {
-  __typename: string;
-  nodes: IImage[];
-}
-interface IProductNode {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  description: string;
-  stockStatus: string;
-  type: string;
-  onSale: boolean;
-  slug: string;
-  averageRating: number;
-  reviewCount: number;
-  image: IImage;
-  galleryImages: IGalleryImages;
-  productId: number;
-  totalSales?: number;
-}
-interface IProduct {
-  __typename: string;
-  node: IProductNode;
-}
-interface IVariationNode {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  description: string;
-  type: string;
-  onSale: boolean;
-  price: string;
-  regularPrice: string;
-  salePrice: string;
-  image: IImage;
-  attributes: {
-    nodes: Array<{
-      id: string;
-      name: string;
-      value: string;
-    }>;
-  };
-}
-interface IVariation {
-  __typename: string;
-  node: IVariationNode;
-}
-export interface IProductRootObject {
-  __typename: string;
-  key: string;
-  product: IProduct;
-  variation?: IVariation;
-  quantity: number;
-  total: string;
-  subtotal: string;
-  subtotalTax: string;
-}
-type TUpdatedItems = { key: string; quantity: number }[];
-export interface IUpdateCartItem {
-  key: string;
-  quantity: number;
-}
-export interface IUpdateCartInput {
-  clientMutationId: string;
-  items: IUpdateCartItem[];
-}
-export interface IUpdateCartVariables {
-  input: IUpdateCartInput;
-}
-export interface IUpdateCartRootObject {
-  variables: IUpdateCartVariables;
-}
-/* Interface for props */
-interface IFormattedCartProps {
-  cart: { contents: { nodes: IProductRootObject[] }; total: number };
-}
-export interface ICheckoutDataProps {
-  firstName: string;
-  lastName: string;
-  address1: string;
-  address2: string;
-  city: string;
-  country: string;
-  state: string;
-  postcode: string;
-  email: string;
-  phone: string;
-  company: string;
-  paymentMethod: string;
-}
-/**
- * Add empty character after currency symbol
- * @param {string} price The price string that we input
- * @param {string} symbol Currency symbol to add empty character/padding after
- */
-export const paddedPrice = (price: string, symbol: string) => {
-  if (!price) return '';
-  return price.split(symbol).join(`${symbol} `);
-};
-/**
- * Shorten inputted string (usually product description) to a maximum of length
- * @param {string} input The string that we input
- * @param {number} length The length that we want to shorten the text to
- */
-export const trimmedStringToLength = (input: string, length: number) => {
-  if (input.length > length) {
-    const subStr = input.substring(0, length);
-    return `${subStr}...`;
-  }
-  return input;
-};
-/**
- * Filter variant price. Changes "kr198.00 - kr299.00" to kr299.00 or kr198 depending on the side variable
- * @param {String} side Which side of the string to return (which side of the "-" symbol)
- * @param {String} price The inputted price that we need to convert
- */
-export const filteredVariantPrice = (price: string, side: string) => {
-  if (!price) {
-    return '';
-  }
-  const dashIndex = price.indexOf('-');
-  if (dashIndex === -1) {
-    // If no dash, it's a single price.
-    // If asking for 'right' (regular/high), return empty or same?
-    // Usually 'right' is used for struck-through regular price in the context of a range.
-    // But in SingleProduct, 'right' is used for regular price.
-    // If there's no range, there's only one price.
-    // Let's assume if side is 'right', we might not want to show it if it's the same as left?
-    // But the current logic returned the WHOLE string for 'right' (due to substring(length, -1)) and EMPTY for 'left'.
-    // We want 'left' (sale/main) to show the price.
-    if (side === 'right') {
-      return ''; // Don't show a "regular" price if there's no range? Or handle in component?
-      // Actually, if we return empty for right, the component might hide the struck-through price.
-      // Let's see SingleProduct usage:
-      // {product.variations ? filteredVariantPrice(price, 'right') : regularPrice}
-      // If we return '', it shows nothing.
-      // {product.variations ? filteredVariantPrice(price, '') : salePrice}
-      // If we return 'GH₵100', it shows 'GH₵100'.
-      // This seems correct for a single price variable product.
-    }
-    return price;
-  }
-  if ('right' === side) {
-    return price.substring(dashIndex + 1).trim();
-  }
-  return price.substring(0, dashIndex).trim();
-};
-/**
- * Returns cart data in the required format.
- * @param {String} data Cart data
- */
-export const getFormattedCart = (data: IFormattedCartProps) => {
-  const formattedCart: RootObject = {
-    products: [],
-    totalProductsCount: 0,
-    totalProductsPrice: 0,
-  };
-  if (!data) {
-    return;
-  }
-  const givenProducts = data.cart.contents.nodes;
-  // Create an empty object.
-  formattedCart.products = [];
-  const product: Product = {
-    productId: 0,
-    cartKey: '',
-    name: '',
-    qty: 0,
-    price: 0,
-    totalPrice: '0',
-    image: { sourceUrl: '', srcSet: '', title: '' },
-  };
-  let totalProductsCount = 0;
-  let i = 0;
-  if (!givenProducts.length) {
-    return;
-  }
-  givenProducts.forEach(() => {
-    const givenProduct = givenProducts[Number(i)].product.node;
-    // Convert price to a float value
-    const convertedCurrency = givenProducts[Number(i)].total.replace(
-      /[^0-9.-]+/g,
-      '',
-    );
-    product.productId = givenProduct.productId;
-    product.cartKey = givenProducts[Number(i)].key;
-    product.name = givenProduct.name;
-    product.qty = givenProducts[Number(i)].quantity;
-    product.price = Number(convertedCurrency) / product.qty;
-    product.totalPrice = givenProducts[Number(i)].total;
-    // Ensure we can add products without images to the cart
-    product.image = givenProduct.image.sourceUrl
-      ? {
-        sourceUrl: givenProduct.image.sourceUrl,
-        srcSet: givenProduct.image.srcSet,
-        title: givenProduct.image.title,
-      }
-      : {
-        sourceUrl: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
-        srcSet: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
-        title: givenProduct.name,
-      };
-    totalProductsCount += givenProducts[Number(i)].quantity;
-    // Push each item into the products array.
-    formattedCart.products.push(product);
-    i++;
-  });
-  formattedCart.totalProductsCount = totalProductsCount;
-  formattedCart.totalProductsPrice = data.cart.total;
-  return formattedCart;
-};
-export const createCheckoutData = (order: ICheckoutDataProps) => ({
-  clientMutationId: uuidv4(),
-  billing: {
-    firstName: order.firstName,
-    lastName: order.lastName,
-    address1: order.address1,
-    address2: order.address2,
-    city: order.city,
-    country: order.country,
-    state: order.state,
-    postcode: order.postcode,
-    email: order.email,
-    phone: order.phone,
-    company: order.company,
-  },
-  shipping: {
-    firstName: order.firstName,
-    lastName: order.lastName,
-    address1: order.address1,
-    address2: order.address2,
-    city: order.city,
-    country: order.country,
-    state: order.state,
-    postcode: order.postcode,
-    email: order.email,
-    phone: order.phone,
-    company: order.company,
-  },
-  shipToDifferentAddress: false,
-  paymentMethod: order.paymentMethod,
-  isPaid: false,
-  transactionId: 'fhggdfjgfi',
-});
-/**
- * Get the updated items in the below format required for mutation input.
- *
- * Creates an array in above format with the newQty (updated Qty ).
- *
- */
-export const getUpdatedItems = (
-  products: IProductRootObject[],
-  newQty: number,
-  cartKey: string,
-) => {
-  // Create an empty array.
-  const updatedItems: TUpdatedItems = [];
-  // Loop through the product array.
-  products.forEach((cartItem) => {
-    // If you find the cart key of the product user is trying to update, push the key and new qty.
-    if (cartItem.key === cartKey) {
-      updatedItems.push({
-        key: cartItem.key,
-        quantity: newQty,
-      });
-      // Otherwise just push the existing qty without updating.
-    } else {
-      updatedItems.push({
-        key: cartItem.key,
-        quantity: cartItem.quantity,
-      });
-    }
-  });
-  // Return the updatedItems array with new Qtys.
-  return updatedItems;
-};
-/*
- * When user changes the quantity, update the cart in localStorage
- * Also update the cart in the global Context
- */
-export const handleQuantityChange = (
-  event: ChangeEvent<HTMLInputElement>,
-  cartKey: string,
-  cart: IProductRootObject[],
-  updateCart: (variables: IUpdateCartRootObject) => void,
-  updateCartProcessing: boolean,
-) => {
-  if (process.browser) {
-    event.stopPropagation();
-    // Return if the previous update cart mutation request is still processing
-    if (updateCartProcessing || !cart) {
-      return;
-    }
-    // If the user tries to delete the count of product, set that to 1 by default ( This will not allow him to reduce it less than zero )
-    const newQty = event.target.value ? parseInt(event.target.value, 10) : 1;
-    if (cart.length) {
-      const updatedItems = getUpdatedItems(cart, newQty, cartKey);
-      updateCart({
-        variables: {
-          input: {
-            clientMutationId: uuidv4(),
-            items: updatedItems,
-          },
-        },
-      });
-    }
-  }
-};
 ````
 
 ## File: site_dump.html
@@ -19577,190 +19761,6 @@ const DeliveryInfo = () => {
 export default DeliveryInfo;
 ````
 
-## File: src/components/Product/ProductActions.component.tsx
-````typescript
-import { useState, useEffect } from 'react';
-interface ProductActionsProps {
-    productName: string;
-    productUrl: string; // Should be full URL if possible, or relative
-    productId: number;
-    orientation?: 'row' | 'col';
-}
-const ProductActions = ({ productName, productUrl, productId, orientation = 'col' }: ProductActionsProps) => {
-    const [isWishlisted, setIsWishlisted] = useState(false);
-    const [shareFeedback, setShareFeedback] = useState<string | null>(null);
-    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-    useEffect(() => {
-        // Check local storage for wishlist status
-        try {
-            const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
-            if (wishlist.includes(productId)) {
-                setIsWishlisted(true);
-            }
-        } catch (e) {
-            console.error("Error reading wishlist", e);
-        }
-    }, [productId]);
-    const handleWishlistToggle = () => {
-        try {
-            const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
-            let newWishlist;
-            if (wishlist.includes(productId)) {
-                newWishlist = wishlist.filter((id: number) => id !== productId);
-                setIsWishlisted(false);
-            } else {
-                newWishlist = [...wishlist, productId];
-                setIsWishlisted(true);
-            }
-            localStorage.setItem('wishlist', JSON.stringify(newWishlist));
-            // Dispatch a custom event so other components can react if needed
-            window.dispatchEvent(new Event('wishlist-updated'));
-        } catch (e) {
-            console.error("Error updating wishlist", e);
-        }
-    };
-    const handleShare = async () => {
-        const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl;
-        // Try native share first if available
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: productName,
-                    text: `Check out ${productName} on Shopwice!`,
-                    url: fullUrl,
-                });
-                return;
-            } catch (error) {
-                console.log('Native share failed or cancelled, falling back to modal', error);
-            }
-        }
-        // Open custom modal if native share not available or failed
-        setIsShareModalOpen(true);
-    };
-    const copyToClipboard = async () => {
-        const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl;
-        try {
-            await navigator.clipboard.writeText(fullUrl);
-            setShareFeedback('Copied!');
-            setTimeout(() => setShareFeedback(null), 2000);
-        } catch (err) {
-            // Fallback for older browsers
-            const textArea = document.createElement("textarea");
-            textArea.value = fullUrl;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                setShareFeedback('Copied!');
-                setTimeout(() => setShareFeedback(null), 2000);
-            } catch (err) {
-                setShareFeedback('Failed');
-                setTimeout(() => setShareFeedback(null), 2000);
-            }
-            document.body.removeChild(textArea);
-        }
-    };
-    const shareLinks = [
-        {
-            name: 'WhatsApp',
-            getUrl: (url: string, text: string) => `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`
-        },
-        {
-            name: 'Facebook',
-            getUrl: (url: string, text: string) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
-        },
-        {
-            name: 'Twitter',
-            getUrl: (url: string, text: string) => `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`
-        },
-        {
-            name: 'Gmail',
-            getUrl: (url: string, text: string) => `mailto:?subject=${encodeURIComponent(text)}&body=${encodeURIComponent(url)}`
-        }
-    ];
-    return (
-        <>
-            <div className={`flex ${orientation === 'row' ? 'flex-row' : 'flex-col'} gap-3`}>
-                {/* Share Button */}
-                <button
-                    onClick={handleShare}
-                    className="flex flex-col items-center justify-center w-10 h-10 bg-white rounded-full shadow-md hover:bg-gray-50 text-gray-700 transition-all active:scale-95 group relative border border-gray-100 z-30 cursor-pointer"
-                    aria-label="Share this product"
-                    title="Share"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" />
-                    </svg>
-                    {shareFeedback && !isShareModalOpen && (
-                        <div className="absolute right-12 top-1 bg-black text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap animate-fade-in z-10 font-bold">
-                            {shareFeedback}
-                        </div>
-                    )}
-                </button>
-                {/* Wishlist Button */}
-                <button
-                    onClick={handleWishlistToggle}
-                    className="flex flex-col items-center justify-center w-10 h-10 bg-white rounded-full shadow-md hover:bg-gray-50 transition-all active:scale-95 border border-gray-100 z-30 cursor-pointer"
-                    aria-label={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-                    title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill={isWishlisted ? "#ef4444" : "none"}
-                        viewBox="0 0 24 24"
-                        strokeWidth={1.5}
-                        stroke={isWishlisted ? "#ef4444" : "currentColor"}
-                        className={`w-5 h-5 transition-colors ${isWishlisted ? 'text-red-500' : 'text-gray-700'}`}
-                    >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
-                    </svg>
-                </button>
-            </div>
-            {/* Share Modal - Refined Minimal Design */}
-            {isShareModalOpen && (
-                <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm" onClick={() => setIsShareModalOpen(false)}>
-                    <div className="bg-white rounded-xl w-full max-w-[280px] shadow-2xl overflow-hidden animate-scale-up" onClick={e => e.stopPropagation()}>
-                        <div className="p-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <h3 className="text-sm font-bold text-gray-900">Share via</h3>
-                            <button onClick={() => setIsShareModalOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors bg-white rounded-full p-1 shadow-sm border border-gray-100">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-                        <div className="py-1">
-                            {shareLinks.map((link) => (
-                                <a
-                                    key={link.name}
-                                    href={link.getUrl(typeof window !== 'undefined' ? `${window.location.origin}${productUrl}` : productUrl, `Check out ${productName} on Shopwice!`)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-sm text-gray-700 font-medium group"
-                                >
-                                    <span className="group-hover:text-gray-900">{link.name}</span>
-                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                </a>
-                            ))}
-                            {/* Copy Link Option */}
-                            <button
-                                onClick={copyToClipboard}
-                                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors text-sm text-gray-700 font-medium border-t border-gray-100 group"
-                            >
-                                <span className="group-hover:text-gray-900">Copy Link</span>
-                                {shareFeedback === 'Copied!' ? (
-                                    <span className="text-green-600 text-xs font-bold bg-green-50 px-2 py-0.5 rounded border border-green-100">Copied!</span>
-                                ) : (
-                                    <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-};
-export default ProductActions;
-````
-
 ## File: src/components/Product/ProductLocationDisplay.component.tsx
 ````typescript
 import { useState, useEffect } from 'react';
@@ -21175,15 +21175,12 @@ export const GET_SINGLE_PRODUCT = gql`
       }
       reviews {
         nodes {
-          ... on Review {
-            id
-            content
-            date
-            rating
-            author {
-              node {
-                name
-              }
+          id
+          content
+          date
+          author {
+            node {
+              name
             }
           }
         }
@@ -22526,17 +22523,14 @@ export const GET_RECENT_REVIEWS_QUERY = gql`
         ... on Product {
           reviews(first: 3, where: { status: "APPROVE" }) {
             nodes {
-              ... on Review {
-                id
-                date
-                content
-                rating
-                author {
-                  node {
-                    name
-                    avatar {
-                      url
-                    }
+              id
+              date
+              content
+              author {
+                node {
+                  name
+                  avatar {
+                    url
                   }
                 }
               }
