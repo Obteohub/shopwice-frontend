@@ -5,15 +5,31 @@ import { useQuery } from '@apollo/client';
 import { GET_RECENT_REVIEWS_QUERY } from '@/utils/gql/GQL_QUERIES';
 
 const RecentRefurbishedReviews = () => {
+    // Client-side only flag
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const { data, loading, error } = useQuery(GET_RECENT_REVIEWS_QUERY, {
-        fetchPolicy: 'cache-and-network',
+        fetchPolicy: 'network-only', // Ensure fresh data
+        skip: !mounted, // Skip query during SSR
         notifyOnNetworkStatusChange: true
     });
+
+    if (!mounted) return null;
+    if (loading) return <div className="p-4 text-xs text-center text-gray-400">Loading reviews...</div>;
+    if (error) {
+        console.error("Refurbished Reviews Error:", error);
+        return null;
+    }
 
     // Determine reviews to show
     const recentRefurbishedReviews = data?.reviews?.nodes?.filter((review: any) =>
         review.commentOn?.name?.toLowerCase().includes('refurbish')
     ) || [];
+
+    console.log("Refurbished Reviews Found:", recentRefurbishedReviews);
 
     if (recentRefurbishedReviews.length === 0) return null;
 
