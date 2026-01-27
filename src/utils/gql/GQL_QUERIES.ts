@@ -46,15 +46,12 @@ export const GET_SINGLE_PRODUCT = gql`
       }
       reviews {
         nodes {
-          ... on Review {
-            id
-            content
-            date
-            rating
-            author {
-              node {
-                name
-              }
+          id
+          content
+          date
+          author {
+            node {
+              name
             }
           }
         }
@@ -1423,17 +1420,14 @@ export const GET_RECENT_REVIEWS_QUERY = gql`
         ... on Product {
           reviews(first: 3, where: { status: "APPROVE" }) {
             nodes {
-              ... on Review {
-                id
-                date
-                content
-                rating
-                author {
-                  node {
-                    name
-                    avatar {
-                      url
-                    }
+              id
+              date
+              content
+              author {
+                node {
+                  name
+                  avatar {
+                    url
                   }
                 }
               }
