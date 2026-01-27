@@ -1418,11 +1418,13 @@ export const GET_RECENT_REVIEWS_QUERY = gql`
           sourceUrl
         }
         ... on Product {
-          reviews(first: 3, where: { status: APPROVE }) {
+          reviews(first: 3, where: { status: "APPROVE" }) {
             nodes {
               id
               date
-              rating
+              ... on Review {
+                 rating
+              }
               content
               author {
                 node {
