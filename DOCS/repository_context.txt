@@ -1121,6 +1121,230 @@ const FadeUp = ({ children, cssClass, delay }: IAnimateWithDelayProps) => {
 export default FadeUp;
 ````
 
+## File: src/components/Cart/CartContents.component.tsx
+````typescript
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery } from '@apollo/client';
+import { useRouter } from 'next/router';
+import { v4 as uuidv4 } from 'uuid';
+import { useCartStore } from '@/stores/cartStore';
+import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
+import CartItem from './CartItem.component';
+import CartSummary from './CartSummary.component';
+import EmptyCart from './EmptyCart.component';
+import UpsellCarousel from './UpsellCarousel.component';
+import {
+  getFormattedCart,
+  getUpdatedItems,
+  IProductRootObject,
+} from '@/utils/functions/functions';
+import { GET_CART } from '@/utils/gql/GQL_QUERIES';
+import { UPDATE_CART } from '@/utils/gql/GQL_MUTATIONS';
+const CartContents = () => {
+  const router = useRouter();
+  const { clearWooCommerceSession, syncWithWooCommerce } = useCartStore();
+  const [isUpdating, setIsUpdating] = useState(false);
+  // Fetch Cart Query
+  const { data, refetch, loading: isFetching, error } = useQuery(GET_CART, {
+    notifyOnNetworkStatusChange: true,
+  });
+  useEffect(() => {
+    if (data) {
+      const updatedCart = getFormattedCart(data);
+      if (!updatedCart && !data?.cart?.contents?.nodes?.length) {
+        clearWooCommerceSession();
+        return;
+      }
+      if (updatedCart) {
+        syncWithWooCommerce(updatedCart);
+      }
+    }
+  }, [data, clearWooCommerceSession, syncWithWooCommerce]);
+  // Update Cart Mutation
+  const [updateCart, { data: updateCartData }] = useMutation(UPDATE_CART, {
+    refetchQueries: [{ query: GET_CART }],
+    awaitRefetchQueries: true,
+    onError: () => {
+      setIsUpdating(false);
+    }
+  });
+  useEffect(() => {
+    if (updateCartData) {
+      setIsUpdating(false);
+    }
+  }, [updateCartData]);
+  // Effect to refetch on mount
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+  // Handlers
+  const handleUpdateQuantity = (item: IProductRootObject, newQty: number) => {
+    if (newQty < 1) return;
+    setIsUpdating(true);
+    const updatedItems = getUpdatedItems(data.cart.contents.nodes, newQty, item.key);
+    updateCart({
+      variables: {
+        input: {
+          clientMutationId: uuidv4(),
+          items: updatedItems,
+        },
+      },
+    });
+  };
+  const handleRemoveItem = (item: IProductRootObject) => {
+    setIsUpdating(true);
+    // Setting quantity to 0 effectively removes it in some WC configs, 
+    // or we might need `removeFromCart` mutation. 
+    // Using `getUpdatedItems` with 0 usually works if the function supports it, 
+    // otherwise we might need a specific remove logic. 
+    // The previous code called `handleRemoveProductClick` which used `getUpdatedItems` with 0? 
+    // Wait, the previous code called `getUpdatedItems(products, 0, cartKey)`? 
+    // Let's verify `getUpdatedItems`. It sets quantity to newQty.
+    // If WC API treats 0 as remove, we are good.
+    // Actually, `handleRemoveProductClick` in the old code did exactly that.
+    const updatedItems = getUpdatedItems(data.cart.contents.nodes, 0, item.key);
+    updateCart({
+      variables: {
+        input: {
+          clientMutationId: uuidv4(),
+          items: updatedItems,
+        },
+      },
+    });
+  };
+  const cartItems = data?.cart?.contents?.nodes || [];
+  const cartTotal = data?.cart?.total || '0';
+  const cartSubtotal = data?.cart?.subtotal || cartTotal;
+  const totalProductsCount = data?.cart?.contents?.itemCount || cartItems.reduce((acc: number, item: any) => acc + item.quantity, 0);
+  // Check if cart is empty
+  if (!isFetching && cartItems.length === 0) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <EmptyCart />
+        {/* Show Bestsellers or Upsells even on empty cart? Maybe. */}
+      </div>
+    );
+  }
+  // Loading state (initial)
+  if (isFetching && !data) {
+    return (
+      <div className="flex justify-center items-center min-h-[500px]">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+  // Error state
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded relative">
+          <strong className="font-bold">Error loading cart: </strong>
+          <span className="block sm:inline">{error.message}</span>
+          <button onClick={() => refetch()} className="underline ml-2">Try again</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="px-0 md:container md:mx-auto md:px-4 py-4 md:py-8">
+      <h1 className="text-2xl md:text-3xl font-medium  mb-4 md:mb-4 px-4 md:px-0">Shopping Cart</h1>
+      <div className="flex flex-col-reverse lg:flex-row gap-6 relative">
+        {/* Left Column: Cart Items */}
+        <div className="w-full lg:w-2/3">
+          <div className="bg-white rounded-none md:rounded-lg shadow-sm border-t md:border border-gray-200 overflow-hidden">
+            <div className="space-y-0 md:space-y-1">
+              {cartItems.map((item: IProductRootObject) => (
+                <CartItem
+                  key={item.key}
+                  item={item}
+                  onUpdateQuantity={(qty) => handleUpdateQuantity(item, qty)}
+                  onRemove={() => handleRemoveItem(item)}
+                  loading={isUpdating}
+                />
+              ))}
+            </div>
+          </div>
+          {/* Cross Sells / Upsells (Below items) */}
+          <div className="mt-12">
+            {/* We would fetch cross-sells here. For now passing empty or mock if data not available in cart query yet.
+                    To do this properly, we should modify GET_CART to fetch cross-sell items or make a separate query.
+                    For this iteration, I'll allow the component to render if we had data.
+                */}
+            <UpsellCarousel title="You might also like" products={[]} />
+          </div>
+        </div>
+        {/* Right Column: Totals (Sticky) */}
+        <div className="w-full lg:w-1/3 lg:sticky lg:top-24 h-fit">
+          <CartSummary
+            subtotal={cartSubtotal}
+            total={cartTotal}
+            totalProductsCount={totalProductsCount}
+          />
+          {/* Optional Trust Badges or banners below summary */}
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-600">
+            <p className="flex items-center gap-2 mb-2">
+              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              <span>Free Shipping on orders over GH₵500</span>
+            </p>
+            <p className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              <span>30 Days Easy Returns</span>
+            </p>
+          </div>
+        </div>
+      </div>
+      {isUpdating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-[1px]">
+          <div className="bg-white p-4 rounded-full shadow-lg">
+            <LoadingSpinner />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+export default CartContents;
+````
+
+## File: src/components/Cart/CartInitializer.component.tsx
+````typescript
+import { useEffect } from 'react';
+import { useQuery } from '@apollo/client';
+// State
+import { useCartStore } from '@/stores/cartStore';
+// Utils
+import { getFormattedCart } from '@/utils/functions/functions';
+// GraphQL
+import { GET_CART } from '@/utils/gql/GQL_QUERIES';
+/**
+ * Non-rendering component responsible for initializing the cart state
+ * by fetching data from WooCommerce and syncing it with the Zustand store.
+ * This should be rendered once at the application root (_app.tsx).
+ * @function CartInitializer
+ * @returns {null} - This component does not render any UI
+ */
+const CartInitializer = () => {
+  const { syncWithWooCommerce } = useCartStore();
+  const { data, refetch } = useQuery(GET_CART, {
+    notifyOnNetworkStatusChange: true,
+  });
+  useEffect(() => {
+    if (data) {
+      const updatedCart = getFormattedCart(data);
+      if (updatedCart) {
+        syncWithWooCommerce(updatedCart);
+      }
+    }
+  }, [data, syncWithWooCommerce]);
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+  // This component does not render any UI
+  return null;
+};
+export default CartInitializer;
+````
+
 ## File: src/components/Cart/CartItem.component.tsx
 ````typescript
 import React from 'react';
@@ -2054,6 +2278,178 @@ const WhyChooseUs = () => {
 export default WhyChooseUs;
 ````
 
+## File: src/components/Input/AddressAutocomplete.component.tsx
+````typescript
+import React, { useEffect } from 'react';
+import usePlacesAutocomplete, {
+    getGeocode,
+    getLatLng,
+} from 'use-places-autocomplete';
+import { useFormContext } from 'react-hook-form';
+import { useJsApiLoader } from '@react-google-maps/api';
+import { useQuery } from '@apollo/client';
+import { GET_ALLOWED_COUNTRIES } from '../../utils/gql/GQL_QUERIES';
+interface IAddressAutocompleteProps {
+    label: string;
+    name: string;
+}
+const libraries: ("places")[] = ["places"];
+const AddressAutocompleteInput = ({ label, name }: IAddressAutocompleteProps) => {
+    // Fetch allowed countries for restriction
+    const { data: countriesData } = useQuery(GET_ALLOWED_COUNTRIES);
+    const allowedCountries = countriesData?.wooCommerce?.countries || [];
+    // Default to 'gh' if no countries found, otherwise use the code of the first allowed country or a list if possible
+    // use-places-autocomplete expects a string or array of strings (max 5)
+    const countryRestriction = allowedCountries.length > 0
+        ? allowedCountries.slice(0, 5).map((c: any) => c.code.toLowerCase())
+        : 'gh';
+    const {
+        ready,
+        value,
+        suggestions: { status, data },
+        setValue,
+        clearSuggestions,
+    } = usePlacesAutocomplete({
+        requestOptions: {
+            componentRestrictions: { country: countryRestriction },
+        },
+        debounce: 300,
+    });
+    const { register, setValue: setFormValue } = useFormContext();
+    const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setValue(e.target.value);
+        setFormValue(name, e.target.value);
+    };
+    const handleSelect =
+        ({ description }: { description: string }) =>
+            () => {
+                setValue(description, false);
+                clearSuggestions();
+                setFormValue(name, description);
+                getGeocode({ address: description }).then((results) => {
+                    const cityComponent = results[0]?.address_components.find(
+                        (component) => component.types.includes('locality') || component.types.includes('administrative_area_level_2')
+                    );
+                    if (cityComponent) {
+                        setFormValue('city', cityComponent.long_name);
+                    }
+                    const stateComponent = results[0]?.address_components.find(
+                        (component) => component.types.includes('administrative_area_level_1')
+                    );
+                    if (stateComponent) {
+                        setFormValue('state', stateComponent.long_name);
+                    }
+                });
+            };
+    const handleUseCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser");
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                // Reverse geocode
+                getGeocode({ location: { lat: latitude, lng: longitude } })
+                    .then((results) => {
+                        if (results[0]) {
+                            const address = results[0].formatted_address;
+                            setValue(address, false);
+                            clearSuggestions();
+                            setFormValue(name, address);
+                            // Parse city (similar to handleSelect)
+                            const cityComponent = results[0].address_components.find(
+                                (component) => component.types.includes('locality') || component.types.includes('administrative_area_level_2')
+                            );
+                            if (cityComponent) {
+                                setFormValue('city', cityComponent.long_name);
+                            }
+                            const stateComponent = results[0].address_components.find(
+                                (component) => component.types.includes('administrative_area_level_1')
+                            );
+                            if (stateComponent) {
+                                setFormValue('state', stateComponent.long_name);
+                            }
+                        }
+                    })
+                    .catch((error) => {
+                        console.error('Error finding address:', error);
+                        alert("Found location but failed to find address: " + error.message);
+                    });
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                let msg = "Unable to retrieve your location";
+                if (error.code === 1) msg = "Location permission denied. Please allow access in browser settings.";
+                if (error.code === 2) msg = "Location unavailable. Ensure GPS is on.";
+                if (error.code === 3) msg = "Location request timed out.";
+                alert(msg);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
+    return (
+        <div className="w-full relative">
+            <label htmlFor={name} className="block mb-1 text-xs font-bold text-gray-700">
+                {label}
+            </label>
+            <div className="relative">
+                <input
+                    {...register(name)}
+                    value={value}
+                    onChange={handleInput}
+                    disabled={!ready}
+                    className="bg-white border border-gray-300 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5 pr-8 placeholder-gray-400"
+                    placeholder={label}
+                    autoComplete="off"
+                />
+                <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
+                    title="Use my current location"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
+            </div>
+            {status === 'OK' && (
+                <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-60 overflow-y-auto">
+                    {data.map(({ place_id, description }) => (
+                        <li
+                            key={place_id}
+                            onClick={handleSelect({ description })}
+                            className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm text-gray-700"
+                        >
+                            {description}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+};
+const AddressAutocomplete = (props: IAddressAutocompleteProps) => {
+    const { isLoaded } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+        libraries,
+    });
+    if (!isLoaded) {
+        return (
+            <div className="w-full">
+                <label className="block mb-1 text-xs font-bold text-gray-700">{props.label}</label>
+                <input disabled className="bg-gray-100 border border-gray-300 text-gray-500 text-sm rounded block w-full p-1.5" placeholder="Loading..." />
+            </div>
+        );
+    }
+    return <AddressAutocompleteInput {...props} />;
+};
+export default AddressAutocomplete;
+````
+
 ## File: src/components/Input/InputField.component.tsx
 ````typescript
 import { useState } from 'react';
@@ -2321,6 +2717,261 @@ const DisplayProducts = ({ products }: IDisplayProductsProps) => (
   </section>
 );
 export default DisplayProducts;
+````
+
+## File: src/components/Product/ProductFilters.component.tsx
+````typescript
+import { Dispatch, SetStateAction } from 'react';
+import { Product, ProductType } from '@/types/product';
+import Button from '@/components/UI/Button.component';
+import Checkbox from '@/components/UI/Checkbox.component';
+import RangeSlider from '@/components/UI/RangeSlider.component';
+import Accordion from '@/components/UI/Accordion.component';
+interface ProductFiltersProps {
+  selectedAttributes: Record<string, string[]>;
+  toggleAttribute: (attributeName: string, value: string) => void;
+  selectedBrands: string[];
+  setSelectedBrands: Dispatch<SetStateAction<string[]>>;
+  selectedLocations: string[];
+  setSelectedLocations: Dispatch<SetStateAction<string[]>>;
+  selectedCategories: string[];
+  setSelectedCategories: Dispatch<SetStateAction<string[]>>;
+  priceRange: [number, number];
+  setPriceRange: Dispatch<SetStateAction<[number, number]>>;
+  minRating: number;
+  setMinRating: Dispatch<SetStateAction<number>>;
+  showOnSaleOnly: boolean;
+  setShowOnSaleOnly: Dispatch<SetStateAction<boolean>>;
+  productTypes: ProductType[];
+  toggleProductType: (id: string) => void;
+  products: Product[];
+  resetFilters: () => void;
+}
+const ProductFilters = ({
+  selectedAttributes,
+  toggleAttribute,
+  selectedBrands,
+  setSelectedBrands,
+  selectedLocations,
+  setSelectedLocations,
+  selectedCategories,
+  setSelectedCategories,
+  priceRange,
+  setPriceRange,
+  minRating,
+  setMinRating,
+  showOnSaleOnly,
+  setShowOnSaleOnly,
+  productTypes,
+  toggleProductType,
+  products,
+  resetFilters,
+}: ProductFiltersProps) => {
+  // Get all unique attributes and their options
+  const attributesMap = new Map<string, Set<string>>();
+  products.forEach((product) => {
+    product.attributes?.nodes?.forEach((attr) => {
+      if (!attributesMap.has(attr.name)) {
+        attributesMap.set(attr.name, new Set());
+      }
+      attr.options?.forEach((option) => {
+        attributesMap.get(attr.name)!.add(option);
+      });
+    });
+  });
+  // Convert to sorted arrays
+  const attributes = Array.from(attributesMap.entries()).map(([name, optionsSet]) => ({
+    name,
+    options: Array.from(optionsSet).sort((a, b) => a.localeCompare(b)),
+  }));
+  // Get unique brands from all products
+  const brands = Array.from(
+    new Set(
+      products.flatMap(
+        (product: Product) =>
+          product.productBrand?.nodes?.map((node) => node.name) || [],
+      ),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+  // Get unique locations from all products
+  const locations = Array.from(
+    new Set(
+      products.flatMap(
+        (product: Product) =>
+          product.productLocation?.nodes?.map((node) => node.name) || [],
+      ),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+  // Get unique categories from all products
+  const categories = Array.from(
+    new Set(
+      products.flatMap(
+        (product: Product) =>
+          product.productCategories?.nodes?.map((cat) => cat.name) || [],
+      ),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+  const toggleBrand = (brand: string) => {
+    setSelectedBrands((prev) =>
+      prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand],
+    );
+  };
+  const toggleLocation = (location: string) => {
+    setSelectedLocations((prev) =>
+      prev.includes(location) ? prev.filter((l) => l !== location) : [...prev, location],
+    );
+  };
+  const toggleCategory = (category: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category],
+    );
+  };
+  return (
+    <div className="w-full">
+      <div className="bg-white rounded-lg lg:rounded-none">
+        <div className="mb-0">
+          <Accordion title="Rating">
+            <div className="space-y-0.5">
+              {[4, 3, 2, 1].map((rating) => (
+                <button
+                  key={rating}
+                  onClick={() => setMinRating(minRating === rating ? 0 : rating)}
+                  className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-md transition-colors ${minRating === rating ? 'bg-blue-50 border border-blue-600' : 'hover:bg-gray-50'
+                    }`}
+                  aria-label={`Filter by rating ${rating} stars and up`}
+                >
+                  <div className="flex">
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <svg
+                        key={i}
+                        className={`w-4 h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
+                  <span className="text-sm">& Up</span>
+                </button>
+              ))}
+            </div>
+          </Accordion>
+        </div>
+        <div className="mb-0">
+          <Accordion title="Availability">
+            <Checkbox
+              id="on-sale"
+              label="On Sale"
+              checked={showOnSaleOnly}
+              onChange={() => setShowOnSaleOnly(!showOnSaleOnly)}
+            />
+          </Accordion>
+        </div>
+        <div className="mb-0">
+          <Accordion title="Price" defaultOpen={true}>
+            <div className="px-2 pt-1 pb-2">
+              <RangeSlider
+                id="price-range"
+                label="Price"
+                min={0}
+                max={50000}
+                value={priceRange[1]}
+                startValue={priceRange[0]}
+                onChange={(value) => setPriceRange([priceRange[0], value])}
+                formatValue={(value) => `GH₵ ${value}`}
+              />
+            </div>
+          </Accordion>
+        </div>
+        {/* Dynamic Attributes */}
+        {attributes.map((attribute) => {
+          const cleanName = (attribute.name.startsWith('pa_')
+            ? attribute.name.replace('pa_', '')
+            : attribute.name);
+          const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1).toLowerCase();
+          return (
+            <div key={attribute.name} className="mb-0">
+              <Accordion title={capitalizedName}>
+                <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                  {attribute.options.map((option) => (
+                    <Checkbox
+                      key={option}
+                      id={`${attribute.name}-${option}`}
+                      label={option}
+                      checked={selectedAttributes[attribute.name]?.includes(option) || false}
+                      onChange={() => toggleAttribute(attribute.name, option)}
+                    />
+                  ))}
+                </div>
+              </Accordion>
+            </div>
+          );
+        })}
+        {brands.length > 0 && (
+          <div className="mb-0">
+            <Accordion title="Brand">
+              <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                {brands.map((brand) => (
+                  <Checkbox
+                    key={brand}
+                    id={`brand-${brand}`}
+                    label={brand}
+                    checked={selectedBrands.includes(brand)}
+                    onChange={() => toggleBrand(brand)}
+                  />
+                ))}
+              </div>
+            </Accordion>
+          </div>
+        )}
+        {locations.length > 0 && (
+          <div className="mb-0">
+            <Accordion title="Location">
+              <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                {locations.map((location) => (
+                  <Checkbox
+                    key={location}
+                    id={`location-${location}`}
+                    label={location}
+                    checked={selectedLocations.includes(location)}
+                    onChange={() => toggleLocation(location)}
+                  />
+                ))}
+              </div>
+            </Accordion>
+          </div>
+        )}
+        {categories.length > 0 && (
+          <div className="mb-0">
+            <Accordion title="Category" defaultOpen={true}>
+              <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                {categories.map((category) => (
+                  <Checkbox
+                    key={category}
+                    id={`category-${category}`}
+                    label={category}
+                    checked={selectedCategories.includes(category)}
+                    onChange={() => toggleCategory(category)}
+                  />
+                ))}
+              </div>
+            </Accordion>
+          </div>
+        )}
+        <div className="mt-4 px-2">
+          <Button
+            handleButtonClick={resetFilters}
+            variant="reset"
+          >
+            Reset filter
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+export default ProductFilters;
 ````
 
 ## File: src/components/UI/Accordion.component.tsx
@@ -4295,6 +4946,60 @@ export interface ProductType {
 }
 ````
 
+## File: src/utils/constants/INPUT_FIELDS.ts
+````typescript
+export const INPUT_FIELDS = [
+  {
+    id: 0,
+    label: 'First Name',
+    name: 'firstName',
+    customValidation: { required: true, minLength: 4 },
+  },
+  {
+    id: 1,
+    label: 'Last Name',
+    name: 'lastName',
+    customValidation: { required: true, minLength: 4 },
+  },
+  {
+    id: 2,
+    label: 'Address',
+    name: 'address1',
+    customValidation: { required: true, minLength: 4 },
+  },
+  {
+    id: 3,
+    label: 'Country / Region',
+    name: 'country',
+    customValidation: { required: true },
+  },
+  {
+    id: 7,
+    label: 'Region', // Updated to 'Region' as per user request (was State/County)
+    name: 'state',
+    customValidation: { required: false },
+  },
+  {
+    id: 4,
+    label: 'City',
+    name: 'city',
+    customValidation: { required: true, minLength: 2 },
+  },
+  {
+    id: 5,
+    label: 'Email',
+    name: 'email',
+    customValidation: { required: true, type: 'email' },
+  },
+  {
+    id: 6,
+    label: 'Phone',
+    name: 'phone',
+    customValidation: { required: true, minLength: 8, pattern: /^[+0-9]{8,12}$/ },
+  },
+];
+````
+
 ## File: src/utils/constants/LINKS.ts
 ````typescript
 interface ILinks {
@@ -6248,45 +6953,6 @@ self.addEventListener('activate', () => {
 });
 ````
 
-## File: src/components/Cart/CartInitializer.component.tsx
-````typescript
-import { useEffect } from 'react';
-import { useQuery } from '@apollo/client';
-// State
-import { useCartStore } from '@/stores/cartStore';
-// Utils
-import { getFormattedCart } from '@/utils/functions/functions';
-// GraphQL
-import { GET_CART } from '@/utils/gql/GQL_QUERIES';
-/**
- * Non-rendering component responsible for initializing the cart state
- * by fetching data from WooCommerce and syncing it with the Zustand store.
- * This should be rendered once at the application root (_app.tsx).
- * @function CartInitializer
- * @returns {null} - This component does not render any UI
- */
-const CartInitializer = () => {
-  const { syncWithWooCommerce } = useCartStore();
-  const { data, refetch } = useQuery(GET_CART, {
-    notifyOnNetworkStatusChange: true,
-  });
-  useEffect(() => {
-    if (data) {
-      const updatedCart = getFormattedCart(data);
-      if (updatedCart) {
-        syncWithWooCommerce(updatedCart);
-      }
-    }
-  }, [data, syncWithWooCommerce]);
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-  // This component does not render any UI
-  return null;
-};
-export default CartInitializer;
-````
-
 ## File: src/components/Cart/QuantityControl.component.tsx
 ````typescript
 import React from 'react';
@@ -6452,6 +7118,404 @@ const Billing = ({ handleFormSubmit, isLoading = false, buttonLabel = 'PLACE ORD
   );
 };
 export default Billing;
+````
+
+## File: src/components/Checkout/CheckoutForm.component.tsx
+````typescript
+/*eslint complexity: ["error", 20]*/
+// Imports
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, ApolloError } from '@apollo/client';
+import { v4 as uuidv4 } from 'uuid';
+// Components
+import Billing from './Billing.component';
+import CheckoutOrderReview from './CheckoutOrderReview.component';
+import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
+import Button from '../UI/Button.component';
+// GraphQL
+import { GET_CART, GET_PAYMENT_GATEWAYS, GET_ALLOWED_COUNTRIES } from '@/utils/gql/GQL_QUERIES';
+import { CHECKOUT_MUTATION, UPDATE_CUSTOMER, UPDATE_SHIPPING_METHOD } from '@/utils/gql/GQL_MUTATIONS';
+import { useCartStore } from '@/stores/cartStore';
+import { useLocationStore } from '@/stores/locationStore';
+// Utils
+import {
+  getFormattedCart,
+  createCheckoutData,
+  ICheckoutDataProps,
+} from '@/utils/functions/functions';
+export interface IBilling {
+  firstName: string;
+  lastName: string;
+  address1: string;
+  city: string;
+  postcode: string;
+  email: string;
+  phone: string;
+}
+export interface IShipping {
+  firstName: string;
+  lastName: string;
+  address1: string;
+  city: string;
+  postcode: string;
+  email: string;
+  phone: string;
+}
+export interface ICheckoutData {
+  clientMutationId: string;
+  billing: IBilling;
+  shipping: IShipping;
+  shipToDifferentAddress: boolean;
+  paymentMethod: string;
+  isPaid: boolean;
+  transactionId: string;
+}
+const CheckoutForm = () => {
+  const { cart, clearWooCommerceSession, syncWithWooCommerce } = useCartStore();
+  const [orderData, setOrderData] = useState<ICheckoutData | null>(null);
+  const [requestError, setRequestError] = useState<ApolloError | null>(null);
+  const [orderCompleted, setOrderCompleted] = useState<boolean>(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
+  // Get Payment Gateways
+  const { data: gatewaysData } = useQuery(GET_PAYMENT_GATEWAYS);
+  const availableGateways = gatewaysData?.paymentGateways?.nodes || [];
+  // Set default payment method
+  useEffect(() => {
+    if (availableGateways.length > 0 && !selectedPaymentMethod) {
+      // Filter out disabled ones if API doesn't already, but typically nodes are enabled ones
+      setSelectedPaymentMethod(availableGateways[0].id);
+    }
+  }, [availableGateways, selectedPaymentMethod]);
+  // Checkout Steps: 1: Address, 2: Shipping, 3: Payment
+  const [step, setStep] = useState<number>(1);
+  const [selectedShippingRate, setSelectedShippingRate] = useState<string>('');
+  // Get cart data query
+  const { data, refetch } = useQuery(GET_CART, {
+    notifyOnNetworkStatusChange: true,
+  });
+  useEffect(() => {
+    if (data) {
+      const updatedCart = getFormattedCart(data);
+      // Only update if we actually got a cart back. 
+      // Do NOT clear session here, as it cleans itself up elsewhere or persists.
+      // Clearing it causes reload issues.
+      if (updatedCart) {
+        syncWithWooCommerce(updatedCart);
+      }
+    }
+  }, [data, syncWithWooCommerce]);
+  // Mutations
+  const [updateCustomer, { loading: isUpdatingCustomer, data: updateCustomerData }] = useMutation(UPDATE_CUSTOMER, {
+    onError: (error) => {
+      setRequestError(error);
+    }
+  });
+  useEffect(() => {
+    if (updateCustomerData) {
+      refetch();
+      setStep(2);
+    }
+  }, [updateCustomerData, refetch]);
+  const [updateShippingMethod, { loading: isUpdatingShipping }] = useMutation(UPDATE_SHIPPING_METHOD, {
+    onCompleted: () => {
+      refetch();
+      setStep(3);
+    },
+    onError: (error) => {
+      setRequestError(error);
+    }
+  });
+  const [checkout, { loading: checkoutLoading, error: checkoutError, data: checkoutData }] = useMutation(CHECKOUT_MUTATION);
+  useEffect(() => {
+    if (checkoutData) {
+      // Order success
+      // router.push('/order-received'); 
+      // Logic handled in component or redirect
+      const result = checkoutData?.checkout;
+      if (result?.redirect) {
+        window.location.href = result.redirect;
+        return; // Stop further execution if redirecting
+      }
+      clearWooCommerceSession();
+      setOrderCompleted(true);
+      refetch();
+    }
+  }, [checkoutData, clearWooCommerceSession, refetch]);
+  useEffect(() => {
+    if (checkoutError) {
+      setRequestError(checkoutError); // Pass the full ApolloError object
+    }
+  }, [checkoutError]);
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+  // Get Allowed Countries
+  const { data: countriesData } = useQuery(GET_ALLOWED_COUNTRIES);
+  const allowedCountries = countriesData?.wooCommerce?.countries || [];
+  const defaultCountry = allowedCountries.length > 0 ? allowedCountries[0].code : 'GH';
+  // Step 1 Handler: Address Submission
+  const handleAddressSubmit = (submitData: ICheckoutDataProps) => {
+    const checkOutData = createCheckoutData(submitData);
+    setOrderData(checkOutData);
+    setRequestError(null);
+    // Update Customer in WooCommerce to trigger shipping calculation
+    updateCustomer({
+      variables: {
+        input: {
+          clientMutationId: uuidv4(),
+          shipping: {
+            firstName: submitData.firstName,
+            lastName: submitData.lastName,
+            address1: submitData.address1,
+            address2: submitData.address2,
+            city: submitData.city,
+            postcode: submitData.postcode || '00000',
+            country: submitData.country || defaultCountry,
+          },
+          billing: {
+            firstName: submitData.firstName,
+            lastName: submitData.lastName,
+            address1: submitData.address1,
+            address2: submitData.address2,
+            city: submitData.city,
+            postcode: submitData.postcode || '00000',
+            country: submitData.country || defaultCountry,
+            email: submitData.email,
+            phone: submitData.phone,
+          }
+        }
+      }
+    });
+  };
+  // Step 2 Handler: Shipping Selection
+  const handleShippingSubmit = () => {
+    if (!selectedShippingRate) {
+      // Show error or alert?
+      return;
+    }
+    updateShippingMethod({
+      variables: {
+        input: {
+          clientMutationId: uuidv4(),
+          shippingMethods: [selectedShippingRate]
+        }
+      }
+    });
+  };
+  // Step 3 Handler: Final Order Placement
+  const handlePaymentSubmit = () => {
+    // Ensure we have orderData
+    if (orderData && selectedPaymentMethod) {
+      const finalOrderData = {
+        ...orderData,
+        paymentMethod: selectedPaymentMethod,
+      };
+      checkout({
+        variables: {
+          input: finalOrderData
+        }
+      });
+    }
+  };
+  const availableShippingMethods = data?.cart?.availableShippingMethods?.[0]?.rates || [];
+  // Get Location from Store
+  const { selectedLocation } = useLocationStore();
+  return (
+    <>
+      {cart && !orderCompleted ? (
+        <div className="w-full px-0 lg:px-2 py-1">
+          {/* ... (rest of the layout) */}
+          <div className="flex flex-col-reverse lg:flex-row gap-2">
+            <div className="flex-grow lg:w-2/3">
+              {/* ... (Steps Indicator and Error Display) */}
+              {/* Step 1: Address */}
+              {step === 1 && (
+                <div className="bg-white rounded border border-gray-200 p-2 animate-fade-in text-[#2c3338]">
+                  <h3 className="text-sm font-bold text-[#2c3338] mb-2 uppercase tracking-wide">Billing & Shipping</h3>
+                  <Billing
+                    handleFormSubmit={handleAddressSubmit}
+                    isLoading={isUpdatingCustomer}
+                    buttonLabel="Next: Shipping"
+                    initialCity={selectedLocation?.name}
+                  />
+                </div>
+              )}
+              {/* Step 2: Shipping Method */}
+              {step === 2 && (
+                <div className="bg-white rounded border border-gray-200 p-2 animate-fade-in">
+                  <h3 className="text-sm font-bold text-[#2c3338] mb-2 uppercase tracking-wide">Shipping Method</h3>
+                  {availableShippingMethods.length === 0 ? (
+                    <div className="p-2 bg-yellow-50 text-yellow-800 rounded border border-yellow-200 mb-2 text-xs">
+                      No shipping methods available. Check address.
+                    </div>
+                  ) : (
+                    <div className="grid gap-1 mb-3">
+                      {availableShippingMethods.map((rate: any) => (
+                        <label
+                          key={rate.id}
+                          className={`
+                                                relative flex items-center p-2 border rounded cursor-pointer transition-all duration-200
+                                                ${selectedShippingRate === rate.id
+                              ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}
+                                            `}
+                        >
+                          <input
+                            type="radio"
+                            name="shipping_method"
+                            value={rate.id}
+                            onChange={(e) => setSelectedShippingRate(e.target.value)}
+                            className="w-3 h-3 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                          <div className="ml-2 flex-grow">
+                            <span className="block font-medium text-gray-900 text-xs">{rate.label}</span>
+                            {rate.company && <span className="block text-[10px] text-gray-500">{rate.company}</span>}
+                          </div>
+                          <div className="font-bold text-gray-900 text-xs">
+                            {rate.cost ? `₵${rate.cost}` : 'Free'}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <button
+                      onClick={() => setStep(1)}
+                      className="text-gray-500 hover:text-gray-900 text-xs font-medium flex items-center gap-1 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                      Back
+                    </button>
+                    <Button
+                      className="px-4 py-1 text-xs"
+                      handleButtonClick={handleShippingSubmit}
+                      buttonDisabled={!selectedShippingRate || isUpdatingShipping}
+                    >
+                      {isUpdatingShipping ? '...' : 'Next'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {/* Step 3: Payment */}
+              {step === 3 && (
+                <div className="bg-white rounded border border-gray-200 p-2 animate-fade-in">
+                  <h3 className="text-sm font-bold text-[#2c3338] mb-2 uppercase tracking-wide">Payment</h3>
+                  <div className="space-y-2 mb-3">
+                    {availableGateways.length === 0 ? (
+                      <div className="p-2 border border-blue-500 bg-blue-50 rounded flex items-start gap-2 ring-1 ring-blue-500">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <input type="radio" checked readOnly className="w-3 h-3 text-blue-600" />
+                        </div>
+                        <div>
+                          <span className="block font-bold text-gray-900 text-xs">Cash on Delivery</span>
+                          <p className="mt-0.5 text-[10px] text-gray-600">Pay safely with cash when your order is delivered.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      availableGateways.map((gateway: any) => (
+                        <label
+                          key={gateway.id}
+                          className={`
+                                    relative flex items-start p-2 border rounded cursor-pointer transition-all duration-200 gap-2
+                                    ${selectedPaymentMethod === gateway.id
+                              ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}
+                                `}
+                        >
+                          <div className="flex-shrink-0 mt-0.5">
+                            <input
+                              type="radio"
+                              name="payment_method"
+                              value={gateway.id}
+                              checked={selectedPaymentMethod === gateway.id}
+                              onChange={() => setSelectedPaymentMethod(gateway.id)}
+                              className="w-3 h-3 text-blue-600 border-gray-300 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="flex-grow">
+                            <span className="block font-bold text-gray-900 text-xs">{gateway.title}</span>
+                            <p className="mt-0.5 text-[10px] text-gray-600">{gateway.description}</p>
+                          </div>
+                          {gateway.icon && (
+                            <img src={gateway.icon} alt={gateway.title} className="h-4 object-contain" />
+                          )}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <button
+                      onClick={() => setStep(2)}
+                      className="text-gray-500 hover:text-gray-900 text-xs font-medium flex items-center gap-1 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                      Back
+                    </button>
+                    <Button
+                      className="bg-green-600 hover:bg-green-700 w-full sm:w-auto px-6 py-2 text-sm font-bold"
+                      handleButtonClick={handlePaymentSubmit}
+                      buttonDisabled={checkoutLoading}
+                    >
+                      {checkoutLoading ? 'Processing...' : 'Place Order'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* Right Column: Summary (Sticky) */}
+            <div className="lg:w-1/3">
+              <div className="sticky top-16">
+                <CheckoutOrderReview cart={data?.cart} />
+                {/* Trust Badges - Ultra Compact */}
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className="bg-gray-50 p-1.5 rounded text-center border border-gray-100">
+                    <div className="text-sm mb-0">🛡️</div>
+                    <div className="text-[9px] font-bold text-gray-700 uppercase tracking-wide">Secure</div>
+                  </div>
+                  <div className="bg-gray-50 p-1.5 rounded text-center border border-gray-100">
+                    <div className="text-sm mb-0">🚚</div>
+                    <div className="text-[9px] font-bold text-gray-700 uppercase tracking-wide">Fast</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {!cart && !orderCompleted && (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
+              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
+              <p className="text-gray-500 mb-8">Looks like you haven't added any products to your cart yet.</p>
+              <Button href="/" className="bg-blue-600">Start Shopping</Button>
+            </div>
+          )}
+          {orderCompleted && (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-fade-in">
+              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Order Recieved!</h1>
+              <p className="text-lg text-gray-600 mb-8">Thank you for your purchase. We've emailed you the receipt.</p>
+              <div className="flex gap-4">
+                <Button href="/my-account" variant="secondary">View Order</Button>
+                <Button href="/" variant="primary">Continue Shopping</Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+};
+export default CheckoutForm;
 ````
 
 ## File: src/components/Header/Header.component.tsx
@@ -6804,178 +7868,6 @@ const SEOContent: React.FC = () => {
 export default SEOContent;
 ````
 
-## File: src/components/Input/AddressAutocomplete.component.tsx
-````typescript
-import React, { useEffect } from 'react';
-import usePlacesAutocomplete, {
-    getGeocode,
-    getLatLng,
-} from 'use-places-autocomplete';
-import { useFormContext } from 'react-hook-form';
-import { useJsApiLoader } from '@react-google-maps/api';
-import { useQuery } from '@apollo/client';
-import { GET_ALLOWED_COUNTRIES } from '../../utils/gql/GQL_QUERIES';
-interface IAddressAutocompleteProps {
-    label: string;
-    name: string;
-}
-const libraries: ("places")[] = ["places"];
-const AddressAutocompleteInput = ({ label, name }: IAddressAutocompleteProps) => {
-    // Fetch allowed countries for restriction
-    const { data: countriesData } = useQuery(GET_ALLOWED_COUNTRIES);
-    const allowedCountries = countriesData?.wooCommerce?.countries || [];
-    // Default to 'gh' if no countries found, otherwise use the code of the first allowed country or a list if possible
-    // use-places-autocomplete expects a string or array of strings (max 5)
-    const countryRestriction = allowedCountries.length > 0
-        ? allowedCountries.slice(0, 5).map((c: any) => c.code.toLowerCase())
-        : 'gh';
-    const {
-        ready,
-        value,
-        suggestions: { status, data },
-        setValue,
-        clearSuggestions,
-    } = usePlacesAutocomplete({
-        requestOptions: {
-            componentRestrictions: { country: countryRestriction },
-        },
-        debounce: 300,
-    });
-    const { register, setValue: setFormValue } = useFormContext();
-    const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setValue(e.target.value);
-        setFormValue(name, e.target.value);
-    };
-    const handleSelect =
-        ({ description }: { description: string }) =>
-            () => {
-                setValue(description, false);
-                clearSuggestions();
-                setFormValue(name, description);
-                getGeocode({ address: description }).then((results) => {
-                    const cityComponent = results[0]?.address_components.find(
-                        (component) => component.types.includes('locality') || component.types.includes('administrative_area_level_2')
-                    );
-                    if (cityComponent) {
-                        setFormValue('city', cityComponent.long_name);
-                    }
-                    const stateComponent = results[0]?.address_components.find(
-                        (component) => component.types.includes('administrative_area_level_1')
-                    );
-                    if (stateComponent) {
-                        setFormValue('state', stateComponent.long_name);
-                    }
-                });
-            };
-    const handleUseCurrentLocation = () => {
-        if (!navigator.geolocation) {
-            alert("Geolocation is not supported by your browser");
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                // Reverse geocode
-                getGeocode({ location: { lat: latitude, lng: longitude } })
-                    .then((results) => {
-                        if (results[0]) {
-                            const address = results[0].formatted_address;
-                            setValue(address, false);
-                            clearSuggestions();
-                            setFormValue(name, address);
-                            // Parse city (similar to handleSelect)
-                            const cityComponent = results[0].address_components.find(
-                                (component) => component.types.includes('locality') || component.types.includes('administrative_area_level_2')
-                            );
-                            if (cityComponent) {
-                                setFormValue('city', cityComponent.long_name);
-                            }
-                            const stateComponent = results[0].address_components.find(
-                                (component) => component.types.includes('administrative_area_level_1')
-                            );
-                            if (stateComponent) {
-                                setFormValue('state', stateComponent.long_name);
-                            }
-                        }
-                    })
-                    .catch((error) => {
-                        console.error('Error finding address:', error);
-                        alert("Found location but failed to find address: " + error.message);
-                    });
-            },
-            (error) => {
-                console.error('Geolocation error:', error);
-                let msg = "Unable to retrieve your location";
-                if (error.code === 1) msg = "Location permission denied. Please allow access in browser settings.";
-                if (error.code === 2) msg = "Location unavailable. Ensure GPS is on.";
-                if (error.code === 3) msg = "Location request timed out.";
-                alert(msg);
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-    };
-    return (
-        <div className="w-full relative">
-            <label htmlFor={name} className="block mb-1 text-xs font-bold text-gray-700">
-                {label}
-            </label>
-            <div className="relative">
-                <input
-                    {...register(name)}
-                    value={value}
-                    onChange={handleInput}
-                    disabled={!ready}
-                    className="bg-white border border-gray-300 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5 pr-8 placeholder-gray-400"
-                    placeholder={label}
-                    autoComplete="off"
-                />
-                <button
-                    type="button"
-                    onClick={handleUseCurrentLocation}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
-                    title="Use my current location"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </button>
-            </div>
-            {status === 'OK' && (
-                <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-60 overflow-y-auto">
-                    {data.map(({ place_id, description }) => (
-                        <li
-                            key={place_id}
-                            onClick={handleSelect({ description })}
-                            className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm text-gray-700"
-                        >
-                            {description}
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </div>
-    );
-};
-const AddressAutocomplete = (props: IAddressAutocompleteProps) => {
-    const { isLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-        libraries,
-    });
-    if (!isLoaded) {
-        return (
-            <div className="w-full">
-                <label className="block mb-1 text-xs font-bold text-gray-700">{props.label}</label>
-                <input disabled className="bg-gray-100 border border-gray-300 text-gray-500 text-sm rounded block w-full p-1.5" placeholder="Loading..." />
-            </div>
-        );
-    }
-    return <AddressAutocompleteInput {...props} />;
-};
-export default AddressAutocomplete;
-````
-
 ## File: src/components/LoadingSpinner/LoadingSpinner.component.tsx
 ````typescript
 /**
@@ -6988,6 +7880,211 @@ const LoadingSpinner = () => (
   </div>
 );
 export default LoadingSpinner;
+````
+
+## File: src/components/Product/AddToCart.component.tsx
+````typescript
+// Imports
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useQuery, useMutation } from '@apollo/client';
+import { v4 as uuidv4 } from 'uuid';
+// Components
+import Button from '@/components/UI/Button.component';
+// State
+import { useCartStore } from '@/stores/cartStore';
+// Utils
+import { getFormattedCart } from '@/utils/functions/functions';
+// GraphQL
+import { GET_CART } from '@/utils/gql/GQL_QUERIES';
+import { ADD_TO_CART } from '@/utils/gql/GQL_MUTATIONS';
+interface IImage {
+  __typename: string;
+  id: string;
+  uri: string;
+  title: string;
+  srcSet: string;
+  sourceUrl: string;
+}
+interface IVariationNode {
+  __typename: string;
+  name: string;
+}
+interface IAllPaColor {
+  __typename: string;
+  nodes: IVariationNode[];
+}
+interface IAllPaSize {
+  __typename: string;
+  nodes: IVariationNode[];
+}
+export interface IVariationNodes {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  stockStatus: string;
+  stockQuantity: number;
+  purchasable: boolean;
+  onSale: boolean;
+  salePrice?: string;
+  regularPrice: string;
+  sku?: string;
+}
+interface IVariations {
+  __typename: string;
+  nodes: IVariationNodes[];
+}
+export interface IProduct {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  averageRating: number;
+  slug: string;
+  description: string;
+  onSale: boolean;
+  image: IImage;
+  name: string;
+  salePrice?: string;
+  regularPrice: string;
+  price: string;
+  stockQuantity: number;
+  sku?: string;
+  stockStatus?: string;
+  totalSales?: number;
+  related?: {
+    nodes: IProduct[];
+  };
+  upsell?: {
+    nodes: IProduct[];
+  };
+  crossSell?: {
+    nodes: IProduct[];
+  };
+  featured?: boolean;
+  shortDescription?: string;
+  reviewCount?: number;
+  allPaColor?: IAllPaColor;
+  allPaSize?: IAllPaSize;
+  variations?: IVariations;
+  productCategories?: {
+    nodes: Array<{ name: string; slug: string }>;
+  };
+  productBrand?: {
+    nodes: Array<{ name: string; slug: string }>;
+  };
+  galleryImages?: {
+    nodes: IImage[];
+  };
+  reviews?: {
+    nodes: Array<{
+      id: string;
+      content: string;
+      date: string;
+      rating: number;
+      author: {
+        node: {
+          name: string;
+        }
+      }
+    }>;
+  };
+  attributes?: {
+    nodes: Array<{ name: string; options: string[] }>;
+  };
+}
+export interface IProductRootObject {
+  product: IProduct;
+  variationId?: number;
+  fullWidth?: boolean;
+  buyNow?: boolean;
+  quantity?: number;
+}
+/**
+ * Handles the Add to cart functionality.
+ * Uses GraphQL for product data
+ * @param {IAddToCartProps} product // Product data
+ * @param {number} variationId // Variation ID
+ * @param {boolean} fullWidth // Whether the button should be full-width
+ */
+const AddToCart = ({
+  product,
+  variationId,
+  fullWidth = false,
+  buyNow = false,
+  quantity = 1,
+}: IProductRootObject) => {
+  const router = useRouter();
+  const { syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
+  const [requestError, setRequestError] = useState<boolean>(false);
+  const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const productId = product?.databaseId ? product?.databaseId : variationId;
+  const productQueryInput = {
+    clientMutationId: uuidv4(), // Generate a unique id.
+    productId,
+    quantity,
+  };
+  // Get cart data query
+  const { data, refetch } = useQuery(GET_CART, {
+    notifyOnNetworkStatusChange: true,
+  });
+  useEffect(() => {
+    if (data) {
+      const updatedCart = getFormattedCart(data);
+      if (updatedCart) {
+        syncWithWooCommerce(updatedCart);
+      }
+    }
+  }, [data, syncWithWooCommerce]);
+  // Add to cart mutation
+  const [addToCart, { loading: addToCartLoading, data: addToCartData, error: addToCartError }] = useMutation(ADD_TO_CART, {
+    variables: {
+      input: productQueryInput,
+    },
+    // Refetch all GET_CART queries to update cart across all components
+    refetchQueries: [{ query: GET_CART }],
+    awaitRefetchQueries: true,
+  });
+  useEffect(() => {
+    if (addToCartData) {
+      // Update the cart with new values in React context.
+      setIsSuccess(true);
+      const timer = setTimeout(() => setIsSuccess(false), 2000);
+      if (buyNow) {
+        router.push('/checkout');
+      }
+      return () => clearTimeout(timer);
+    }
+  }, [addToCartData, buyNow, router]);
+  useEffect(() => {
+    if (addToCartError) {
+      console.log('Add to cart error:', addToCartError);
+      setRequestError(true);
+    }
+  }, [addToCartError]);
+  const handleAddToCart = () => {
+    addToCart();
+  };
+  return (
+    <>
+      <Button
+        handleButtonClick={() => handleAddToCart()}
+        buttonDisabled={addToCartLoading || requestError || isCartLoading || isSuccess}
+        fullWidth={fullWidth}
+        className={
+          isSuccess
+            ? 'bg-green-600 hover:bg-green-700'
+            : buyNow
+              ? 'bg-orange-600 hover:bg-orange-700'
+              : ''
+        }
+      >
+        {isCartLoading ? 'Loading...' : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
+      </Button>
+    </>
+  );
+};
+export default AddToCart;
 ````
 
 ## File: src/components/Product/ComparePriceModal.component.tsx
@@ -7080,261 +8177,6 @@ const ComparePriceModal = ({ isOpen, onClose, newPrice, refurbPrice, productName
     );
 };
 export default ComparePriceModal;
-````
-
-## File: src/components/Product/ProductFilters.component.tsx
-````typescript
-import { Dispatch, SetStateAction } from 'react';
-import { Product, ProductType } from '@/types/product';
-import Button from '@/components/UI/Button.component';
-import Checkbox from '@/components/UI/Checkbox.component';
-import RangeSlider from '@/components/UI/RangeSlider.component';
-import Accordion from '@/components/UI/Accordion.component';
-interface ProductFiltersProps {
-  selectedAttributes: Record<string, string[]>;
-  toggleAttribute: (attributeName: string, value: string) => void;
-  selectedBrands: string[];
-  setSelectedBrands: Dispatch<SetStateAction<string[]>>;
-  selectedLocations: string[];
-  setSelectedLocations: Dispatch<SetStateAction<string[]>>;
-  selectedCategories: string[];
-  setSelectedCategories: Dispatch<SetStateAction<string[]>>;
-  priceRange: [number, number];
-  setPriceRange: Dispatch<SetStateAction<[number, number]>>;
-  minRating: number;
-  setMinRating: Dispatch<SetStateAction<number>>;
-  showOnSaleOnly: boolean;
-  setShowOnSaleOnly: Dispatch<SetStateAction<boolean>>;
-  productTypes: ProductType[];
-  toggleProductType: (id: string) => void;
-  products: Product[];
-  resetFilters: () => void;
-}
-const ProductFilters = ({
-  selectedAttributes,
-  toggleAttribute,
-  selectedBrands,
-  setSelectedBrands,
-  selectedLocations,
-  setSelectedLocations,
-  selectedCategories,
-  setSelectedCategories,
-  priceRange,
-  setPriceRange,
-  minRating,
-  setMinRating,
-  showOnSaleOnly,
-  setShowOnSaleOnly,
-  productTypes,
-  toggleProductType,
-  products,
-  resetFilters,
-}: ProductFiltersProps) => {
-  // Get all unique attributes and their options
-  const attributesMap = new Map<string, Set<string>>();
-  products.forEach((product) => {
-    product.attributes?.nodes?.forEach((attr) => {
-      if (!attributesMap.has(attr.name)) {
-        attributesMap.set(attr.name, new Set());
-      }
-      attr.options?.forEach((option) => {
-        attributesMap.get(attr.name)!.add(option);
-      });
-    });
-  });
-  // Convert to sorted arrays
-  const attributes = Array.from(attributesMap.entries()).map(([name, optionsSet]) => ({
-    name,
-    options: Array.from(optionsSet).sort((a, b) => a.localeCompare(b)),
-  }));
-  // Get unique brands from all products
-  const brands = Array.from(
-    new Set(
-      products.flatMap(
-        (product: Product) =>
-          product.productBrand?.nodes?.map((node) => node.name) || [],
-      ),
-    ),
-  ).sort((a, b) => a.localeCompare(b));
-  // Get unique locations from all products
-  const locations = Array.from(
-    new Set(
-      products.flatMap(
-        (product: Product) =>
-          product.productLocation?.nodes?.map((node) => node.name) || [],
-      ),
-    ),
-  ).sort((a, b) => a.localeCompare(b));
-  // Get unique categories from all products
-  const categories = Array.from(
-    new Set(
-      products.flatMap(
-        (product: Product) =>
-          product.productCategories?.nodes?.map((cat) => cat.name) || [],
-      ),
-    ),
-  ).sort((a, b) => a.localeCompare(b));
-  const toggleBrand = (brand: string) => {
-    setSelectedBrands((prev) =>
-      prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand],
-    );
-  };
-  const toggleLocation = (location: string) => {
-    setSelectedLocations((prev) =>
-      prev.includes(location) ? prev.filter((l) => l !== location) : [...prev, location],
-    );
-  };
-  const toggleCategory = (category: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category],
-    );
-  };
-  return (
-    <div className="w-full">
-      <div className="bg-white rounded-lg lg:rounded-none">
-        <div className="mb-0">
-          <Accordion title="Rating">
-            <div className="space-y-0.5">
-              {[4, 3, 2, 1].map((rating) => (
-                <button
-                  key={rating}
-                  onClick={() => setMinRating(minRating === rating ? 0 : rating)}
-                  className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-md transition-colors ${minRating === rating ? 'bg-blue-50 border border-blue-600' : 'hover:bg-gray-50'
-                    }`}
-                  aria-label={`Filter by rating ${rating} stars and up`}
-                >
-                  <div className="flex">
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <svg
-                        key={i}
-                        className={`w-4 h-4 ${i < rating ? 'text-yellow-400' : 'text-gray-300'}`}
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                  <span className="text-sm">& Up</span>
-                </button>
-              ))}
-            </div>
-          </Accordion>
-        </div>
-        <div className="mb-0">
-          <Accordion title="Availability">
-            <Checkbox
-              id="on-sale"
-              label="On Sale"
-              checked={showOnSaleOnly}
-              onChange={() => setShowOnSaleOnly(!showOnSaleOnly)}
-            />
-          </Accordion>
-        </div>
-        <div className="mb-0">
-          <Accordion title="Price" defaultOpen={true}>
-            <div className="px-2 pt-1 pb-2">
-              <RangeSlider
-                id="price-range"
-                label="Price"
-                min={0}
-                max={50000}
-                value={priceRange[1]}
-                startValue={priceRange[0]}
-                onChange={(value) => setPriceRange([priceRange[0], value])}
-                formatValue={(value) => `GH₵ ${value}`}
-              />
-            </div>
-          </Accordion>
-        </div>
-        {/* Dynamic Attributes */}
-        {attributes.map((attribute) => {
-          const cleanName = (attribute.name.startsWith('pa_')
-            ? attribute.name.replace('pa_', '')
-            : attribute.name);
-          const capitalizedName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1).toLowerCase();
-          return (
-            <div key={attribute.name} className="mb-0">
-              <Accordion title={capitalizedName}>
-                <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                  {attribute.options.map((option) => (
-                    <Checkbox
-                      key={option}
-                      id={`${attribute.name}-${option}`}
-                      label={option}
-                      checked={selectedAttributes[attribute.name]?.includes(option) || false}
-                      onChange={() => toggleAttribute(attribute.name, option)}
-                    />
-                  ))}
-                </div>
-              </Accordion>
-            </div>
-          );
-        })}
-        {brands.length > 0 && (
-          <div className="mb-0">
-            <Accordion title="Brand">
-              <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                {brands.map((brand) => (
-                  <Checkbox
-                    key={brand}
-                    id={`brand-${brand}`}
-                    label={brand}
-                    checked={selectedBrands.includes(brand)}
-                    onChange={() => toggleBrand(brand)}
-                  />
-                ))}
-              </div>
-            </Accordion>
-          </div>
-        )}
-        {locations.length > 0 && (
-          <div className="mb-0">
-            <Accordion title="Location">
-              <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                {locations.map((location) => (
-                  <Checkbox
-                    key={location}
-                    id={`location-${location}`}
-                    label={location}
-                    checked={selectedLocations.includes(location)}
-                    onChange={() => toggleLocation(location)}
-                  />
-                ))}
-              </div>
-            </Accordion>
-          </div>
-        )}
-        {categories.length > 0 && (
-          <div className="mb-0">
-            <Accordion title="Category" defaultOpen={true}>
-              <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                {categories.map((category) => (
-                  <Checkbox
-                    key={category}
-                    id={`category-${category}`}
-                    label={category}
-                    checked={selectedCategories.includes(category)}
-                    onChange={() => toggleCategory(category)}
-                  />
-                ))}
-              </div>
-            </Accordion>
-          </div>
-        )}
-        <div className="mt-4 px-2">
-          <Button
-            handleButtonClick={resetFilters}
-            variant="reset"
-          >
-            Reset filter
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-};
-export default ProductFilters;
 ````
 
 ## File: src/components/Product/ProductGalleryVertical.component.tsx
@@ -7464,54 +8306,6 @@ const ProductGalleryVertical: React.FC<ProductGalleryProps> = ({ mainImage, gall
     );
 };
 export default ProductGalleryVertical;
-````
-
-## File: src/components/Product/RecentRefurbishedReviews.component.tsx
-````typescript
-import React from 'react';
-import Link from 'next/link';
-import { useQuery } from '@apollo/client';
-import { GET_RECENT_REVIEWS_QUERY } from '@/utils/gql/GQL_QUERIES';
-const RecentRefurbishedReviews = () => {
-    const { data, loading, error } = useQuery(GET_RECENT_REVIEWS_QUERY, {
-        fetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true
-    });
-    // Determine reviews to show
-    const recentRefurbishedReviews = data?.reviews?.nodes?.filter((review: any) =>
-        review.commentOn?.name?.toLowerCase().includes('refurbish')
-    ) || [];
-    if (recentRefurbishedReviews.length === 0) return null;
-    return (
-        <div className="mt-6 border-t border-gray-100 pt-4">
-            <h4 className="text-sm font-bold text-gray-900 mb-3">Recent Refurbished Reviews</h4>
-            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-                {recentRefurbishedReviews.slice(0, 5).map((review: any) => (
-                    <div key={review.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-xs">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <div className="flex items-center gap-1.5">
-                                <span className="font-bold text-gray-800">{review.author?.node?.name || 'Customer'}</span>
-                                <div className="flex text-yellow-400">
-                                    {[...Array(5)].map((_, i) => (
-                                        <svg key={i} className={`w-3 h-3 ${i < (review.rating || 5) ? 'fill-current' : 'text-gray-300'}`} viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                                    ))}
-                                </div>
-                            </div>
-                            <span className="text-gray-400 text-[10px] whitespace-nowrap">{new Date(review.date).toLocaleDateString()}</span>
-                        </div>
-                        <div className="text-gray-600 mb-2 leading-relaxed" dangerouslySetInnerHTML={{ __html: review.content }} />
-                        {review.commentOn?.slug && (
-                            <Link href={`/product/${review.commentOn.slug}`} className="text-[10px] text-blue-600 hover:underline block border-t border-gray-200 pt-1 mt-1 font-medium">
-                                Verified Purchase: {review.commentOn.name}
-                            </Link>
-                        )}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-export default RecentRefurbishedReviews;
 ````
 
 ## File: src/components/Product/WhatIsRefurbishedModal.component.tsx
@@ -9090,58 +9884,62 @@ const client = new ApolloClient({
 export default client;
 ````
 
-## File: src/utils/constants/INPUT_FIELDS.ts
-````typescript
-export const INPUT_FIELDS = [
-  {
-    id: 0,
-    label: 'First Name',
-    name: 'firstName',
-    customValidation: { required: true, minLength: 4 },
-  },
-  {
-    id: 1,
-    label: 'Last Name',
-    name: 'lastName',
-    customValidation: { required: true, minLength: 4 },
-  },
-  {
-    id: 2,
-    label: 'Address',
-    name: 'address1',
-    customValidation: { required: true, minLength: 4 },
-  },
-  {
-    id: 3,
-    label: 'Country / Region',
-    name: 'country',
-    customValidation: { required: true },
-  },
-  {
-    id: 7,
-    label: 'Region', // Updated to 'Region' as per user request (was State/County)
-    name: 'state',
-    customValidation: { required: false },
-  },
-  {
-    id: 4,
-    label: 'City',
-    name: 'city',
-    customValidation: { required: true, minLength: 2 },
-  },
-  {
-    id: 5,
-    label: 'Email',
-    name: 'email',
-    customValidation: { required: true, type: 'email' },
-  },
-  {
-    id: 6,
-    label: 'Phone',
-    name: 'phone',
-    customValidation: { required: true, minLength: 8, pattern: /^[+0-9]{8,12}$/ },
-  },
-];
+## File: .gitignore
+````
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# sitemap and robots
+public/sitemap*.xml
+public/robots.txt
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+/test-results/
+/playwright-report/
+/playwright/.cache/
+src/pages/registrer.tsx
 ````
 
 ## File: check_pagination_support.js
@@ -9538,191 +10336,6 @@ test();
     "node_modules"
   ]
 }
-````
-
-## File: src/components/Cart/CartContents.component.tsx
-````typescript
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
-import { useRouter } from 'next/router';
-import { v4 as uuidv4 } from 'uuid';
-import { useCartStore } from '@/stores/cartStore';
-import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
-import CartItem from './CartItem.component';
-import CartSummary from './CartSummary.component';
-import EmptyCart from './EmptyCart.component';
-import UpsellCarousel from './UpsellCarousel.component';
-import {
-  getFormattedCart,
-  getUpdatedItems,
-  IProductRootObject,
-} from '@/utils/functions/functions';
-import { GET_CART } from '@/utils/gql/GQL_QUERIES';
-import { UPDATE_CART } from '@/utils/gql/GQL_MUTATIONS';
-const CartContents = () => {
-  const router = useRouter();
-  const { clearWooCommerceSession, syncWithWooCommerce } = useCartStore();
-  const [isUpdating, setIsUpdating] = useState(false);
-  // Fetch Cart Query
-  const { data, refetch, loading: isFetching, error } = useQuery(GET_CART, {
-    notifyOnNetworkStatusChange: true,
-  });
-  useEffect(() => {
-    if (data) {
-      const updatedCart = getFormattedCart(data);
-      if (!updatedCart && !data?.cart?.contents?.nodes?.length) {
-        clearWooCommerceSession();
-        return;
-      }
-      if (updatedCart) {
-        syncWithWooCommerce(updatedCart);
-      }
-    }
-  }, [data, clearWooCommerceSession, syncWithWooCommerce]);
-  // Update Cart Mutation
-  const [updateCart, { data: updateCartData }] = useMutation(UPDATE_CART, {
-    refetchQueries: [{ query: GET_CART }],
-    awaitRefetchQueries: true,
-    onError: () => {
-      setIsUpdating(false);
-    }
-  });
-  useEffect(() => {
-    if (updateCartData) {
-      setIsUpdating(false);
-    }
-  }, [updateCartData]);
-  // Effect to refetch on mount
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-  // Handlers
-  const handleUpdateQuantity = (item: IProductRootObject, newQty: number) => {
-    if (newQty < 1) return;
-    setIsUpdating(true);
-    const updatedItems = getUpdatedItems(data.cart.contents.nodes, newQty, item.key);
-    updateCart({
-      variables: {
-        input: {
-          clientMutationId: uuidv4(),
-          items: updatedItems,
-        },
-      },
-    });
-  };
-  const handleRemoveItem = (item: IProductRootObject) => {
-    setIsUpdating(true);
-    // Setting quantity to 0 effectively removes it in some WC configs, 
-    // or we might need `removeFromCart` mutation. 
-    // Using `getUpdatedItems` with 0 usually works if the function supports it, 
-    // otherwise we might need a specific remove logic. 
-    // The previous code called `handleRemoveProductClick` which used `getUpdatedItems` with 0? 
-    // Wait, the previous code called `getUpdatedItems(products, 0, cartKey)`? 
-    // Let's verify `getUpdatedItems`. It sets quantity to newQty.
-    // If WC API treats 0 as remove, we are good.
-    // Actually, `handleRemoveProductClick` in the old code did exactly that.
-    const updatedItems = getUpdatedItems(data.cart.contents.nodes, 0, item.key);
-    updateCart({
-      variables: {
-        input: {
-          clientMutationId: uuidv4(),
-          items: updatedItems,
-        },
-      },
-    });
-  };
-  const cartItems = data?.cart?.contents?.nodes || [];
-  const cartTotal = data?.cart?.total || '0';
-  const cartSubtotal = data?.cart?.subtotal || cartTotal;
-  const totalProductsCount = data?.cart?.contents?.itemCount || cartItems.reduce((acc: number, item: any) => acc + item.quantity, 0);
-  // Check if cart is empty
-  if (!isFetching && cartItems.length === 0) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <EmptyCart />
-        {/* Show Bestsellers or Upsells even on empty cart? Maybe. */}
-      </div>
-    );
-  }
-  // Loading state (initial)
-  if (isFetching && !data) {
-    return (
-      <div className="flex justify-center items-center min-h-[500px]">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-  // Error state
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded relative">
-          <strong className="font-bold">Error loading cart: </strong>
-          <span className="block sm:inline">{error.message}</span>
-          <button onClick={() => refetch()} className="underline ml-2">Try again</button>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="px-0 md:container md:mx-auto md:px-4 py-4 md:py-8">
-      <h1 className="text-2xl md:text-3xl font-medium  mb-4 md:mb-4 px-4 md:px-0">Shopping Cart</h1>
-      <div className="flex flex-col-reverse lg:flex-row gap-6 relative">
-        {/* Left Column: Cart Items */}
-        <div className="w-full lg:w-2/3">
-          <div className="bg-white rounded-none md:rounded-lg shadow-sm border-t md:border border-gray-200 overflow-hidden">
-            <div className="space-y-0 md:space-y-1">
-              {cartItems.map((item: IProductRootObject) => (
-                <CartItem
-                  key={item.key}
-                  item={item}
-                  onUpdateQuantity={(qty) => handleUpdateQuantity(item, qty)}
-                  onRemove={() => handleRemoveItem(item)}
-                  loading={isUpdating}
-                />
-              ))}
-            </div>
-          </div>
-          {/* Cross Sells / Upsells (Below items) */}
-          <div className="mt-12">
-            {/* We would fetch cross-sells here. For now passing empty or mock if data not available in cart query yet.
-                    To do this properly, we should modify GET_CART to fetch cross-sell items or make a separate query.
-                    For this iteration, I'll allow the component to render if we had data.
-                */}
-            <UpsellCarousel title="You might also like" products={[]} />
-          </div>
-        </div>
-        {/* Right Column: Totals (Sticky) */}
-        <div className="w-full lg:w-1/3 lg:sticky lg:top-24 h-fit">
-          <CartSummary
-            subtotal={cartSubtotal}
-            total={cartTotal}
-            totalProductsCount={totalProductsCount}
-          />
-          {/* Optional Trust Badges or banners below summary */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-600">
-            <p className="flex items-center gap-2 mb-2">
-              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-              <span>Free Shipping on orders over GH₵500</span>
-            </p>
-            <p className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              <span>30 Days Easy Returns</span>
-            </p>
-          </div>
-        </div>
-      </div>
-      {isUpdating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-[1px]">
-          <div className="bg-white p-4 rounded-full shadow-lg">
-            <LoadingSpinner />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-export default CartContents;
 ````
 
 ## File: src/components/Header/CategorySidebar.component.tsx
@@ -11360,211 +11973,6 @@ const TopRatedProducts = ({ products }: TopRatedProductsProps) => {
 export default TopRatedProducts;
 ````
 
-## File: src/components/Product/AddToCart.component.tsx
-````typescript
-// Imports
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { useQuery, useMutation } from '@apollo/client';
-import { v4 as uuidv4 } from 'uuid';
-// Components
-import Button from '@/components/UI/Button.component';
-// State
-import { useCartStore } from '@/stores/cartStore';
-// Utils
-import { getFormattedCart } from '@/utils/functions/functions';
-// GraphQL
-import { GET_CART } from '@/utils/gql/GQL_QUERIES';
-import { ADD_TO_CART } from '@/utils/gql/GQL_MUTATIONS';
-interface IImage {
-  __typename: string;
-  id: string;
-  uri: string;
-  title: string;
-  srcSet: string;
-  sourceUrl: string;
-}
-interface IVariationNode {
-  __typename: string;
-  name: string;
-}
-interface IAllPaColor {
-  __typename: string;
-  nodes: IVariationNode[];
-}
-interface IAllPaSize {
-  __typename: string;
-  nodes: IVariationNode[];
-}
-export interface IVariationNodes {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  stockStatus: string;
-  stockQuantity: number;
-  purchasable: boolean;
-  onSale: boolean;
-  salePrice?: string;
-  regularPrice: string;
-  sku?: string;
-}
-interface IVariations {
-  __typename: string;
-  nodes: IVariationNodes[];
-}
-export interface IProduct {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  averageRating: number;
-  slug: string;
-  description: string;
-  onSale: boolean;
-  image: IImage;
-  name: string;
-  salePrice?: string;
-  regularPrice: string;
-  price: string;
-  stockQuantity: number;
-  sku?: string;
-  stockStatus?: string;
-  totalSales?: number;
-  related?: {
-    nodes: IProduct[];
-  };
-  upsell?: {
-    nodes: IProduct[];
-  };
-  crossSell?: {
-    nodes: IProduct[];
-  };
-  featured?: boolean;
-  shortDescription?: string;
-  reviewCount?: number;
-  allPaColor?: IAllPaColor;
-  allPaSize?: IAllPaSize;
-  variations?: IVariations;
-  productCategories?: {
-    nodes: Array<{ name: string; slug: string }>;
-  };
-  productBrand?: {
-    nodes: Array<{ name: string; slug: string }>;
-  };
-  galleryImages?: {
-    nodes: IImage[];
-  };
-  reviews?: {
-    nodes: Array<{
-      id: string;
-      content: string;
-      date: string;
-      rating: number;
-      author: {
-        node: {
-          name: string;
-        }
-      }
-    }>;
-  };
-  attributes?: {
-    nodes: Array<{ name: string; options: string[] }>;
-  };
-}
-export interface IProductRootObject {
-  product: IProduct;
-  variationId?: number;
-  fullWidth?: boolean;
-  buyNow?: boolean;
-  quantity?: number;
-}
-/**
- * Handles the Add to cart functionality.
- * Uses GraphQL for product data
- * @param {IAddToCartProps} product // Product data
- * @param {number} variationId // Variation ID
- * @param {boolean} fullWidth // Whether the button should be full-width
- */
-const AddToCart = ({
-  product,
-  variationId,
-  fullWidth = false,
-  buyNow = false,
-  quantity = 1,
-}: IProductRootObject) => {
-  const router = useRouter();
-  const { syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
-  const [requestError, setRequestError] = useState<boolean>(false);
-  const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const productId = product?.databaseId ? product?.databaseId : variationId;
-  const productQueryInput = {
-    clientMutationId: uuidv4(), // Generate a unique id.
-    productId,
-    quantity,
-  };
-  // Get cart data query
-  const { data, refetch } = useQuery(GET_CART, {
-    notifyOnNetworkStatusChange: true,
-  });
-  useEffect(() => {
-    if (data) {
-      const updatedCart = getFormattedCart(data);
-      if (updatedCart) {
-        syncWithWooCommerce(updatedCart);
-      }
-    }
-  }, [data, syncWithWooCommerce]);
-  // Add to cart mutation
-  const [addToCart, { loading: addToCartLoading, data: addToCartData, error: addToCartError }] = useMutation(ADD_TO_CART, {
-    variables: {
-      input: productQueryInput,
-    },
-    // Refetch all GET_CART queries to update cart across all components
-    refetchQueries: [{ query: GET_CART }],
-    awaitRefetchQueries: true,
-  });
-  useEffect(() => {
-    if (addToCartData) {
-      // Update the cart with new values in React context.
-      setIsSuccess(true);
-      const timer = setTimeout(() => setIsSuccess(false), 2000);
-      if (buyNow) {
-        router.push('/checkout');
-      }
-      return () => clearTimeout(timer);
-    }
-  }, [addToCartData, buyNow, router]);
-  useEffect(() => {
-    if (addToCartError) {
-      console.log('Add to cart error:', addToCartError);
-      setRequestError(true);
-    }
-  }, [addToCartError]);
-  const handleAddToCart = () => {
-    addToCart();
-  };
-  return (
-    <>
-      <Button
-        handleButtonClick={() => handleAddToCart()}
-        buttonDisabled={addToCartLoading || requestError || isCartLoading || isSuccess}
-        fullWidth={fullWidth}
-        className={
-          isSuccess
-            ? 'bg-green-600 hover:bg-green-700'
-            : buyNow
-              ? 'bg-orange-600 hover:bg-orange-700'
-              : ''
-        }
-      >
-        {isCartLoading ? 'Loading...' : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
-      </Button>
-    </>
-  );
-};
-export default AddToCart;
-````
-
 ## File: src/components/Product/ProductReviews.component.tsx
 ````typescript
 import React from 'react';
@@ -12295,64 +12703,6 @@ export const handleQuantityChange = (
     }
   }
 };
-````
-
-## File: .gitignore
-````
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# sitemap and robots
-public/sitemap*.xml
-public/robots.txt
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# local env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-/test-results/
-/playwright-report/
-/playwright/.cache/
-src/pages/registrer.tsx
 ````
 
 ## File: site_dump.html
@@ -18673,404 +19023,6 @@ src/pages/registrer.tsx
 </html>
 ````
 
-## File: src/components/Checkout/CheckoutForm.component.tsx
-````typescript
-/*eslint complexity: ["error", 20]*/
-// Imports
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation, ApolloError } from '@apollo/client';
-import { v4 as uuidv4 } from 'uuid';
-// Components
-import Billing from './Billing.component';
-import CheckoutOrderReview from './CheckoutOrderReview.component';
-import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
-import Button from '../UI/Button.component';
-// GraphQL
-import { GET_CART, GET_PAYMENT_GATEWAYS, GET_ALLOWED_COUNTRIES } from '@/utils/gql/GQL_QUERIES';
-import { CHECKOUT_MUTATION, UPDATE_CUSTOMER, UPDATE_SHIPPING_METHOD } from '@/utils/gql/GQL_MUTATIONS';
-import { useCartStore } from '@/stores/cartStore';
-import { useLocationStore } from '@/stores/locationStore';
-// Utils
-import {
-  getFormattedCart,
-  createCheckoutData,
-  ICheckoutDataProps,
-} from '@/utils/functions/functions';
-export interface IBilling {
-  firstName: string;
-  lastName: string;
-  address1: string;
-  city: string;
-  postcode: string;
-  email: string;
-  phone: string;
-}
-export interface IShipping {
-  firstName: string;
-  lastName: string;
-  address1: string;
-  city: string;
-  postcode: string;
-  email: string;
-  phone: string;
-}
-export interface ICheckoutData {
-  clientMutationId: string;
-  billing: IBilling;
-  shipping: IShipping;
-  shipToDifferentAddress: boolean;
-  paymentMethod: string;
-  isPaid: boolean;
-  transactionId: string;
-}
-const CheckoutForm = () => {
-  const { cart, clearWooCommerceSession, syncWithWooCommerce } = useCartStore();
-  const [orderData, setOrderData] = useState<ICheckoutData | null>(null);
-  const [requestError, setRequestError] = useState<ApolloError | null>(null);
-  const [orderCompleted, setOrderCompleted] = useState<boolean>(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
-  // Get Payment Gateways
-  const { data: gatewaysData } = useQuery(GET_PAYMENT_GATEWAYS);
-  const availableGateways = gatewaysData?.paymentGateways?.nodes || [];
-  // Set default payment method
-  useEffect(() => {
-    if (availableGateways.length > 0 && !selectedPaymentMethod) {
-      // Filter out disabled ones if API doesn't already, but typically nodes are enabled ones
-      setSelectedPaymentMethod(availableGateways[0].id);
-    }
-  }, [availableGateways, selectedPaymentMethod]);
-  // Checkout Steps: 1: Address, 2: Shipping, 3: Payment
-  const [step, setStep] = useState<number>(1);
-  const [selectedShippingRate, setSelectedShippingRate] = useState<string>('');
-  // Get cart data query
-  const { data, refetch } = useQuery(GET_CART, {
-    notifyOnNetworkStatusChange: true,
-  });
-  useEffect(() => {
-    if (data) {
-      const updatedCart = getFormattedCart(data);
-      // Only update if we actually got a cart back. 
-      // Do NOT clear session here, as it cleans itself up elsewhere or persists.
-      // Clearing it causes reload issues.
-      if (updatedCart) {
-        syncWithWooCommerce(updatedCart);
-      }
-    }
-  }, [data, syncWithWooCommerce]);
-  // Mutations
-  const [updateCustomer, { loading: isUpdatingCustomer, data: updateCustomerData }] = useMutation(UPDATE_CUSTOMER, {
-    onError: (error) => {
-      setRequestError(error);
-    }
-  });
-  useEffect(() => {
-    if (updateCustomerData) {
-      refetch();
-      setStep(2);
-    }
-  }, [updateCustomerData, refetch]);
-  const [updateShippingMethod, { loading: isUpdatingShipping }] = useMutation(UPDATE_SHIPPING_METHOD, {
-    onCompleted: () => {
-      refetch();
-      setStep(3);
-    },
-    onError: (error) => {
-      setRequestError(error);
-    }
-  });
-  const [checkout, { loading: checkoutLoading, error: checkoutError, data: checkoutData }] = useMutation(CHECKOUT_MUTATION);
-  useEffect(() => {
-    if (checkoutData) {
-      // Order success
-      // router.push('/order-received'); 
-      // Logic handled in component or redirect
-      const result = checkoutData?.checkout;
-      if (result?.redirect) {
-        window.location.href = result.redirect;
-        return; // Stop further execution if redirecting
-      }
-      clearWooCommerceSession();
-      setOrderCompleted(true);
-      refetch();
-    }
-  }, [checkoutData, clearWooCommerceSession, refetch]);
-  useEffect(() => {
-    if (checkoutError) {
-      setRequestError(checkoutError); // Pass the full ApolloError object
-    }
-  }, [checkoutError]);
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
-  // Get Allowed Countries
-  const { data: countriesData } = useQuery(GET_ALLOWED_COUNTRIES);
-  const allowedCountries = countriesData?.wooCommerce?.countries || [];
-  const defaultCountry = allowedCountries.length > 0 ? allowedCountries[0].code : 'GH';
-  // Step 1 Handler: Address Submission
-  const handleAddressSubmit = (submitData: ICheckoutDataProps) => {
-    const checkOutData = createCheckoutData(submitData);
-    setOrderData(checkOutData);
-    setRequestError(null);
-    // Update Customer in WooCommerce to trigger shipping calculation
-    updateCustomer({
-      variables: {
-        input: {
-          clientMutationId: uuidv4(),
-          shipping: {
-            firstName: submitData.firstName,
-            lastName: submitData.lastName,
-            address1: submitData.address1,
-            address2: submitData.address2,
-            city: submitData.city,
-            postcode: submitData.postcode || '00000',
-            country: submitData.country || defaultCountry,
-          },
-          billing: {
-            firstName: submitData.firstName,
-            lastName: submitData.lastName,
-            address1: submitData.address1,
-            address2: submitData.address2,
-            city: submitData.city,
-            postcode: submitData.postcode || '00000',
-            country: submitData.country || defaultCountry,
-            email: submitData.email,
-            phone: submitData.phone,
-          }
-        }
-      }
-    });
-  };
-  // Step 2 Handler: Shipping Selection
-  const handleShippingSubmit = () => {
-    if (!selectedShippingRate) {
-      // Show error or alert?
-      return;
-    }
-    updateShippingMethod({
-      variables: {
-        input: {
-          clientMutationId: uuidv4(),
-          shippingMethods: [selectedShippingRate]
-        }
-      }
-    });
-  };
-  // Step 3 Handler: Final Order Placement
-  const handlePaymentSubmit = () => {
-    // Ensure we have orderData
-    if (orderData && selectedPaymentMethod) {
-      const finalOrderData = {
-        ...orderData,
-        paymentMethod: selectedPaymentMethod,
-      };
-      checkout({
-        variables: {
-          input: finalOrderData
-        }
-      });
-    }
-  };
-  const availableShippingMethods = data?.cart?.availableShippingMethods?.[0]?.rates || [];
-  // Get Location from Store
-  const { selectedLocation } = useLocationStore();
-  return (
-    <>
-      {cart && !orderCompleted ? (
-        <div className="w-full px-0 lg:px-2 py-1">
-          {/* ... (rest of the layout) */}
-          <div className="flex flex-col-reverse lg:flex-row gap-2">
-            <div className="flex-grow lg:w-2/3">
-              {/* ... (Steps Indicator and Error Display) */}
-              {/* Step 1: Address */}
-              {step === 1 && (
-                <div className="bg-white rounded border border-gray-200 p-2 animate-fade-in text-[#2c3338]">
-                  <h3 className="text-sm font-bold text-[#2c3338] mb-2 uppercase tracking-wide">Billing & Shipping</h3>
-                  <Billing
-                    handleFormSubmit={handleAddressSubmit}
-                    isLoading={isUpdatingCustomer}
-                    buttonLabel="Next: Shipping"
-                    initialCity={selectedLocation?.name}
-                  />
-                </div>
-              )}
-              {/* Step 2: Shipping Method */}
-              {step === 2 && (
-                <div className="bg-white rounded border border-gray-200 p-2 animate-fade-in">
-                  <h3 className="text-sm font-bold text-[#2c3338] mb-2 uppercase tracking-wide">Shipping Method</h3>
-                  {availableShippingMethods.length === 0 ? (
-                    <div className="p-2 bg-yellow-50 text-yellow-800 rounded border border-yellow-200 mb-2 text-xs">
-                      No shipping methods available. Check address.
-                    </div>
-                  ) : (
-                    <div className="grid gap-1 mb-3">
-                      {availableShippingMethods.map((rate: any) => (
-                        <label
-                          key={rate.id}
-                          className={`
-                                                relative flex items-center p-2 border rounded cursor-pointer transition-all duration-200
-                                                ${selectedShippingRate === rate.id
-                              ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
-                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}
-                                            `}
-                        >
-                          <input
-                            type="radio"
-                            name="shipping_method"
-                            value={rate.id}
-                            onChange={(e) => setSelectedShippingRate(e.target.value)}
-                            className="w-3 h-3 text-blue-600 border-gray-300 focus:ring-blue-500"
-                          />
-                          <div className="ml-2 flex-grow">
-                            <span className="block font-medium text-gray-900 text-xs">{rate.label}</span>
-                            {rate.company && <span className="block text-[10px] text-gray-500">{rate.company}</span>}
-                          </div>
-                          <div className="font-bold text-gray-900 text-xs">
-                            {rate.cost ? `₵${rate.cost}` : 'Free'}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <button
-                      onClick={() => setStep(1)}
-                      className="text-gray-500 hover:text-gray-900 text-xs font-medium flex items-center gap-1 transition-colors"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                      Back
-                    </button>
-                    <Button
-                      className="px-4 py-1 text-xs"
-                      handleButtonClick={handleShippingSubmit}
-                      buttonDisabled={!selectedShippingRate || isUpdatingShipping}
-                    >
-                      {isUpdatingShipping ? '...' : 'Next'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {/* Step 3: Payment */}
-              {step === 3 && (
-                <div className="bg-white rounded border border-gray-200 p-2 animate-fade-in">
-                  <h3 className="text-sm font-bold text-[#2c3338] mb-2 uppercase tracking-wide">Payment</h3>
-                  <div className="space-y-2 mb-3">
-                    {availableGateways.length === 0 ? (
-                      <div className="p-2 border border-blue-500 bg-blue-50 rounded flex items-start gap-2 ring-1 ring-blue-500">
-                        <div className="flex-shrink-0 mt-0.5">
-                          <input type="radio" checked readOnly className="w-3 h-3 text-blue-600" />
-                        </div>
-                        <div>
-                          <span className="block font-bold text-gray-900 text-xs">Cash on Delivery</span>
-                          <p className="mt-0.5 text-[10px] text-gray-600">Pay safely with cash when your order is delivered.</p>
-                        </div>
-                      </div>
-                    ) : (
-                      availableGateways.map((gateway: any) => (
-                        <label
-                          key={gateway.id}
-                          className={`
-                                    relative flex items-start p-2 border rounded cursor-pointer transition-all duration-200 gap-2
-                                    ${selectedPaymentMethod === gateway.id
-                              ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500'
-                              : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}
-                                `}
-                        >
-                          <div className="flex-shrink-0 mt-0.5">
-                            <input
-                              type="radio"
-                              name="payment_method"
-                              value={gateway.id}
-                              checked={selectedPaymentMethod === gateway.id}
-                              onChange={() => setSelectedPaymentMethod(gateway.id)}
-                              className="w-3 h-3 text-blue-600 border-gray-300 focus:ring-blue-500"
-                            />
-                          </div>
-                          <div className="flex-grow">
-                            <span className="block font-bold text-gray-900 text-xs">{gateway.title}</span>
-                            <p className="mt-0.5 text-[10px] text-gray-600">{gateway.description}</p>
-                          </div>
-                          {gateway.icon && (
-                            <img src={gateway.icon} alt={gateway.title} className="h-4 object-contain" />
-                          )}
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <button
-                      onClick={() => setStep(2)}
-                      className="text-gray-500 hover:text-gray-900 text-xs font-medium flex items-center gap-1 transition-colors"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                      Back
-                    </button>
-                    <Button
-                      className="bg-green-600 hover:bg-green-700 w-full sm:w-auto px-6 py-2 text-sm font-bold"
-                      handleButtonClick={handlePaymentSubmit}
-                      buttonDisabled={checkoutLoading}
-                    >
-                      {checkoutLoading ? 'Processing...' : 'Place Order'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* Right Column: Summary (Sticky) */}
-            <div className="lg:w-1/3">
-              <div className="sticky top-16">
-                <CheckoutOrderReview cart={data?.cart} />
-                {/* Trust Badges - Ultra Compact */}
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <div className="bg-gray-50 p-1.5 rounded text-center border border-gray-100">
-                    <div className="text-sm mb-0">🛡️</div>
-                    <div className="text-[9px] font-bold text-gray-700 uppercase tracking-wide">Secure</div>
-                  </div>
-                  <div className="bg-gray-50 p-1.5 rounded text-center border border-gray-100">
-                    <div className="text-sm mb-0">🚚</div>
-                    <div className="text-[9px] font-bold text-gray-700 uppercase tracking-wide">Fast</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          {!cart && !orderCompleted && (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
-              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-                <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h1>
-              <p className="text-gray-500 mb-8">Looks like you haven't added any products to your cart yet.</p>
-              <Button href="/" className="bg-blue-600">Start Shopping</Button>
-            </div>
-          )}
-          {orderCompleted && (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 animate-fade-in">
-              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-                <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Order Recieved!</h1>
-              <p className="text-lg text-gray-600 mb-8">Thank you for your purchase. We've emailed you the receipt.</p>
-              <div className="flex gap-4">
-                <Button href="/my-account" variant="secondary">View Order</Button>
-                <Button href="/" variant="primary">Continue Shopping</Button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </>
-  );
-};
-export default CheckoutForm;
-````
-
 ## File: src/components/Index/FeaturedCategories.component.tsx
 ````typescript
 import React from 'react';
@@ -19796,6 +19748,138 @@ module.exports = {
 }
 ````
 
+## File: src/components/Header/Navbar.component.tsx
+````typescript
+import Link from 'next/link';
+import Image from 'next/image';
+import dynamic from 'next/dynamic';
+import { useState } from 'react';
+import Cart from './Cart.component';
+import NativeSearchBox from '../Search/NativeSearchBox.component';
+const MobileNativeSearch = dynamic(() => import('../Search/MobileNativeSearch.component'), { ssr: false });
+const MegaMenu = dynamic(() => import('./MegaMenu.component'), { ssr: false });
+const CategorySidebar = dynamic(() => import('./CategorySidebar.component'), { ssr: false });
+const LocationPicker = dynamic(() => import('./LocationPicker.component'), { ssr: false });
+/**
+ * Navigation for the application.
+ * Includes mobile menu.
+ */
+const Navbar = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  return (
+    <header className="w-full">
+      <nav id="header" className="z-50 w-full bg-white">
+        <LocationPicker variant="headless" />
+        {/* Mobile Navbar */}
+        <div className="flex flex-col md:hidden w-full border-b border-gray-100">
+          <div className="flex items-center justify-between px-4 py-3 bg-white">
+            <button
+              aria-label="Menu"
+              className="p-1"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-7 h-7 text-[#2c3338]"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                />
+              </svg>
+            </button>
+            <Link href="/" className="ml-2">
+              <Image
+                src="/logo.png"
+                alt="Shopwice"
+                width={120}
+                height={35}
+                className="object-contain"
+                priority
+              />
+            </Link>
+            <div className="flex items-center space-x-4">
+              <Link href="/my-account" aria-label="Account">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#2c3338]">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                </svg>
+              </Link>
+              <Cart />
+            </div>
+          </div>
+          <div className="w-full bg-[#0C6DC9] px-4 py-3">
+            <MobileNativeSearch />
+          </div>
+        </div>
+        {/* Desktop Navbar - Top Bar */}
+        <div className="hidden md:block border-b border-gray-100 py-4">
+          <div className="w-full px-8 flex items-center justify-between gap-12">
+            {/* Logo */}
+            <div className="flex-shrink-0">
+              <Link href="/">
+                <Image
+                  src="/logo.png"
+                  alt="Shopwice"
+                  width={150}
+                  height={45}
+                  className="object-contain"
+                  priority
+                />
+              </Link>
+            </div>
+            {/* Search Bar (Expanded) */}
+            <div className="flex-grow max-w-4xl">
+              <NativeSearchBox />
+            </div>
+            {/* Location Picker */}
+            <div className="block">
+              <LocationPicker />
+            </div>
+            {/* Icons */}
+            <div className="flex items-center space-x-10">
+              {/* Account */}
+              <Link href="/my-account" className="flex items-center gap-2.5 group transition-colors">
+                <div className="transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#0C6DC9] group-hover:text-[#0a59a4]">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                  </svg>
+                </div>
+                <div className="hidden lg:flex flex-col">
+                  <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Welcome</span>
+                  <span className="text-sm font-bold text-[#0C6DC9] group-hover:text-[#0a59a4] whitespace-nowrap">My Account</span>
+                </div>
+              </Link>
+              {/* Cart */}
+              <div className="relative group">
+                <div className="flex items-center gap-2.5">
+                  <div className="transition-colors">
+                    <Cart />
+                  </div>
+                  <div className="hidden lg:flex flex-col">
+                    <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Shopping</span>
+                    <span className="text-sm font-bold text-[#0C6DC9] whitespace-nowrap">My Basket</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Desktop Navbar - Mega Menu (Row 2) */}
+        <MegaMenu />
+        {/* Mobile Menu Drawer */}
+        {isMenuOpen && <CategorySidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />}
+      </nav>
+    </header>
+  );
+};
+export default Navbar;
+````
+
 ## File: src/components/Product/DeliveryInfo.component.tsx
 ````typescript
 import React, { useState, useEffect } from 'react';
@@ -20407,6 +20491,77 @@ const ProductLocationDisplay = () => {
 export default ProductLocationDisplay;
 ````
 
+## File: src/components/Product/RecentRefurbishedReviews.component.tsx
+````typescript
+import React from 'react';
+import Link from 'next/link';
+import { useQuery } from '@apollo/client';
+import { GET_RECENT_REVIEWS_QUERY } from '@/utils/gql/GQL_QUERIES';
+const RecentRefurbishedReviews = () => {
+    // Client-side only flag
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+    const { data, loading, error } = useQuery(GET_RECENT_REVIEWS_QUERY, {
+        fetchPolicy: 'network-only', // Ensure fresh data
+        skip: !mounted, // Skip query during SSR
+        notifyOnNetworkStatusChange: true
+    });
+    if (!mounted) return null;
+    if (loading) return <div className="p-4 text-xs text-center text-gray-400">Loading reviews...</div>;
+    if (error) {
+        console.error("Refurbished Reviews Error:", error);
+        return null;
+    }
+    // Flatten reviews from products
+    const products = data?.products?.nodes || [];
+    const recentRefurbishedReviews = products.flatMap((product: any) =>
+        (product.reviews?.nodes || []).map((review: any) => ({
+            ...review,
+            commentOn: {
+                name: product.name,
+                slug: product.slug
+            }
+        }))
+    ).sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5); // Keep top 5
+    console.log("Refurbished Reviews Found:", recentRefurbishedReviews);
+    if (recentRefurbishedReviews.length === 0) return null;
+    return (
+        <div className="mt-6 border-t border-gray-100 pt-4">
+            <h4 className="text-sm font-bold text-gray-900 mb-3">Recent Refurbished Reviews</h4>
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {recentRefurbishedReviews.slice(0, 5).map((review: any) => (
+                    <div key={review.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-xs">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-gray-800">{review.author?.node?.name || 'Customer'}</span>
+                                {review.rating && (
+                                    <div className="flex text-yellow-400">
+                                        {[...Array(5)].map((_, i) => (
+                                            <svg key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-300'}`} viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <span className="text-gray-400 text-[10px] whitespace-nowrap">{new Date(review.date).toLocaleDateString()}</span>
+                        </div>
+                        <div className="text-gray-600 mb-2 leading-relaxed" dangerouslySetInnerHTML={{ __html: review.content }} />
+                        {review.commentOn?.slug && (
+                            <Link href={`/product/${review.commentOn.slug}`} className="text-[10px] text-blue-600 hover:underline block border-t border-gray-200 pt-1 mt-1 font-medium">
+                                Verified Purchase: {review.commentOn.name}
+                            </Link>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+export default RecentRefurbishedReviews;
+````
+
 ## File: deploy.sh
 ````bash
 #!/bin/bash
@@ -20519,138 +20674,6 @@ If you see `404 Not Found` errors for JS/CSS files or the site looks broken afte
     1.  Go to **Cloudflare Dashboard > Caching > Configuration**.
     2.  Click **Purge Everything**.
     3.  **Disable Rocket Loader**: Go to **Speed > Optimization** and turn off "Rocket Loader". It often breaks Next.js hydration.
-````
-
-## File: src/components/Header/Navbar.component.tsx
-````typescript
-import Link from 'next/link';
-import Image from 'next/image';
-import dynamic from 'next/dynamic';
-import { useState } from 'react';
-import Cart from './Cart.component';
-import NativeSearchBox from '../Search/NativeSearchBox.component';
-const MobileNativeSearch = dynamic(() => import('../Search/MobileNativeSearch.component'), { ssr: false });
-const MegaMenu = dynamic(() => import('./MegaMenu.component'), { ssr: false });
-const CategorySidebar = dynamic(() => import('./CategorySidebar.component'), { ssr: false });
-const LocationPicker = dynamic(() => import('./LocationPicker.component'), { ssr: false });
-/**
- * Navigation for the application.
- * Includes mobile menu.
- */
-const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  return (
-    <header className="w-full">
-      <nav id="header" className="z-50 w-full bg-white">
-        <LocationPicker variant="headless" />
-        {/* Mobile Navbar */}
-        <div className="flex flex-col md:hidden w-full border-b border-gray-100">
-          <div className="flex items-center justify-between px-4 py-3 bg-white">
-            <button
-              aria-label="Menu"
-              className="p-1"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-7 h-7 text-[#2c3338]"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                />
-              </svg>
-            </button>
-            <Link href="/" className="ml-2">
-              <Image
-                src="/logo.png"
-                alt="Shopwice"
-                width={120}
-                height={35}
-                className="object-contain"
-                priority
-              />
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/my-account" aria-label="Account">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#2c3338]">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                </svg>
-              </Link>
-              <Cart />
-            </div>
-          </div>
-          <div className="w-full bg-[#0C6DC9] px-4 py-3">
-            <MobileNativeSearch />
-          </div>
-        </div>
-        {/* Desktop Navbar - Top Bar */}
-        <div className="hidden md:block border-b border-gray-100 py-4">
-          <div className="w-full px-8 flex items-center justify-between gap-12">
-            {/* Logo */}
-            <div className="flex-shrink-0">
-              <Link href="/">
-                <Image
-                  src="/logo.png"
-                  alt="Shopwice"
-                  width={150}
-                  height={45}
-                  className="object-contain"
-                  priority
-                />
-              </Link>
-            </div>
-            {/* Search Bar (Expanded) */}
-            <div className="flex-grow max-w-4xl">
-              <NativeSearchBox />
-            </div>
-            {/* Location Picker */}
-            <div className="block">
-              <LocationPicker />
-            </div>
-            {/* Icons */}
-            <div className="flex items-center space-x-10">
-              {/* Account */}
-              <Link href="/my-account" className="flex items-center gap-2.5 group transition-colors">
-                <div className="transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#0C6DC9] group-hover:text-[#0a59a4]">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                  </svg>
-                </div>
-                <div className="hidden lg:flex flex-col">
-                  <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Welcome</span>
-                  <span className="text-sm font-bold text-[#0C6DC9] group-hover:text-[#0a59a4] whitespace-nowrap">My Account</span>
-                </div>
-              </Link>
-              {/* Cart */}
-              <div className="relative group">
-                <div className="flex items-center gap-2.5">
-                  <div className="transition-colors">
-                    <Cart />
-                  </div>
-                  <div className="hidden lg:flex flex-col">
-                    <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Shopping</span>
-                    <span className="text-sm font-bold text-[#0C6DC9] whitespace-nowrap">My Basket</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Desktop Navbar - Mega Menu (Row 2) */}
-        <MegaMenu />
-        {/* Mobile Menu Drawer */}
-        {isMenuOpen && <CategorySidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />}
-      </nav>
-    </header>
-  );
-};
-export default Navbar;
 ````
 
 ## File: next.config.js
@@ -20949,6 +20972,158 @@ const ProductActions = ({ productName, productUrl, productId, orientation = 'col
     );
 };
 export default ProductActions;
+````
+
+## File: src/pages/product/[slug].tsx
+````typescript
+// Imports
+import { withRouter } from 'next/router';
+import { useRouter } from 'next/router';
+// Components
+import SingleProduct from '@/components/Product/SingleProductFinal.component';
+import Layout from '@/components/Layout/Layout.component';
+// Utilities
+import client from '@/utils/apollo/ApolloClient';
+// Types
+import type {
+  NextPage,
+  GetStaticProps,
+  GetStaticPaths,
+  InferGetStaticPropsType,
+} from 'next';
+// GraphQL
+import { GET_SINGLE_PRODUCT, FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
+import { NextSeo, ProductJsonLd } from 'next-seo';
+/**
+ * Display a single product with dynamic pretty urls
+ * @function Produkt
+ * @param {InferGetStaticPropsType<typeof getStaticProps>} products
+ * @returns {JSX.Element} - Rendered component
+ */
+const Produkt: NextPage = ({
+  product,
+  networkStatus,
+}: InferGetStaticPropsType<typeof getStaticProps>) => {
+  const router = useRouter();
+  const hasError = networkStatus === 8;
+  // Handle fallback state
+  if (router.isFallback) {
+    return (
+      <Layout title="Loading..." fullWidth>
+        <div className="mt-8 text-2xl text-center">Loading...</div>
+      </Layout>
+    );
+  }
+  // --- SEO Preparation ---
+  // Safely extract data
+  const name = product?.name || 'Product';
+  const slug = product?.slug || '';
+  const description = product?.shortDescription?.replace(/<[^>]+>/g, '') || product?.description?.replace(/<[^>]+>/g, '').substring(0, 160) || '';
+  const mainImage = product?.image?.sourceUrl || '';
+  const gallery = product?.galleryImages?.nodes?.map((img: { sourceUrl: string }) => img.sourceUrl) || [];
+  const images = [mainImage, ...gallery].filter(Boolean).map(url => ({ url }));
+  // RankMath SEO Data (Fallback to Product Data)
+  const seo = product?.seo;
+  const seoTitle = seo?.title || name;
+  const seoDescription = seo?.description || description;
+  // Price & Currency (Assuming simple product for base price, or low price for variable)
+  // Converting 'GH₵100' -> 100
+  const rawPrice = product?.price || product?.salePrice || product?.regularPrice || '0';
+  const priceAmount = parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0;
+  const currency = 'GHS'; // Ghana Cedis
+  // Stock
+  const isInstock = product?.stockStatus !== 'OUT_OF_STOCK';
+  const availability = isInstock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+  // Ratings
+  const ratingValue = product?.averageRating || 0;
+  const reviewCount = product?.reviewCount || 0;
+  return (
+    <>
+      {product && (
+        <>
+          <NextSeo
+            title={seoTitle}
+            description={seoDescription}
+            canonical={`https://shopwice.com/product/${slug}`}
+            openGraph={{
+              type: 'product',
+              url: `https://shopwice.com/product/${slug}`,
+              title: seoTitle,
+              description: seoDescription,
+              images: images,
+            }}
+          />
+          <ProductJsonLd
+            productName={name}
+            images={images.map(i => i.url)}
+            description={description}
+            brand="Shopwice" // Or product.productBrand if available
+            // sku={product.sku} // Add to query if not present
+            offers={[
+              {
+                price: priceAmount.toString(),
+                priceCurrency: currency,
+                itemCondition: 'https://schema.org/NewCondition', // Assuming new
+                availability: availability,
+                url: `https://shopwice.com/product/${slug}`,
+                seller: {
+                  name: 'Shopwice',
+                },
+              },
+            ]}
+            aggregateRating={
+              reviewCount > 0
+                ? {
+                  ratingValue: ratingValue.toString(),
+                  reviewCount: reviewCount.toString(),
+                }
+                : undefined
+            }
+          />
+        </>
+      )}
+      <Layout title={`${product?.name ? product.name : ''}`} fullWidth>
+        {product ? (
+          <SingleProduct product={product} />
+        ) : (
+          <div className="mt-8 text-2xl text-center">Loading product...</div>
+        )}
+        {hasError && (
+          <div className="mt-8 text-2xl text-center">
+            Error loading product...
+          </div>
+        )}
+      </Layout>
+    </>
+  );
+};
+export default withRouter(Produkt);
+export const getStaticPaths: GetStaticPaths = async () => {
+  return {
+    paths: [],
+    fallback: 'blocking',
+  };
+};
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+  try {
+    console.log('Fetching product for slug:', params?.slug);
+    const { data, loading, networkStatus } = await client.query({
+      query: GET_SINGLE_PRODUCT,
+      variables: { slug: params?.slug },
+      fetchPolicy: 'no-cache'
+    });
+    if (!data?.product) {
+      return { notFound: true };
+    }
+    return {
+      props: { product: data.product, loading, networkStatus },
+      revalidate: 60, // Revalidate every 60 seconds
+    };
+  } catch (error) {
+    console.error(error);
+    return { notFound: true };
+  }
+};
 ````
 
 ## File: src/utils/gql/GQL_QUERIES.ts
@@ -22337,32 +22512,27 @@ export const FETCH_PROMO_PRODUCT_QUERY = gql`
 `;
 export const GET_RECENT_REVIEWS_QUERY = gql`
   query GetRecentReviews {
-    reviews(first: 50, where: { status: APPROVE }) {
+    products(first: 10, where: { search: "Refurbished" }) {
       nodes {
         id
-        date
-        rating
-        content
-        author {
-          node {
-            name
-            avatar {
-              url
-            }
-          }
+        name
+        slug
+        image {
+          sourceUrl
         }
-        commentOn {
-          ... on Product {
-            id
-            name
-            slug
-            image {
-              sourceUrl
-            }
-            attributes {
-              nodes {
-                name
-                options
+        ... on Product {
+          reviews(first: 3, where: { status: "APPROVE" }) {
+            nodes {
+              id
+              date
+              content
+              author {
+                node {
+                  name
+                  avatar {
+                    url
+                  }
+                }
               }
             }
           }
@@ -22371,158 +22541,6 @@ export const GET_RECENT_REVIEWS_QUERY = gql`
     }
   }
 `;
-````
-
-## File: src/pages/product/[slug].tsx
-````typescript
-// Imports
-import { withRouter } from 'next/router';
-import { useRouter } from 'next/router';
-// Components
-import SingleProduct from '@/components/Product/SingleProductFinal.component';
-import Layout from '@/components/Layout/Layout.component';
-// Utilities
-import client from '@/utils/apollo/ApolloClient';
-// Types
-import type {
-  NextPage,
-  GetStaticProps,
-  GetStaticPaths,
-  InferGetStaticPropsType,
-} from 'next';
-// GraphQL
-import { GET_SINGLE_PRODUCT, FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
-import { NextSeo, ProductJsonLd } from 'next-seo';
-/**
- * Display a single product with dynamic pretty urls
- * @function Produkt
- * @param {InferGetStaticPropsType<typeof getStaticProps>} products
- * @returns {JSX.Element} - Rendered component
- */
-const Produkt: NextPage = ({
-  product,
-  networkStatus,
-}: InferGetStaticPropsType<typeof getStaticProps>) => {
-  const router = useRouter();
-  const hasError = networkStatus === 8;
-  // Handle fallback state
-  if (router.isFallback) {
-    return (
-      <Layout title="Loading..." fullWidth>
-        <div className="mt-8 text-2xl text-center">Loading...</div>
-      </Layout>
-    );
-  }
-  // --- SEO Preparation ---
-  // Safely extract data
-  const name = product?.name || 'Product';
-  const slug = product?.slug || '';
-  const description = product?.shortDescription?.replace(/<[^>]+>/g, '') || product?.description?.replace(/<[^>]+>/g, '').substring(0, 160) || '';
-  const mainImage = product?.image?.sourceUrl || '';
-  const gallery = product?.galleryImages?.nodes?.map((img: { sourceUrl: string }) => img.sourceUrl) || [];
-  const images = [mainImage, ...gallery].filter(Boolean).map(url => ({ url }));
-  // RankMath SEO Data (Fallback to Product Data)
-  const seo = product?.seo;
-  const seoTitle = seo?.title || name;
-  const seoDescription = seo?.description || description;
-  // Price & Currency (Assuming simple product for base price, or low price for variable)
-  // Converting 'GH₵100' -> 100
-  const rawPrice = product?.price || product?.salePrice || product?.regularPrice || '0';
-  const priceAmount = parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0;
-  const currency = 'GHS'; // Ghana Cedis
-  // Stock
-  const isInstock = product?.stockStatus !== 'OUT_OF_STOCK';
-  const availability = isInstock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
-  // Ratings
-  const ratingValue = product?.averageRating || 0;
-  const reviewCount = product?.reviewCount || 0;
-  return (
-    <>
-      {product && (
-        <>
-          <NextSeo
-            title={seoTitle}
-            description={seoDescription}
-            canonical={`https://shopwice.com/product/${slug}`}
-            openGraph={{
-              type: 'product',
-              url: `https://shopwice.com/product/${slug}`,
-              title: seoTitle,
-              description: seoDescription,
-              images: images,
-            }}
-          />
-          <ProductJsonLd
-            productName={name}
-            images={images.map(i => i.url)}
-            description={description}
-            brand="Shopwice" // Or product.productBrand if available
-            // sku={product.sku} // Add to query if not present
-            offers={[
-              {
-                price: priceAmount.toString(),
-                priceCurrency: currency,
-                itemCondition: 'https://schema.org/NewCondition', // Assuming new
-                availability: availability,
-                url: `https://shopwice.com/product/${slug}`,
-                seller: {
-                  name: 'Shopwice',
-                },
-              },
-            ]}
-            aggregateRating={
-              reviewCount > 0
-                ? {
-                  ratingValue: ratingValue.toString(),
-                  reviewCount: reviewCount.toString(),
-                }
-                : undefined
-            }
-          />
-        </>
-      )}
-      <Layout title={`${product?.name ? product.name : ''}`} fullWidth>
-        {product ? (
-          <SingleProduct product={product} />
-        ) : (
-          <div className="mt-8 text-2xl text-center">Loading product...</div>
-        )}
-        {hasError && (
-          <div className="mt-8 text-2xl text-center">
-            Error loading product...
-          </div>
-        )}
-      </Layout>
-    </>
-  );
-};
-export default withRouter(Produkt);
-export const getStaticPaths: GetStaticPaths = async () => {
-  return {
-    paths: [],
-    fallback: 'blocking',
-  };
-};
-export const getStaticProps: GetStaticProps = async ({ params }) => {
-  try {
-    console.log('Fetching product for slug:', params?.slug);
-    const { data, loading, networkStatus } = await client.query({
-      query: GET_SINGLE_PRODUCT,
-      variables: { slug: params?.slug },
-      fetchPolicy: 'no-cache'
-    });
-    if (!data?.product) {
-      return { notFound: true };
-    }
-    return {
-      props: { product: data.product, loading, networkStatus },
-      revalidate: 60, // Revalidate every 60 seconds
-    };
-  } catch (error) {
-    console.error(error);
-    return { notFound: true };
-  }
-};
 ````
 
 ## File: src/components/Product/SingleProductFinal.component.tsx
