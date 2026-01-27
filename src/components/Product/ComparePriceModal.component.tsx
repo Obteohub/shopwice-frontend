@@ -49,7 +49,7 @@ const ComparePriceModal = ({ isOpen, onClose, newPrice, refurbPrice, productName
                                 <tr>
                                     <td className="py-3 px-4 text-gray-600 font-medium">Condition</td>
                                     <td className="py-3 px-4 text-left text-gray-900 text-xs">Sealed in Box</td>
-                                    <td className="py-3 px-4 text-left text-gray-900 bg-green-50/30 text-xs">Fresh in Box (Little to no usage)</td>
+                                    <td className="py-3 px-4 text-left text-gray-900 bg-green-50/30 text-xs">Fresh in Box </td>
                                 </tr>
                                 <tr>
                                     <td className="py-3 px-4 text-gray-600 font-medium">Performance</td>
@@ -59,12 +59,12 @@ const ComparePriceModal = ({ isOpen, onClose, newPrice, refurbPrice, productName
                                 <tr>
                                     <td className="py-3 px-4 text-gray-600 font-medium">Battery Health</td>
                                     <td className="py-3 px-4 text-left text-gray-900 text-xs">100%</td>
-                                    <td className="py-3 px-4 text-left text-gray-900 bg-green-50/30 text-xs">Always 100%</td>
+                                    <td className="py-3 px-4 text-left text-gray-900 bg-green-50/30 text-xs">100%</td>
                                 </tr>
                                 <tr>
                                     <td className="py-3 px-4 text-gray-600 font-medium">Warranty</td>
                                     <td className="py-3 px-4 text-left text-gray-900 text-xs">12 Months</td>
-                                    <td className="py-3 px-4 text-left text-gray-900 bg-green-50/30 text-xs">6 Months</td>
+                                    <td className="py-3 px-4 text-left text-gray-900 bg-green-50/30 text-xs">3 Months</td>
                                 </tr>
 
                                 <tr className="bg-gray-50/50">

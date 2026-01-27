@@ -234,7 +234,7 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                     {shortDescription && (
                                         <div className="mt-0">
                                             <div
-                                                className={`text-gray-600 text-sm leading-relaxed ${!isShortDescriptionExpanded ? 'line-clamp-6' : ''}`}
+                                                className={`text-gray-600 text-sm leading-relaxed ${!isShortDescriptionExpanded ? 'line-clamp-4' : ''}`}
                                                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(shortDescription) }}
                                             />
                                             <button
@@ -262,7 +262,19 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                                 <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
                                                 </svg>
-                                                <span className="font-medium">6 months warranty</span>
+                                                <span className="font-medium">3 months warranty</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-gray-700">
+                                                <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                                                </svg>
+                                                <span className="font-medium">100% Battery</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-gray-700">
+                                                <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                                                </svg>
+                                                <span className="font-medium">100% Battery</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs text-gray-700">
                                                 <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -326,14 +338,14 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                                 {isRefurbished && (
                                                     <button
                                                         onClick={() => setShowCompareModal(true)}
-                                                        className="text-xs font-semibold text-blue-600 underline mt-2 hover:text-blue-800 text-left"
+                                                        className="text-xs font-semibold text-gray-600 underline mt-2 hover:text-blue-800 text-left"
                                                     >
                                                         Compare with Brand New
                                                     </button>
                                                 )}
                                             </div>
                                         ) : (
-                                            <p className="text-3xl font-bold text-blue-600">{price}</p>
+                                            <p className="text-3xl font-bold text-gray-600">{price}</p>
                                         )}
                                     </div>
 
