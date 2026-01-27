@@ -103,7 +103,7 @@ const ProductCard = ({
         {/* Refurbished Badge */}
         {showRefurbishedBadge && (
           <div className="absolute top-2 left-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 uppercase tracking-wide">
-            Renewed-
+            Renewed
           </div>
         )}
 

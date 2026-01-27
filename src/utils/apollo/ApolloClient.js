@@ -94,7 +94,7 @@ const client = new ApolloClient({
     afterware.concat(
       createHttpLink({
         // Use proxy on client to avoid CORS, absolute URL on server
-        uri: typeof window === 'undefined' ? process.env.NEXT_PUBLIC_GRAPHQL_URL : '/graphql',
+        uri: typeof window === 'undefined' ? 'https://api.shopwice.com/graphql' : '/graphql',
         fetch,
         credentials: 'omit',
       }),

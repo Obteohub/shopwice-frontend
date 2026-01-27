@@ -102,7 +102,7 @@ const nextConfig = {
     return [
       {
         source: '/graphql',
-        destination: 'https://shopwice.com/graphql',
+        destination: 'https://api.shopwice.com/graphql',
       },
     ];
   },
