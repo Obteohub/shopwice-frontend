@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { gql } from '@apollo/client';
+import client from '@/utils/apollo/ApolloClient';
 
 interface Review {
     id: number;
@@ -31,7 +33,7 @@ const RecentRefurbishedReviewsREST = () => {
 
             try {
                 setLoading(true);
-                // Fetch recent approved reviews - increased to 100 to catch more potential refurbished items
+                // 1. Fetch recent approved reviews from Middleware REST API
                 const reviewsResponse = await fetch(
                     'https://api.shopwice.com/api/reviews?per_page=100',
                     {
@@ -42,64 +44,69 @@ const RecentRefurbishedReviewsREST = () => {
                 );
 
                 if (!reviewsResponse.ok) {
-                    throw new Error(`HTTP error! status: ${reviewsResponse.status}`);
+                    return;
                 }
 
                 const reviewsData = await reviewsResponse.json();
 
-                // Get unique product IDs
+                // 2. Get unique product IDs
                 const productIds = [...new Set(reviewsData.map((r: Review) => r.product_id))];
 
-                // Fetch product details to check if they're refurbished (limit batch size to avoid timeout)
-                const productDetailsPromises = productIds.slice(0, 30).map(async (productId) => {
-                    try {
-                        const response = await fetch(
-                            `https://api.shopwice.com/api/products/${productId}`,
-                            {
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
+                if (productIds.length > 0) {
+                    // 3. Fetch product details using GraphQL to check "Condition"
+                    const { data } = await client.query({
+                        query: gql`
+                            query GetProductConditions($include: [Int]) {
+                                products(where: { include: $include }, first: 100) {
+                                    nodes {
+                                        databaseId
+                                        attributes {
+                                            nodes {
+                                                name
+                                                options
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        );
-                        if (response.ok) {
-                            return await response.json();
-                        }
-                    } catch (err) {
-                        console.error(`Error fetching product ${productId}:`, err);
-                    }
-                    return null;
-                });
+                        `,
+                        variables: {
+                            include: productIds.slice(0, 50) // Limit to 50 to be safe
+                        },
+                        fetchPolicy: 'network-only'
+                    });
 
-                const products = (await Promise.all(productDetailsPromises)).filter(Boolean);
+                    const products = data?.products?.nodes || [];
 
-                // Check if product is refurbished based on Condition attribute
-                const refurbishedProductIds = new Set(
-                    products
-                        .filter((product: any) => {
-                            // A refurbished product has a "Condition" attribute set to "Refurbish"
-                            const conditionAttr = product.attributes?.find(
-                                (attr: any) => attr.name?.toLowerCase() === 'condition'
-                            );
-                            return conditionAttr?.options?.some(
-                                (opt: any) => opt.toLowerCase().includes('refurbish')
-                            );
-                        })
-                        .map((product: any) => product.id)
-                );
+                    // 4. Check if product is refurbished based on Condition attribute
+                    const refurbishedProductIds = new Set(
+                        products
+                            .filter((product: any) => {
+                                // A refurbished product has a "Condition" attribute set to "Refurbish"
+                                const conditionAttr = product.attributes?.nodes?.find(
+                                    (attr: any) => attr.name?.toLowerCase() === 'condition'
+                                );
+                                return conditionAttr?.options?.some(
+                                    (opt: string) => opt.toLowerCase().includes('refurbish')
+                                );
+                            })
+                            .map((product: any) => product.databaseId)
+                    );
 
-                // Filter reviews for refurbished products
-                const refurbishedReviews = reviewsData.filter((review: Review) =>
-                    refurbishedProductIds.has(review.product_id)
-                );
+                    // 5. Filter reviews for refurbished products
+                    const refurbishedReviews = reviewsData.filter((review: Review) =>
+                        refurbishedProductIds.has(review.product_id)
+                    );
 
-                // Sort by date and take top 10 for the slider
-                const sortedReviews = refurbishedReviews
-                    .sort((a: Review, b: Review) =>
-                        new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
-                    )
-                    .slice(0, 10);
+                    // Sort by date and take top 10
+                    const sortedReviews = refurbishedReviews
+                        .sort((a: Review, b: Review) =>
+                            new Date(b.date_created).getTime() - new Date(a.date_created).getTime()
+                        )
+                        .slice(0, 10);
 
-                setReviews(sortedReviews);
+                    setReviews(sortedReviews);
+                }
             } catch (err) {
                 console.error('Error fetching refurbished reviews:', err);
             } finally {
