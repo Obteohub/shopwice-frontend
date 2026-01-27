@@ -72,14 +72,17 @@ const SingleProductFinal = ({ product }: { product: any }) => {
         (cat: any) => cat.name.toLowerCase() === 'mobile phones' || cat.slug === 'mobile-phones'
     );
 
+    useEffect(() => {
+        console.log('CLIENT ATTRIBUTES DEBUG:', attributes?.nodes);
+    }, [attributes]);
+
 
     // A refurbished product has a "Condition" attribute set to "Refurbish"
-    const conditionAttr = attributes?.nodes?.find(
-        (attr: any) => attr.name?.toLowerCase().trim() === 'condition'
+    // Using loose check to match ProductCard logic matches "all refurbish information" request
+    const isRefurbished = attributes?.nodes?.some(
+        (attr: any) => attr.options?.some((opt: any) => opt.toLowerCase().includes('refurbish'))
     );
-    const isRefurbished = conditionAttr?.options?.some(
-        (opt: any) => opt.toLowerCase().includes('refurbish')
-    );
+
 
     // Determine Box Content
     const boxContentAttr = attributes?.nodes?.find((attr: any) =>
@@ -208,7 +211,7 @@ const SingleProductFinal = ({ product }: { product: any }) => {
                     <div className="lg:col-span-7 w-full">
                         <div className="sticky top-24 flex flex-col gap-6">
                             {/* Header Info */}
-                            <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-2" suppressHydrationWarning>
                                 <div className="flex justify-start items-center gap-4">
                                     {productBrand?.nodes?.[0] && (
                                         <Link href={`/brand/${productBrand.nodes[0].slug}`} className="text-sm font-bold text-blue-600 uppercase tracking-wider hover:underline">

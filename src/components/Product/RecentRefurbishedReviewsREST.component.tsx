@@ -83,11 +83,9 @@ const RecentRefurbishedReviewsREST = () => {
                         products
                             .filter((product: any) => {
                                 // A refurbished product has a "Condition" attribute set to "Refurbish"
-                                const conditionAttr = product.attributes?.nodes?.find(
-                                    (attr: any) => attr.name?.toLowerCase().trim() === 'condition'
-                                );
-                                return conditionAttr?.options?.some(
-                                    (opt: string) => opt.toLowerCase().includes('refurbish')
+                                // Using loose check to match ProductCard logic matches "all refurbish information" request
+                                return product.attributes?.nodes?.some(
+                                    (attr: any) => attr.options?.some((opt: any) => opt.toLowerCase().includes('refurbish'))
                                 );
                             })
                             .map((product: any) => product.databaseId)
