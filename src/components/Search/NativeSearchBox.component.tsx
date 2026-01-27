@@ -56,7 +56,7 @@ const NativeSearchBox = () => {
                 }
 
                 setData(json.data);
-                console.log('Search Data:', json.data);
+                // console.log('Search Data:', json.data);
 
             } catch (err: any) {
                 console.error('Search Error:', err);

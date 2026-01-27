@@ -235,7 +235,7 @@ const SingleProductFinal = ({ product }: IProductRootObject) => {
                                             onClick={() => setShowWhatIsRefurbishedModal(true)}
                                             className="text-xs text-gray-500 underline hover:text-blue-600 cursor-pointer"
                                         >
-                                            What is this?
+                                            learn more?
                                         </button>
                                     </div>
                                 )}

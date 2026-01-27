@@ -103,14 +103,14 @@ const ProductCard = ({
         {/* Refurbished Badge */}
         {showRefurbishedBadge && (
           <div className="absolute top-2 left-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 uppercase tracking-wide">
-            Refurbished-Excellent
+            Renewed-
           </div>
         )}
 
         {/* Warranty Badge - Only for Refurbished Phones */}
         {showWarrantyBadge && (
           <div className="absolute top-8 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 uppercase tracking-wide">
-            6 Month Warranty
+            12 Month Warranty
           </div>
         )}
 
