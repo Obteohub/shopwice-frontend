@@ -5657,6 +5657,53 @@ legacy-peer-deps=true
 }
 ````
 
+## File: check_pagination_support.js
+````javascript
+const url = 'https://shopwice.com/graphql';
+async function test() {
+    const queries = [
+        {
+            name: 'Offset Arg Check',
+            query: `query { products(first: 1, where: { offset: 10 }) { nodes { name } } }`
+        },
+        {
+            name: 'Total Field Check',
+            query: `query { products(first: 1) { total } }`
+        },
+        {
+            name: 'Count Field Check',
+            query: `query { products(first: 1) { count } }`
+        },
+        {
+            name: 'PageInfo Total Check',
+            query: `query { products(first: 1) { pageInfo { total } } }`
+        }
+    ];
+    for (const q of queries) {
+        console.log(`--- Testing ${q.name} ---`);
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: q.query })
+            });
+            const json = await res.json();
+            if (json.errors) {
+                console.log("Result: FAILED");
+                // console.log(JSON.stringify(json.errors[0].message, null, 2));
+            } else {
+                console.log("Result: SUCCESS");
+                console.log(JSON.stringify(json, null, 2));
+            }
+        } catch (e) {
+            console.log("Result: ERROR", e.message);
+        }
+        console.log("\n");
+    }
+}
+test();
+````
+
 ## File: CODE_OF_CONDUCT.md
 ````markdown
 # Contributor Covenant Code of Conduct
@@ -5832,6 +5879,31 @@ available at [http://contributor-covenant.org/version/1/4][version]
 [homepage]: http://contributor-covenant.org
 
 [version]: http://contributor-covenant.org/version/1/4/
+````
+
+## File: deploy.sh
+````bash
+#!/bin/bash
+set -e # Exit on error
+# Deployment Fix Script for Vultr/CloudPanel
+# Usage: ./deploy.sh
+echo ">>> Stopping shopwice process..."
+# Using || true to prevent script failure if app doesn't exist yet
+pm2 delete shopwice || true
+echo ">>> Stashing any local changes (e.g. generated sitemaps)..."
+git stash
+echo ">>> Pulling latest code..."
+git pull origin main
+echo ">>> Rebuilding project..."
+npm ci --include=dev
+npm run build
+echo ">>> Checking PM2 Config..."
+cat ecosystem.config.js
+echo ">>> Starting Server with PM2..."
+pm2 start ecosystem.config.js
+pm2 save
+echo ">>> Done! Server should be running on Port 3001."
+pm2 list
 ````
 
 ## File: deployment_guide.md
@@ -7027,6 +7099,39 @@ module.exports = {
     require('@tailwindcss/typography'),
   ],
 };
+````
+
+## File: test_gql_caps.js
+````javascript
+const url = 'https://shopwice.com/graphql';
+async function test() {
+    const query = `
+    query TestPagination {
+      foundCheck: products(first: 1) {
+        found
+        nodes { name }
+      }
+      offsetCheck1: products(first: 1, where: { offset: 0 }) {
+        nodes { name }
+      }
+      offsetCheck2: products(first: 1, where: { offset: 1 }) {
+        nodes { name }
+      }
+    }
+  `;
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        const json = await res.json();
+        console.log(JSON.stringify(json, null, 2));
+    } catch (e) {
+        console.error("Error:", e.message);
+    }
+}
+test();
 ````
 
 ## File: tsconfig.json
@@ -10686,6 +10791,84 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 ````
 
+## File: src/pages/product-category/[slug].tsx
+````typescript
+import React from 'react';
+import { GetServerSideProps } from 'next';
+import Layout from '@/components/Layout/Layout.component';
+import ProductList from '@/components/Product/ProductList.component';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
+interface CategoryPageProps {
+    category: any;
+    products: any[];
+    pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string | null;
+    };
+    slug: string;
+}
+import BackButton from '@/components/UI/BackButton.component';
+const CategoryPage = ({ category, products, pageInfo, slug }: CategoryPageProps) => {
+    return (
+        <Layout title={category?.name || 'Category'} fullWidth={true}>
+            <div className="px-2 md:px-4 pt-1 pb-1">
+                <BackButton />
+                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
+                    {category?.name?.toLowerCase()}
+                </h1>
+                {category?.description && (
+                    <div
+                        className="mb-10 text-gray-500 max-w-3xl"
+                        dangerouslySetInnerHTML={{ __html: category.description }}
+                    />
+                )}
+                <ProductList
+                    products={products}
+                    title={category?.name}
+                    pageInfo={pageInfo}
+                    slug={slug}
+                    query={GET_CATEGORY_DATA_BY_SLUG}
+                    queryVariables={{ slug, id: slug }}
+                    totalCount={category?.count}
+                />
+            </div>
+        </Layout>
+    );
+};
+export default CategoryPage;
+export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
+    const slug = params?.slug as string;
+    try {
+        // Cache control
+        res.setHeader(
+            'Cache-Control',
+            'public, s-maxage=60, stale-while-revalidate=59'
+        );
+        const { data } = await client.query({
+            query: GET_CATEGORY_DATA_BY_SLUG,
+            variables: { slug, id: slug },
+        });
+        if (!data?.productCategory) {
+            return { notFound: true };
+        }
+        return {
+            props: {
+                category: data.productCategory,
+                products: data.products.nodes,
+                pageInfo: data.products.pageInfo,
+                slug,
+            },
+        };
+    } catch (error) {
+        console.error('Error fetching category data:', error);
+        return {
+            notFound: true,
+        };
+    }
+};
+````
+
 ## File: src/pages/_app.tsx
 ````typescript
 // Imports
@@ -11750,53 +11933,6 @@ export async function logout() {
 }
 ````
 
-## File: check_pagination_support.js
-````javascript
-const url = 'https://shopwice.com/graphql';
-async function test() {
-    const queries = [
-        {
-            name: 'Offset Arg Check',
-            query: `query { products(first: 1, where: { offset: 10 }) { nodes { name } } }`
-        },
-        {
-            name: 'Total Field Check',
-            query: `query { products(first: 1) { total } }`
-        },
-        {
-            name: 'Count Field Check',
-            query: `query { products(first: 1) { count } }`
-        },
-        {
-            name: 'PageInfo Total Check',
-            query: `query { products(first: 1) { pageInfo { total } } }`
-        }
-    ];
-    for (const q of queries) {
-        console.log(`--- Testing ${q.name} ---`);
-        try {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query: q.query })
-            });
-            const json = await res.json();
-            if (json.errors) {
-                console.log("Result: FAILED");
-                // console.log(JSON.stringify(json.errors[0].message, null, 2));
-            } else {
-                console.log("Result: SUCCESS");
-                console.log(JSON.stringify(json, null, 2));
-            }
-        } catch (e) {
-            console.log("Result: ERROR", e.message);
-        }
-        console.log("\n");
-    }
-}
-test();
-````
-
 ## File: CLOUDFLARE_DEPLOY.md
 ````markdown
 # Deploying to Cloudflare Pages
@@ -11970,29 +12106,22 @@ async function checkRefurbishedReviews() {
 checkRefurbishedReviews();
 ````
 
-## File: deploy.sh
-````bash
-#!/bin/bash
-set -e # Exit on error
-# Deployment Fix Script for Vultr/CloudPanel
-# Usage: ./deploy.sh
-echo ">>> Stopping shopwice process..."
-# Using || true to prevent script failure if app doesn't exist yet
-pm2 delete shopwice || true
-echo ">>> Stashing any local changes (e.g. generated sitemaps)..."
-git stash
-echo ">>> Pulling latest code..."
-git pull origin main
-echo ">>> Rebuilding project..."
-npm ci --include=dev
-npm run build
-echo ">>> Checking PM2 Config..."
-cat ecosystem.config.js
-echo ">>> Starting Server with PM2..."
-pm2 start ecosystem.config.js
-pm2 save
-echo ">>> Done! Server should be running on Port 3001."
-pm2 list
+## File: ecosystem.config.js
+````javascript
+module.exports = {
+    apps: [{
+        name: "shopwice",
+        script: "npm",
+        cwd: ".",
+        args: "start",
+        instances: 1,
+        exec_mode: "fork",
+        env: {
+            PORT: 3001,
+            NODE_ENV: "production"
+        }
+    }]
+}
 ````
 
 ## File: probe_api.js
@@ -18355,39 +18484,6 @@ probeApi();
 
 ````
 
-## File: test_gql_caps.js
-````javascript
-const url = 'https://shopwice.com/graphql';
-async function test() {
-    const query = `
-    query TestPagination {
-      foundCheck: products(first: 1) {
-        found
-        nodes { name }
-      }
-      offsetCheck1: products(first: 1, where: { offset: 0 }) {
-        nodes { name }
-      }
-      offsetCheck2: products(first: 1, where: { offset: 1 }) {
-        nodes { name }
-      }
-    }
-  `;
-    try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query })
-        });
-        const json = await res.json();
-        console.log(JSON.stringify(json, null, 2));
-    } catch (e) {
-        console.error("Error:", e.message);
-    }
-}
-test();
-````
-
 ## File: src/components/Index/FeaturedCategories.component.tsx
 ````typescript
 import React from 'react';
@@ -19112,6 +19208,324 @@ const ProductGalleryVertical: React.FC<ProductGalleryProps> = ({ mainImage, gall
 export default ProductGalleryVertical;
 ````
 
+## File: src/components/Product/ProductList.component.tsx
+````typescript
+import { useState } from 'react';
+import { Product } from '@/types/product';
+import { useProductFilters } from '@/hooks/useProductFilters';
+import { usePagination } from '@/hooks/usePagination';
+import ProductCard from './ProductCard.component';
+import ProductFilters from './ProductFilters.component';
+import { useCollectionData } from '@/hooks/useCollectionData';
+interface ProductListProps {
+  products: Product[];
+  title: string;
+  pageInfo?: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
+  slug?: string;
+  query?: any;
+  queryVariables?: Record<string, any>;
+  context?: any;
+  totalCount?: number;
+}
+const ProductList = ({
+  products: initialProducts,
+  title,
+  pageInfo,
+  slug,
+  query,
+  queryVariables,
+  context = { useDirectFetch: true, fetchOptions: { credentials: 'omit' } },
+  totalCount
+}: ProductListProps) => {
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const { data: collectionData } = useCollectionData();
+  // Pagination hook
+  const {
+    products: allProducts,
+    hasNextPage,
+    hasPreviousPage,
+    isLoading,
+    error,
+    loadNext,
+    loadPrevious,
+    currentPage
+  } = usePagination({
+    initialProducts,
+    initialHasNextPage: pageInfo?.hasNextPage || false,
+    initialEndCursor: pageInfo?.endCursor || null,
+    slug: slug || '',
+    query,
+    queryVariables,
+    context
+  });
+  const {
+    sortBy,
+    setSortBy,
+    selectedAttributes,
+    toggleAttribute,
+    selectedBrands,
+    setSelectedBrands,
+    selectedLocations,
+    setSelectedLocations,
+    selectedCategories,
+    setSelectedCategories,
+    priceRange,
+    setPriceRange,
+    minRating,
+    setMinRating,
+    showOnSaleOnly,
+    setShowOnSaleOnly,
+    productTypes,
+    toggleProductType,
+    resetFilters,
+    filterProducts
+  } = useProductFilters(allProducts);
+  const filteredProducts = filterProducts(allProducts);
+  return (
+    <div className="w-full px-1 md:px-4 lg:grid lg:grid-cols-[240px_1fr] lg:gap-4 py-1" id="results-header">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:block">
+        <div className="sticky top-20">
+          <h2 className="text-xl font-bold mb-4 text-[#2c3338] uppercase tracking-tight">Filters</h2>
+          <ProductFilters
+            selectedAttributes={selectedAttributes}
+            toggleAttribute={toggleAttribute}
+            selectedBrands={selectedBrands}
+            setSelectedBrands={setSelectedBrands}
+            selectedLocations={selectedLocations}
+            setSelectedLocations={setSelectedLocations}
+            selectedCategories={selectedCategories}
+            setSelectedCategories={setSelectedCategories}
+            priceRange={priceRange}
+            setPriceRange={setPriceRange}
+            minRating={minRating}
+            setMinRating={setMinRating}
+            showOnSaleOnly={showOnSaleOnly}
+            setShowOnSaleOnly={setShowOnSaleOnly}
+            productTypes={productTypes}
+            toggleProductType={toggleProductType}
+            products={allProducts}
+            resetFilters={resetFilters}
+            options={collectionData || undefined}
+          />
+        </div>
+      </aside>
+      <div className="flex flex-col">
+        {/* Top Bar: Results, Sorting, Filter Button */}
+        <div className="flex items-center justify-between mb-2 gap-2">
+          {/* Results Count - Compact on mobile */}
+          <div className="flex items-center flex-shrink-1 min-w-0 overflow-hidden">
+            <p className="text-xs md:text-sm text-gray-500 font-normal truncate">
+              <span className="md:inline hidden">Found </span>
+              <span className="font-semibold text-gray-900">{totalCount || filteredProducts.length}</span>
+              <span className="md:inline hidden"> products</span>
+              <span className="md:hidden inline"> items found</span>
+            </p>
+          </div>
+          {/* Sorting & Filter Button */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Desktop Sort (Visible lg+) */}
+            <div className="hidden lg:block relative">
+              <select
+                id="sort-select-desktop"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="border rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="popular">Popular</option>
+                <option value="price-low">Price: Low to High</option>
+                <option value="price-high">Price: High to Low</option>
+                <option value="newest">Newest</option>
+                <option value="avg-rating">Top Rated</option>
+              </select>
+            </div>
+            {/* Mobile Sort Icon (Visible < lg) */}
+            <div className="relative lg:hidden">
+              <button
+                onClick={() => setIsSortOpen(!isSortOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 transition-colors whitespace-nowrap"
+                aria-label="Sort"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-700">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                </svg>
+                <span className="text-sm font-medium text-gray-700">Sort</span>
+              </button>
+              {/* Mobile Sort Dropdown */}
+              {isSortOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)}></div>
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-md shadow-xl border border-gray-100 z-40 py-1">
+                    {[
+                      { value: 'popular', label: 'Popular' },
+                      { value: 'price-low', label: 'Price: Low to High' },
+                      { value: 'price-high', label: 'Price: High to Low' },
+                      { value: 'newest', label: 'Newest' },
+                      { value: 'avg-rating', label: 'Top Rated' }
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setSortBy(option.value);
+                          setIsSortOpen(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2.5 text-sm ${sortBy === option.value ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Filter Button (Mobile Only) */}
+            <button
+              onClick={() => setIsFilterOpen(true)}
+              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 transition-colors whitespace-nowrap"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5" />
+              </svg>
+              <span className="text-sm font-medium">Filters</span>
+            </button>
+          </div>
+        </div>
+        {/* Filter Sidebar Overlay */}
+        {isFilterOpen && (
+          <div className="fixed inset-0 z-50 flex">
+            {/* Backdrop */}
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setIsFilterOpen(false)}></div>
+            {/* Sidebar */}
+            <div className="relative ml-auto w-full max-w-sm h-full bg-white shadow-xl overflow-y-auto">
+              {/* Header */}
+              <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
+                <h2 className="text-lg font-semibold">Filters</h2>
+                <button onClick={() => setIsFilterOpen(false)} className="p-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              {/* Filter Content */}
+              <div className="px-6 py-6">
+                <ProductFilters
+                  selectedAttributes={selectedAttributes}
+                  toggleAttribute={toggleAttribute}
+                  selectedBrands={selectedBrands}
+                  setSelectedBrands={setSelectedBrands}
+                  selectedLocations={selectedLocations}
+                  setSelectedLocations={setSelectedLocations}
+                  selectedCategories={selectedCategories}
+                  setSelectedCategories={setSelectedCategories}
+                  priceRange={priceRange}
+                  setPriceRange={setPriceRange}
+                  minRating={minRating}
+                  setMinRating={setMinRating}
+                  showOnSaleOnly={showOnSaleOnly}
+                  setShowOnSaleOnly={setShowOnSaleOnly}
+                  productTypes={productTypes}
+                  toggleProductType={toggleProductType}
+                  products={allProducts}
+                  resetFilters={resetFilters}
+                  options={collectionData || undefined}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Product Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-x-1 gap-y-2 md:gap-x-3 md:gap-y-6">
+          {filteredProducts.map((product: Product, index: number) => (
+            <ProductCard
+              key={product.databaseId}
+              databaseId={product.databaseId}
+              name={product.name}
+              price={product.price}
+              regularPrice={product.regularPrice}
+              salePrice={product.salePrice}
+              onSale={product.onSale}
+              slug={product.slug}
+              image={product.image}
+              averageRating={product.averageRating}
+              productCategories={product.productCategories}
+              attributes={product.attributes}
+              stockQuantity={product.stockQuantity}
+              reviewCount={product.reviewCount}
+            />
+          ))}
+        </div>
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-lg text-gray-500 font-medium animate-pulse">Loading products...</div>
+          </div>
+        )}
+        {/* Error State */}
+        {error && (
+          <div className="flex flex-col justify-center items-center py-8 gap-2">
+            <p className="text-red-500">Failed to load products</p>
+            <div className="flex gap-2">
+              <button
+                onClick={loadPrevious}
+                disabled={!hasPreviousPage}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
+              >
+                Try Previous
+              </button>
+              <button
+                onClick={loadNext}
+                disabled={!hasNextPage}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                Try Next
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Pagination Controls */}
+        {!isLoading && !error && (
+          <div className="flex justify-center items-center gap-4 py-8 mt-4 border-t border-gray-100">
+            <button
+              onClick={loadPrevious}
+              disabled={!hasPreviousPage}
+              className={`px-6 py-2.5 rounded-lg font-medium transition-all ${hasPreviousPage
+                ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
+                : 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-100'
+                }`}
+            >
+              Previous
+            </button>
+            <span className="text-sm font-medium text-gray-600">
+              Page {currentPage}
+            </span>
+            <button
+              onClick={loadNext}
+              disabled={!hasNextPage}
+              className={`px-6 py-2.5 rounded-lg font-medium transition-all ${hasNextPage
+                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-200'
+                : 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-100'
+                }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
+        {!hasNextPage && !isLoading && !error && filteredProducts.length > 0 && (
+          <div className="text-center pb-8 text-xs text-gray-400">
+            End of results
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+export default ProductList;
+````
+
 ## File: src/components/Product/ReviewsInitializer.component.tsx
 ````typescript
 import { useEffect } from 'react';
@@ -19383,84 +19797,6 @@ const GlobalInitializer = () => {
 export default GlobalInitializer;
 ````
 
-## File: src/pages/product-category/[slug].tsx
-````typescript
-import React from 'react';
-import { GetServerSideProps } from 'next';
-import Layout from '@/components/Layout/Layout.component';
-import ProductList from '@/components/Product/ProductList.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
-interface CategoryPageProps {
-    category: any;
-    products: any[];
-    pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string | null;
-    };
-    slug: string;
-}
-import BackButton from '@/components/UI/BackButton.component';
-const CategoryPage = ({ category, products, pageInfo, slug }: CategoryPageProps) => {
-    return (
-        <Layout title={category?.name || 'Category'} fullWidth={true}>
-            <div className="px-2 md:px-4 pt-1 pb-1">
-                <BackButton />
-                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
-                    {category?.name?.toLowerCase()}
-                </h1>
-                {category?.description && (
-                    <div
-                        className="mb-10 text-gray-500 max-w-3xl"
-                        dangerouslySetInnerHTML={{ __html: category.description }}
-                    />
-                )}
-                <ProductList
-                    products={products}
-                    title={category?.name}
-                    pageInfo={pageInfo}
-                    slug={slug}
-                    query={GET_CATEGORY_DATA_BY_SLUG}
-                    queryVariables={{ slug, id: slug }}
-                    totalCount={category?.count}
-                />
-            </div>
-        </Layout>
-    );
-};
-export default CategoryPage;
-export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
-    const slug = params?.slug as string;
-    try {
-        // Cache control
-        res.setHeader(
-            'Cache-Control',
-            'public, s-maxage=60, stale-while-revalidate=59'
-        );
-        const { data } = await client.query({
-            query: GET_CATEGORY_DATA_BY_SLUG,
-            variables: { slug, id: slug },
-        });
-        if (!data?.productCategory) {
-            return { notFound: true };
-        }
-        return {
-            props: {
-                category: data.productCategory,
-                products: data.products.nodes,
-                pageInfo: data.products.pageInfo,
-                slug,
-            },
-        };
-    } catch (error) {
-        console.error('Error fetching category data:', error);
-        return {
-            notFound: true,
-        };
-    }
-};
-````
-
 ## File: src/pages/404.tsx
 ````typescript
 import Link from 'next/link';
@@ -19723,24 +20059,6 @@ export const useReviewsStore = create<ReviewsState>()(
         }
     )
 );
-````
-
-## File: ecosystem.config.js
-````javascript
-module.exports = {
-    apps: [{
-        name: "shopwice",
-        script: "npm",
-        cwd: ".",
-        args: "start",
-        instances: 1,
-        exec_mode: "fork",
-        env: {
-            PORT: 3001,
-            NODE_ENV: "production"
-        }
-    }]
-}
 ````
 
 ## File: src/components/Index/AirConditionerProducts.component.tsx
@@ -21007,324 +21325,6 @@ const DeliveryInfo = () => {
 export default DeliveryInfo;
 ````
 
-## File: src/components/Product/ProductList.component.tsx
-````typescript
-import { useState } from 'react';
-import { Product } from '@/types/product';
-import { useProductFilters } from '@/hooks/useProductFilters';
-import { usePagination } from '@/hooks/usePagination';
-import ProductCard from './ProductCard.component';
-import ProductFilters from './ProductFilters.component';
-import { useCollectionData } from '@/hooks/useCollectionData';
-interface ProductListProps {
-  products: Product[];
-  title: string;
-  pageInfo?: {
-    hasNextPage: boolean;
-    endCursor: string | null;
-  };
-  slug?: string;
-  query?: any;
-  queryVariables?: Record<string, any>;
-  context?: any;
-  totalCount?: number;
-}
-const ProductList = ({
-  products: initialProducts,
-  title,
-  pageInfo,
-  slug,
-  query,
-  queryVariables,
-  context = { useDirectFetch: true, fetchOptions: { credentials: 'omit' } },
-  totalCount
-}: ProductListProps) => {
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isSortOpen, setIsSortOpen] = useState(false);
-  const { data: collectionData } = useCollectionData();
-  // Pagination hook
-  const {
-    products: allProducts,
-    hasNextPage,
-    hasPreviousPage,
-    isLoading,
-    error,
-    loadNext,
-    loadPrevious,
-    currentPage
-  } = usePagination({
-    initialProducts,
-    initialHasNextPage: pageInfo?.hasNextPage || false,
-    initialEndCursor: pageInfo?.endCursor || null,
-    slug: slug || '',
-    query,
-    queryVariables,
-    context
-  });
-  const {
-    sortBy,
-    setSortBy,
-    selectedAttributes,
-    toggleAttribute,
-    selectedBrands,
-    setSelectedBrands,
-    selectedLocations,
-    setSelectedLocations,
-    selectedCategories,
-    setSelectedCategories,
-    priceRange,
-    setPriceRange,
-    minRating,
-    setMinRating,
-    showOnSaleOnly,
-    setShowOnSaleOnly,
-    productTypes,
-    toggleProductType,
-    resetFilters,
-    filterProducts
-  } = useProductFilters(allProducts);
-  const filteredProducts = filterProducts(allProducts);
-  return (
-    <div className="w-full px-1 md:px-4 lg:grid lg:grid-cols-[240px_1fr] lg:gap-4 py-1" id="results-header">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:block">
-        <div className="sticky top-20">
-          <h2 className="text-xl font-bold mb-4 text-[#2c3338] uppercase tracking-tight">Filters</h2>
-          <ProductFilters
-            selectedAttributes={selectedAttributes}
-            toggleAttribute={toggleAttribute}
-            selectedBrands={selectedBrands}
-            setSelectedBrands={setSelectedBrands}
-            selectedLocations={selectedLocations}
-            setSelectedLocations={setSelectedLocations}
-            selectedCategories={selectedCategories}
-            setSelectedCategories={setSelectedCategories}
-            priceRange={priceRange}
-            setPriceRange={setPriceRange}
-            minRating={minRating}
-            setMinRating={setMinRating}
-            showOnSaleOnly={showOnSaleOnly}
-            setShowOnSaleOnly={setShowOnSaleOnly}
-            productTypes={productTypes}
-            toggleProductType={toggleProductType}
-            products={allProducts}
-            resetFilters={resetFilters}
-            options={collectionData || undefined}
-          />
-        </div>
-      </aside>
-      <div className="flex flex-col">
-        {/* Top Bar: Results, Sorting, Filter Button */}
-        <div className="flex items-center justify-between mb-2 gap-2">
-          {/* Results Count - Compact on mobile */}
-          <div className="flex items-center flex-shrink-1 min-w-0 overflow-hidden">
-            <p className="text-xs md:text-sm text-gray-500 font-normal truncate">
-              <span className="md:inline hidden">Found </span>
-              <span className="font-semibold text-gray-900">{totalCount || filteredProducts.length}</span>
-              <span className="md:inline hidden"> products</span>
-              <span className="md:hidden inline"> items found</span>
-            </p>
-          </div>
-          {/* Sorting & Filter Button */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Desktop Sort (Visible lg+) */}
-            <div className="hidden lg:block relative">
-              <select
-                id="sort-select-desktop"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="border rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-              >
-                <option value="popular">Popular</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="newest">Newest</option>
-                <option value="avg-rating">Top Rated</option>
-              </select>
-            </div>
-            {/* Mobile Sort Icon (Visible < lg) */}
-            <div className="relative lg:hidden">
-              <button
-                onClick={() => setIsSortOpen(!isSortOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 transition-colors whitespace-nowrap"
-                aria-label="Sort"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 text-gray-700">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
-                </svg>
-                <span className="text-sm font-medium text-gray-700">Sort</span>
-              </button>
-              {/* Mobile Sort Dropdown */}
-              {isSortOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setIsSortOpen(false)}></div>
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-md shadow-xl border border-gray-100 z-40 py-1">
-                    {[
-                      { value: 'popular', label: 'Popular' },
-                      { value: 'price-low', label: 'Price: Low to High' },
-                      { value: 'price-high', label: 'Price: High to Low' },
-                      { value: 'newest', label: 'Newest' },
-                      { value: 'avg-rating', label: 'Top Rated' }
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => {
-                          setSortBy(option.value);
-                          setIsSortOpen(false);
-                        }}
-                        className={`block w-full text-left px-4 py-2.5 text-sm ${sortBy === option.value ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-            {/* Filter Button (Mobile Only) */}
-            <button
-              onClick={() => setIsFilterOpen(true)}
-              className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 border rounded-md bg-white hover:bg-gray-50 transition-colors whitespace-nowrap"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5" />
-              </svg>
-              <span className="text-sm font-medium">Filters</span>
-            </button>
-          </div>
-        </div>
-        {/* Filter Sidebar Overlay */}
-        {isFilterOpen && (
-          <div className="fixed inset-0 z-50 flex">
-            {/* Backdrop */}
-            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setIsFilterOpen(false)}></div>
-            {/* Sidebar */}
-            <div className="relative ml-auto w-full max-w-sm h-full bg-white shadow-xl overflow-y-auto">
-              {/* Header */}
-              <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
-                <h2 className="text-lg font-semibold">Filters</h2>
-                <button onClick={() => setIsFilterOpen(false)} className="p-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              {/* Filter Content */}
-              <div className="px-6 py-6">
-                <ProductFilters
-                  selectedAttributes={selectedAttributes}
-                  toggleAttribute={toggleAttribute}
-                  selectedBrands={selectedBrands}
-                  setSelectedBrands={setSelectedBrands}
-                  selectedLocations={selectedLocations}
-                  setSelectedLocations={setSelectedLocations}
-                  selectedCategories={selectedCategories}
-                  setSelectedCategories={setSelectedCategories}
-                  priceRange={priceRange}
-                  setPriceRange={setPriceRange}
-                  minRating={minRating}
-                  setMinRating={setMinRating}
-                  showOnSaleOnly={showOnSaleOnly}
-                  setShowOnSaleOnly={setShowOnSaleOnly}
-                  productTypes={productTypes}
-                  toggleProductType={toggleProductType}
-                  products={allProducts}
-                  resetFilters={resetFilters}
-                  options={collectionData || undefined}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Product Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-x-1 gap-y-2 md:gap-x-3 md:gap-y-6">
-          {filteredProducts.map((product: Product, index: number) => (
-            <ProductCard
-              key={product.databaseId}
-              databaseId={product.databaseId}
-              name={product.name}
-              price={product.price}
-              regularPrice={product.regularPrice}
-              salePrice={product.salePrice}
-              onSale={product.onSale}
-              slug={product.slug}
-              image={product.image}
-              averageRating={product.averageRating}
-              productCategories={product.productCategories}
-              attributes={product.attributes}
-              stockQuantity={product.stockQuantity}
-              reviewCount={product.reviewCount}
-            />
-          ))}
-        </div>
-        {/* Loading Indicator */}
-        {isLoading && (
-          <div className="flex justify-center items-center py-12">
-            <div className="text-lg text-gray-500 font-medium animate-pulse">Loading products...</div>
-          </div>
-        )}
-        {/* Error State */}
-        {error && (
-          <div className="flex flex-col justify-center items-center py-8 gap-2">
-            <p className="text-red-500">Failed to load products</p>
-            <div className="flex gap-2">
-              <button
-                onClick={loadPrevious}
-                disabled={!hasPreviousPage}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
-              >
-                Try Previous
-              </button>
-              <button
-                onClick={loadNext}
-                disabled={!hasNextPage}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50"
-              >
-                Try Next
-              </button>
-            </div>
-          </div>
-        )}
-        {/* Pagination Controls */}
-        {!isLoading && !error && (
-          <div className="flex justify-center items-center gap-4 py-8 mt-4 border-t border-gray-100">
-            <button
-              onClick={loadPrevious}
-              disabled={!hasPreviousPage}
-              className={`px-6 py-2.5 rounded-lg font-medium transition-all ${hasPreviousPage
-                ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 shadow-sm'
-                : 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-100'
-                }`}
-            >
-              Previous
-            </button>
-            <span className="text-sm font-medium text-gray-600">
-              Page {currentPage}
-            </span>
-            <button
-              onClick={loadNext}
-              disabled={!hasNextPage}
-              className={`px-6 py-2.5 rounded-lg font-medium transition-all ${hasNextPage
-                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-200'
-                : 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-100'
-                }`}
-            >
-              Next
-            </button>
-          </div>
-        )}
-        {!hasNextPage && !isLoading && !error && filteredProducts.length > 0 && (
-          <div className="text-center pb-8 text-xs text-gray-400">
-            End of results
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-export default ProductList;
-````
-
 ## File: src/components/Product/ProductLocationDisplay.component.tsx
 ````typescript
 import { useState, useEffect } from 'react';
@@ -21910,6 +21910,122 @@ export const getStaticProps: GetStaticProps = async () => {
 };
 ````
 
+## File: next.config.js
+````javascript
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  compress: true,
+  compiler: {
+    removeConsole: false,
+  },
+  experimental: {
+    // allowedDevOrigins removed as it causes validation error
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'swewoocommerce.dfweb.no',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'shopwice.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.shopwice.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'web.shopwice.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.shopwice.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '**',
+      },
+    ],
+    minimumCacheTTL: 60,
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    qualities: [75, 90],
+    unoptimized: true,
+  },
+  i18n: {
+    locales: ['en'],
+    defaultLocale: 'en',
+  },
+  async headers() {
+    return [
+      {
+        source: '/:all*(svg|jpg|png|webp|avif|js|css|woff2)',
+        locale: false,
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+        ],
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/graphql',
+        destination: 'https://api.shopwice.com/graphql',
+      },
+      {
+        source: '/api/:path*',
+        destination: 'https://api.shopwice.com/api/:path*',
+      },
+    ];
+  },
+};
+module.exports = nextConfig;
+````
+
 ## File: src/components/Product/ProductCard.component.tsx
 ````typescript
 import { useState, useEffect } from 'react';
@@ -22102,232 +22218,6 @@ const ProductCard = ({
 export default ProductCard;
 ````
 
-## File: src/utils/apollo/ApolloClient.js
-````javascript
-/*eslint complexity: ["error", 8]*/
-import {
-  ApolloClient,
-  InMemoryCache,
-  createHttpLink,
-  ApolloLink,
-} from '@apollo/client';
-const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-/**
- * Middleware operation
- * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
- */
-export const middleware = new ApolloLink((operation, forward) => {
-  /**
-   * If session data exist in local storage, set value as session header.
-   */
-  const sessionData = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('woo-session'))
-    : null;
-  const authData = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('auth-data'))
-    : null;
-  const headers = {};
-  // Middleware Log
-  if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
-    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
-  }
-  // Add Session Header (Skip for Registration to prevent Nonce/Session conflicts)
-  if (sessionData && sessionData.token && sessionData.createdTime && operation.operationName !== 'CreateUser') {
-    const { token, createdTime } = sessionData;
-    // Check if the token is older than 7 days
-    if (Date.now() - createdTime > SEVEN_DAYS) {
-      localStorage.removeItem('woo-session');
-    } else {
-      headers['woocommerce-session'] = `Session ${token}`;
-    }
-  }
-  // Add JWT Authorization if available (Skip for Registration)
-  if (authData && authData.authToken && operation.operationName !== 'CreateUser') {
-    headers['Authorization'] = `Bearer ${authData.authToken}`;
-  }
-  operation.setContext({
-    headers,
-  });
-  return forward(operation);
-});
-/**
- * Afterware operation.
- *
- * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
- */
-export const afterware = new ApolloLink((operation, forward) =>
-  forward(operation).map((response) => {
-    /**
-     * Check for session header and update session in local storage accordingly.
-     */
-    const context = operation.getContext();
-    const responseHeaders = context?.response?.headers;
-    const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
-    if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
-      console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session Header:`, session);
-    }
-    if (session && typeof window !== 'undefined') {
-      if ('false' === session) {
-        // Remove session data if session destroyed.
-        localStorage.removeItem('woo-session');
-        // Update session new data if changed.
-      } else {
-        // Always update session data if header is present
-        localStorage.setItem(
-          'woo-session',
-          JSON.stringify({ token: session, createdTime: Date.now() }),
-        );
-      }
-    }
-    // Check for errors in response
-    if (response.errors) {
-      response.errors.forEach(err => {
-        if (err.message === "The 'woocommerce-session' header is invalid") {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('woo-session');
-            window.location.reload();
-          }
-        }
-      })
-    }
-    return response;
-  }),
-);
-const clientSide = typeof window === 'undefined';
-// Apollo GraphQL client.
-const client = new ApolloClient({
-  ssrMode: clientSide,
-  link: middleware.concat(
-    afterware.concat(
-      createHttpLink({
-        // Use proxy on client to avoid CORS, absolute URL on server
-        uri: typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql') : '/graphql',
-        fetch,
-        credentials: 'include',
-      }),
-    ),
-  ),
-  cache: new InMemoryCache(),
-});
-export default client;
-````
-
-## File: next.config.js
-````javascript
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
-  compress: true,
-  compiler: {
-    removeConsole: false,
-  },
-  experimental: {
-    // allowedDevOrigins removed as it causes validation error
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'swewoocommerce.dfweb.no',
-        pathname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'shopwice.com',
-        pathname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'www.shopwice.com',
-        pathname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'web.shopwice.com',
-        pathname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'cdn.shopwice.com',
-        pathname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',
-        pathname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'via.placeholder.com',
-        pathname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        pathname: '**',
-      },
-    ],
-    minimumCacheTTL: 60,
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    qualities: [75, 90],
-    unoptimized: true,
-  },
-  i18n: {
-    locales: ['en'],
-    defaultLocale: 'en',
-  },
-  async headers() {
-    return [
-      {
-        source: '/:all*(svg|jpg|png|webp|avif|js|css|woff2)',
-        locale: false,
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-        ],
-      },
-    ];
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/graphql',
-        destination: 'https://api.shopwice.com/graphql',
-      },
-      {
-        source: '/api/:path*',
-        destination: 'https://api.shopwice.com/api/:path*',
-      },
-    ];
-  },
-};
-module.exports = nextConfig;
-````
-
 ## File: src/pages/product/[slug].tsx
 ````typescript
 // Imports - Updated Layout
@@ -22497,6 +22387,119 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res }) =>
     return { notFound: true };
   }
 };
+````
+
+## File: src/utils/apollo/ApolloClient.js
+````javascript
+/*eslint complexity: ["error", 8]*/
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  ApolloLink,
+} from '@apollo/client';
+const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+/**
+ * Middleware operation
+ * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
+ */
+export const middleware = new ApolloLink((operation, forward) => {
+  /**
+   * If session data exist in local storage, set value as session header.
+   */
+  const sessionData = typeof window !== 'undefined'
+    ? JSON.parse(localStorage.getItem('woo-session'))
+    : null;
+  const authData = typeof window !== 'undefined'
+    ? JSON.parse(localStorage.getItem('auth-data'))
+    : null;
+  const headers = {};
+  // Middleware Log
+  if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
+    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
+  }
+  // Add Session Header (Skip for Registration to prevent Nonce/Session conflicts)
+  if (sessionData && sessionData.token && sessionData.createdTime && operation.operationName !== 'CreateUser') {
+    const { token, createdTime } = sessionData;
+    // Check if the token is older than 7 days
+    if (Date.now() - createdTime > SEVEN_DAYS) {
+      localStorage.removeItem('woo-session');
+    } else {
+      headers['woocommerce-session'] = `Session ${token}`;
+    }
+  }
+  // Add JWT Authorization if available (Skip for Registration)
+  if (authData && authData.authToken && operation.operationName !== 'CreateUser') {
+    headers['Authorization'] = `Bearer ${authData.authToken}`;
+  }
+  operation.setContext({
+    headers,
+  });
+  return forward(operation);
+});
+/**
+ * Afterware operation.
+ *
+ * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
+ */
+export const afterware = new ApolloLink((operation, forward) =>
+  forward(operation).map((response) => {
+    /**
+     * Check for session header and update session in local storage accordingly.
+     */
+    const context = operation.getContext();
+    const responseHeaders = context?.response?.headers;
+    const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
+    if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
+      console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session Header:`, session);
+    }
+    if (session && typeof window !== 'undefined') {
+      if ('false' === session) {
+        // Remove session data if session destroyed.
+        localStorage.removeItem('woo-session');
+        // Update session new data if changed.
+      } else {
+        // Always update session data if header is present
+        localStorage.setItem(
+          'woo-session',
+          JSON.stringify({ token: session, createdTime: Date.now() }),
+        );
+      }
+    }
+    // Check for errors in response
+    if (response.errors) {
+      response.errors.forEach(err => {
+        if (err.message === "The 'woocommerce-session' header is invalid") {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('woo-session');
+            window.location.reload();
+          }
+        }
+      })
+    }
+    return response;
+  }),
+);
+const clientSide = typeof window === 'undefined';
+// Apollo GraphQL client.
+const client = new ApolloClient({
+  ssrMode: clientSide,
+  link: middleware.concat(
+    afterware.concat(
+      createHttpLink({
+        // Use proxy on client to avoid CORS, absolute URL on server
+        // Enhanced check for Node.js/Build environment where window might be mocked
+        uri: (typeof window === 'undefined' || (typeof process !== 'undefined' && process.release && process.release.name === 'node'))
+          ? (process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql')
+          : '/graphql',
+        fetch,
+        credentials: 'include',
+      }),
+    ),
+  ),
+  cache: new InMemoryCache(),
+});
+export default client;
 ````
 
 ## File: src/components/Product/RecentRefurbishedReviewsREST.component.tsx
