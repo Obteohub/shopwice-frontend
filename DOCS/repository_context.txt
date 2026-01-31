@@ -3730,6 +3730,158 @@ const withAuth = <P extends object>(WrappedComponent: ComponentType<P>) => {
 export default withAuth;
 ````
 
+## File: src/hooks/usePagination.ts
+````typescript
+import { useState, useEffect, useCallback } from 'react';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
+import { Product } from '@/types/product';
+import { DocumentNode } from '@apollo/client';
+import { print } from 'graphql';
+interface UsePaginationProps {
+    initialProducts: Product[];
+    initialHasNextPage: boolean;
+    initialEndCursor: string | null;
+    slug: string;
+    query?: DocumentNode;
+    queryVariables?: Record<string, any>;
+    context?: any;
+}
+export const usePagination = ({
+    initialProducts,
+    initialHasNextPage,
+    initialEndCursor,
+    slug,
+    query,
+    queryVariables = {},
+    context = {},
+}: UsePaginationProps) => {
+    const [products, setProducts] = useState<Product[]>(initialProducts);
+    const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
+    const [endCursor, setEndCursor] = useState<string | null>(initialEndCursor);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+    // Stack of cursors for Previous navigation: [null, "cursor1", "cursor2"]
+    // Page 1 uses null. Page 2 uses cursor1.
+    const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    // Reset when slug/initial props change
+    useEffect(() => {
+        setProducts(initialProducts);
+        setHasNextPage(initialHasNextPage);
+        setEndCursor(initialEndCursor);
+        setCursorStack([null]);
+        setCurrentIndex(0);
+        setError(null);
+        setIsLoading(false);
+    }, [initialProducts, initialHasNextPage, initialEndCursor, slug]);
+    const fetchPage = useCallback(async (afterCursor: string | null) => {
+        setIsLoading(true);
+        setError(null);
+        // Scroll to top of results
+        const resultsHeader = document.getElementById('results-header');
+        if (resultsHeader) {
+            resultsHeader.scrollIntoView({ behavior: 'smooth' });
+        } else {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        try {
+            const activeQuery = query || GET_CATEGORY_DATA_BY_SLUG;
+            const activeVariables = {
+                first: 24,
+                ...queryVariables,
+                after: afterCursor,
+                ...(slug && !queryVariables.slug ? { slug } : {}),
+                ...(slug && !queryVariables.id ? { id: slug } : {}),
+            };
+            let data;
+            if (context?.useDirectFetch) {
+                const fetchOptions = context?.fetchOptions || {};
+                const response = await fetch(process.env.NEXT_PUBLIC_GRAPHQL_URL as string, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'omit',
+                    cache: 'no-store',
+                    ...fetchOptions,
+                    body: JSON.stringify({
+                        query: print(activeQuery),
+                        variables: activeVariables
+                    }),
+                });
+                const json = await response.json();
+                if (json.errors) throw new Error(json.errors[0].message);
+                data = json.data;
+            } else {
+                const result = await client.query({
+                    query: activeQuery,
+                    variables: activeVariables,
+                    context: context,
+                    fetchPolicy: 'network-only',
+                });
+                data = result.data;
+            }
+            let newProducts: Product[] = [];
+            let newPageInfo = { hasNextPage: false, endCursor: null };
+            // Parse response (same logic as before)
+            if (data?.productBrand?.products) {
+                newProducts = data.productBrand.products.nodes;
+                newPageInfo = data.productBrand.products.pageInfo;
+            } else if (data?.productLocation?.products) {
+                newProducts = data.productLocation.products.nodes;
+                newPageInfo = data.productLocation.products.pageInfo;
+            } else if (data?.productCategory?.products) {
+                newProducts = data.productCategory.products.nodes;
+                newPageInfo = data.productCategory.products.pageInfo;
+            } else if (data?.products) {
+                newProducts = data.products.nodes;
+                newPageInfo = data.products.pageInfo;
+            }
+            setProducts(newProducts);
+            setHasNextPage(newPageInfo.hasNextPage);
+            setEndCursor(newPageInfo.endCursor);
+        } catch (err: any) {
+            console.error('Pagination Error:', err);
+            setError(err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [query, queryVariables, slug, context]);
+    const loadNext = () => {
+        if (!hasNextPage || isLoading) return;
+        // Push current endCursor to stack relative to current index
+        // We are moving TO index + 1
+        // The cursor for index + 1 is the current `endCursor`
+        // Wait, logic check:
+        // Stack: [null] (Page 1). Current Index: 0.
+        // We have `endCursor` 'A' from Page 1 data.
+        // Click Next.
+        // We want to fetch with `after: 'A'`.
+        // New Stack should be [null, 'A']. New Index: 1.
+        const newStack = [...cursorStack.slice(0, currentIndex + 1), endCursor];
+        setCursorStack(newStack);
+        setCurrentIndex(currentIndex + 1);
+        fetchPage(endCursor);
+    };
+    const loadPrevious = () => {
+        if (currentIndex === 0 || isLoading) return;
+        const prevIndex = currentIndex - 1;
+        const prevCursor = cursorStack[prevIndex];
+        setCurrentIndex(prevIndex);
+        fetchPage(prevCursor);
+    };
+    return {
+        products,
+        hasNextPage,
+        hasPreviousPage: currentIndex > 0,
+        isLoading,
+        error,
+        loadNext,
+        loadPrevious,
+        currentPage: currentIndex + 1,
+    };
+};
+````
+
 ## File: src/hooks/useProductFilters.ts
 ````typescript
 import { useState } from 'react';
@@ -10504,158 +10656,6 @@ export const useCollectionData = () => {
         fetchData();
     }, []);
     return { data, isLoading, error };
-};
-````
-
-## File: src/hooks/usePagination.ts
-````typescript
-import { useState, useEffect, useCallback } from 'react';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
-import { Product } from '@/types/product';
-import { DocumentNode } from '@apollo/client';
-import { print } from 'graphql';
-interface UsePaginationProps {
-    initialProducts: Product[];
-    initialHasNextPage: boolean;
-    initialEndCursor: string | null;
-    slug: string;
-    query?: DocumentNode;
-    queryVariables?: Record<string, any>;
-    context?: any;
-}
-export const usePagination = ({
-    initialProducts,
-    initialHasNextPage,
-    initialEndCursor,
-    slug,
-    query,
-    queryVariables = {},
-    context = {},
-}: UsePaginationProps) => {
-    const [products, setProducts] = useState<Product[]>(initialProducts);
-    const [hasNextPage, setHasNextPage] = useState(initialHasNextPage);
-    const [endCursor, setEndCursor] = useState<string | null>(initialEndCursor);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<Error | null>(null);
-    // Stack of cursors for Previous navigation: [null, "cursor1", "cursor2"]
-    // Page 1 uses null. Page 2 uses cursor1.
-    const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    // Reset when slug/initial props change
-    useEffect(() => {
-        setProducts(initialProducts);
-        setHasNextPage(initialHasNextPage);
-        setEndCursor(initialEndCursor);
-        setCursorStack([null]);
-        setCurrentIndex(0);
-        setError(null);
-        setIsLoading(false);
-    }, [initialProducts, initialHasNextPage, initialEndCursor, slug]);
-    const fetchPage = useCallback(async (afterCursor: string | null) => {
-        setIsLoading(true);
-        setError(null);
-        // Scroll to top of results
-        const resultsHeader = document.getElementById('results-header');
-        if (resultsHeader) {
-            resultsHeader.scrollIntoView({ behavior: 'smooth' });
-        } else {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-        try {
-            const activeQuery = query || GET_CATEGORY_DATA_BY_SLUG;
-            const activeVariables = {
-                first: 24,
-                ...queryVariables,
-                after: afterCursor,
-                ...(slug && !queryVariables.slug ? { slug } : {}),
-                ...(slug && !queryVariables.id ? { id: slug } : {}),
-            };
-            let data;
-            if (context?.useDirectFetch) {
-                const fetchOptions = context?.fetchOptions || {};
-                const response = await fetch(process.env.NEXT_PUBLIC_GRAPHQL_URL as string, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'omit',
-                    cache: 'no-store',
-                    ...fetchOptions,
-                    body: JSON.stringify({
-                        query: print(activeQuery),
-                        variables: activeVariables
-                    }),
-                });
-                const json = await response.json();
-                if (json.errors) throw new Error(json.errors[0].message);
-                data = json.data;
-            } else {
-                const result = await client.query({
-                    query: activeQuery,
-                    variables: activeVariables,
-                    context: context,
-                    fetchPolicy: 'network-only',
-                });
-                data = result.data;
-            }
-            let newProducts: Product[] = [];
-            let newPageInfo = { hasNextPage: false, endCursor: null };
-            // Parse response (same logic as before)
-            if (data?.productBrand?.products) {
-                newProducts = data.productBrand.products.nodes;
-                newPageInfo = data.productBrand.products.pageInfo;
-            } else if (data?.productLocation?.products) {
-                newProducts = data.productLocation.products.nodes;
-                newPageInfo = data.productLocation.products.pageInfo;
-            } else if (data?.productCategory?.products) {
-                newProducts = data.productCategory.products.nodes;
-                newPageInfo = data.productCategory.products.pageInfo;
-            } else if (data?.products) {
-                newProducts = data.products.nodes;
-                newPageInfo = data.products.pageInfo;
-            }
-            setProducts(newProducts);
-            setHasNextPage(newPageInfo.hasNextPage);
-            setEndCursor(newPageInfo.endCursor);
-        } catch (err: any) {
-            console.error('Pagination Error:', err);
-            setError(err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [query, queryVariables, slug, context]);
-    const loadNext = () => {
-        if (!hasNextPage || isLoading) return;
-        // Push current endCursor to stack relative to current index
-        // We are moving TO index + 1
-        // The cursor for index + 1 is the current `endCursor`
-        // Wait, logic check:
-        // Stack: [null] (Page 1). Current Index: 0.
-        // We have `endCursor` 'A' from Page 1 data.
-        // Click Next.
-        // We want to fetch with `after: 'A'`.
-        // New Stack should be [null, 'A']. New Index: 1.
-        const newStack = [...cursorStack.slice(0, currentIndex + 1), endCursor];
-        setCursorStack(newStack);
-        setCurrentIndex(currentIndex + 1);
-        fetchPage(endCursor);
-    };
-    const loadPrevious = () => {
-        if (currentIndex === 0 || isLoading) return;
-        const prevIndex = currentIndex - 1;
-        const prevCursor = cursorStack[prevIndex];
-        setCurrentIndex(prevIndex);
-        fetchPage(prevCursor);
-    };
-    return {
-        products,
-        hasNextPage,
-        hasPreviousPage: currentIndex > 0,
-        isLoading,
-        error,
-        loadNext,
-        loadPrevious,
-        currentPage: currentIndex + 1,
-    };
 };
 ````
 
@@ -21007,192 +21007,6 @@ const DeliveryInfo = () => {
 export default DeliveryInfo;
 ````
 
-## File: src/components/Product/ProductLocationDisplay.component.tsx
-````typescript
-import { useState, useEffect } from 'react';
-import { useLocationStore } from '@/stores/locationStore';
-import { useQuery } from '@apollo/client';
-import { FETCH_ALL_LOCATIONS_QUERY } from '@/utils/gql/GQL_QUERIES';
-const ProductLocationDisplay = () => {
-    const { selectedLocation, setSelectedLocation } = useLocationStore();
-    const [isDetecting, setIsDetecting] = useState(false);
-    const [geoError, setGeoError] = useState<string | null>(null);
-    const [hasMounted, setHasMounted] = useState(false);
-    const { data } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
-    useEffect(() => {
-        setHasMounted(true);
-    }, []);
-    // ... (rest of logic) ...
-    const locations = data?.productLocations?.nodes || [];
-    const handleDetectLocation = () => {
-        // ... same logic ...
-        setIsDetecting(true);
-        setGeoError(null);
-        if (!navigator.geolocation) {
-            setGeoError('Geolocation is not supported');
-            setIsDetecting(false);
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                try {
-                    const { latitude, longitude } = position.coords;
-                    // ... fetch logic ...
-                    const response = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
-                    );
-                    const data = await response.json();
-                    const detectedCity = data.address?.city || data.address?.town || data.address?.suburb || data.address?.state;
-                    if (detectedCity) {
-                        const match = locations.find((loc: any) =>
-                            loc.name.toLowerCase().includes(detectedCity.toLowerCase()) ||
-                            detectedCity.toLowerCase().includes(loc.name.toLowerCase())
-                        );
-                        if (match) {
-                            setSelectedLocation({ name: match.name, slug: match.slug });
-                        } else {
-                            setGeoError(`Location "${detectedCity}" not in delivery zones.`);
-                        }
-                    } else {
-                        setGeoError('Could not determine city.');
-                    }
-                } catch (error) {
-                    setGeoError('Failed to fetch address.');
-                } finally {
-                    setIsDetecting(false);
-                }
-            },
-            (error) => {
-                setGeoError('Location access denied.');
-                setIsDetecting(false);
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-    };
-    return (
-        <div>
-            <div className="flex items-center gap-2 mb-1">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                </svg>
-                <span className="text-xs text-gray-600">
-                    Deliver to: <span className="text-gray-600">{hasMounted && selectedLocation ? selectedLocation.name : 'Select Location'}</span>
-                </span>
-                {(!hasMounted || !selectedLocation) && !isDetecting && (
-                    <button
-                        onClick={handleDetectLocation}
-                        className="text-xs text-gray-600 hover:underline ml-2 font-medium"
-                    >
-                        Auto-detect
-                    </button>
-                )}
-                {hasMounted && selectedLocation && !isDetecting && (
-                    <button
-                        onClick={() => window.dispatchEvent(new Event('open-location-picker'))}
-                        className="text-xs text-gray-600 underline ml-2 font-medium"
-                    >
-                        change location
-                    </button>
-                )}
-                {isDetecting && (
-                    <span className="text-xs text-gray-400 ml-2 animate-pulse">detecting...</span>
-                )}
-            </div>
-            {geoError && (
-                <p className="text-[10px] text-red-500 ml-7">{geoError}</p>
-            )}
-        </div>
-    );
-};
-export default ProductLocationDisplay;
-````
-
-## File: package.json
-````json
-{
-  "name": "shopwice",
-  "version": "1.2.4",
-  "private": true,
-  "scripts": {
-    "lhci": "lhci autorun",
-    "lhci:perf": "lhci autorun --collect.settings.preset=perf",
-    "lhci:desktop": "lhci autorun --collect.settings.preset=desktop",
-    "dev": "next dev --turbopack",
-    "pages:build": "npx @cloudflare/next-on-pages",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "format": "prettier --write \"**/*.{js,ts,tsx,json}\"",
-    "playwright": "npx playwright test",
-    "playwright:ui": "npx playwright test --ui",
-    "playwright:debug": "npx playwright test --debug",
-    "playwright:codegen": "playwright codegen",
-    "refresh": "rm -rf node_modules && rm package-lock.json && npm i && npm run format",
-    "generate-reviews": "node scripts/generate-reviews.js",
-    "postbuild": "next-sitemap"
-  },
-  "keywords": [
-    "next.js",
-    "next",
-    "javascript",
-    "framer"
-  ],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@apollo/client": "^3.12.0",
-    "@react-google-maps/api": "^2.20.8",
-    "@react-oauth/google": "^0.13.4",
-    "@types/react": "^19.2.7",
-    "@types/react-facebook-login": "^4.1.11",
-    "autoprefixer": "^10.4.23",
-    "graphql": "^16.12.0",
-    "isomorphic-dompurify": "^2.35.0",
-    "lodash": "^4.17.21",
-    "motion": "^12.23.26",
-    "next": "16.1.1",
-    "next-seo": "^6.6.0",
-    "next-sitemap": "^4.2.3",
-    "node-fetch": "^3.3.2",
-    "nprogress": "^0.2.0",
-    "postcss": "^8.5.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-facebook-login": "^4.1.1",
-    "react-hook-form": "^7.69.0",
-    "use-places-autocomplete": "^4.0.1",
-    "uuid": "^13.0.0",
-    "zustand": "^5.0.9"
-  },
-  "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
-    "@lhci/cli": "^0.15.1",
-    "@playwright/test": "^1.57.0",
-    "@tailwindcss/typography": "^0.5.19",
-    "@types/google.maps": "^3.58.1",
-    "@types/lodash": "^4.17.21",
-    "@types/node": "24.10.4",
-    "@types/nprogress": "^0.2.3",
-    "@types/react-dom": "^19.2.3",
-    "@types/uuid": "^11.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.50.1",
-    "@typescript-eslint/parser": "^8.50.1",
-    "babel-plugin-styled-components": "^2.1.4",
-    "eslint-config-next": "^16.1.1",
-    "postcss-preset-env": "^10.5.0",
-    "prettier": "^3.7.4",
-    "tailwindcss": "^3.4.19",
-    "typescript": "^5.9.3"
-  },
-  "browserslist": [
-    "defaults",
-    "not IE 11",
-    "maintained node versions"
-  ]
-}
-````
-
 ## File: src/components/Product/ProductList.component.tsx
 ````typescript
 import { useState } from 'react';
@@ -21509,6 +21323,192 @@ const ProductList = ({
   );
 };
 export default ProductList;
+````
+
+## File: src/components/Product/ProductLocationDisplay.component.tsx
+````typescript
+import { useState, useEffect } from 'react';
+import { useLocationStore } from '@/stores/locationStore';
+import { useQuery } from '@apollo/client';
+import { FETCH_ALL_LOCATIONS_QUERY } from '@/utils/gql/GQL_QUERIES';
+const ProductLocationDisplay = () => {
+    const { selectedLocation, setSelectedLocation } = useLocationStore();
+    const [isDetecting, setIsDetecting] = useState(false);
+    const [geoError, setGeoError] = useState<string | null>(null);
+    const [hasMounted, setHasMounted] = useState(false);
+    const { data } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
+    // ... (rest of logic) ...
+    const locations = data?.productLocations?.nodes || [];
+    const handleDetectLocation = () => {
+        // ... same logic ...
+        setIsDetecting(true);
+        setGeoError(null);
+        if (!navigator.geolocation) {
+            setGeoError('Geolocation is not supported');
+            setIsDetecting(false);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                try {
+                    const { latitude, longitude } = position.coords;
+                    // ... fetch logic ...
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+                    );
+                    const data = await response.json();
+                    const detectedCity = data.address?.city || data.address?.town || data.address?.suburb || data.address?.state;
+                    if (detectedCity) {
+                        const match = locations.find((loc: any) =>
+                            loc.name.toLowerCase().includes(detectedCity.toLowerCase()) ||
+                            detectedCity.toLowerCase().includes(loc.name.toLowerCase())
+                        );
+                        if (match) {
+                            setSelectedLocation({ name: match.name, slug: match.slug });
+                        } else {
+                            setGeoError(`Location "${detectedCity}" not in delivery zones.`);
+                        }
+                    } else {
+                        setGeoError('Could not determine city.');
+                    }
+                } catch (error) {
+                    setGeoError('Failed to fetch address.');
+                } finally {
+                    setIsDetecting(false);
+                }
+            },
+            (error) => {
+                setGeoError('Location access denied.');
+                setIsDetecting(false);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    };
+    return (
+        <div>
+            <div className="flex items-center gap-2 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                </svg>
+                <span className="text-xs text-gray-600">
+                    Deliver to: <span className="text-gray-600">{hasMounted && selectedLocation ? selectedLocation.name : 'Select Location'}</span>
+                </span>
+                {(!hasMounted || !selectedLocation) && !isDetecting && (
+                    <button
+                        onClick={handleDetectLocation}
+                        className="text-xs text-gray-600 hover:underline ml-2 font-medium"
+                    >
+                        Auto-detect
+                    </button>
+                )}
+                {hasMounted && selectedLocation && !isDetecting && (
+                    <button
+                        onClick={() => window.dispatchEvent(new Event('open-location-picker'))}
+                        className="text-xs text-gray-600 underline ml-2 font-medium"
+                    >
+                        change location
+                    </button>
+                )}
+                {isDetecting && (
+                    <span className="text-xs text-gray-400 ml-2 animate-pulse">detecting...</span>
+                )}
+            </div>
+            {geoError && (
+                <p className="text-[10px] text-red-500 ml-7">{geoError}</p>
+            )}
+        </div>
+    );
+};
+export default ProductLocationDisplay;
+````
+
+## File: package.json
+````json
+{
+  "name": "shopwice",
+  "version": "1.2.4",
+  "private": true,
+  "scripts": {
+    "lhci": "lhci autorun",
+    "lhci:perf": "lhci autorun --collect.settings.preset=perf",
+    "lhci:desktop": "lhci autorun --collect.settings.preset=desktop",
+    "dev": "next dev --turbopack",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"**/*.{js,ts,tsx,json}\"",
+    "playwright": "npx playwright test",
+    "playwright:ui": "npx playwright test --ui",
+    "playwright:debug": "npx playwright test --debug",
+    "playwright:codegen": "playwright codegen",
+    "refresh": "rm -rf node_modules && rm package-lock.json && npm i && npm run format",
+    "generate-reviews": "node scripts/generate-reviews.js",
+    "postbuild": "next-sitemap"
+  },
+  "keywords": [
+    "next.js",
+    "next",
+    "javascript",
+    "framer"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@apollo/client": "^3.12.0",
+    "@react-google-maps/api": "^2.20.8",
+    "@react-oauth/google": "^0.13.4",
+    "@types/react": "^19.2.7",
+    "@types/react-facebook-login": "^4.1.11",
+    "autoprefixer": "^10.4.23",
+    "graphql": "^16.12.0",
+    "isomorphic-dompurify": "^2.35.0",
+    "lodash": "^4.17.21",
+    "motion": "^12.23.26",
+    "next": "16.1.1",
+    "next-seo": "^6.6.0",
+    "next-sitemap": "^4.2.3",
+    "node-fetch": "^3.3.2",
+    "nprogress": "^0.2.0",
+    "postcss": "^8.5.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-facebook-login": "^4.1.1",
+    "react-hook-form": "^7.69.0",
+    "use-places-autocomplete": "^4.0.1",
+    "uuid": "^13.0.0",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.16",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.57.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/google.maps": "^3.58.1",
+    "@types/lodash": "^4.17.21",
+    "@types/node": "24.10.4",
+    "@types/nprogress": "^0.2.3",
+    "@types/react-dom": "^19.2.3",
+    "@types/uuid": "^11.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.50.1",
+    "@typescript-eslint/parser": "^8.50.1",
+    "babel-plugin-styled-components": "^2.1.4",
+    "eslint-config-next": "^16.1.1",
+    "postcss-preset-env": "^10.5.0",
+    "prettier": "^3.7.4",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3"
+  },
+  "browserslist": [
+    "defaults",
+    "not IE 11",
+    "maintained node versions"
+  ]
+}
 ````
 
 ## File: src/components/Product/ProductReviewsREST.component.tsx
@@ -21910,116 +21910,6 @@ export const getStaticProps: GetStaticProps = async () => {
 };
 ````
 
-## File: src/utils/apollo/ApolloClient.js
-````javascript
-/*eslint complexity: ["error", 8]*/
-import {
-  ApolloClient,
-  InMemoryCache,
-  createHttpLink,
-  ApolloLink,
-} from '@apollo/client';
-const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-/**
- * Middleware operation
- * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
- */
-export const middleware = new ApolloLink((operation, forward) => {
-  /**
-   * If session data exist in local storage, set value as session header.
-   */
-  const sessionData = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('woo-session'))
-    : null;
-  const authData = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('auth-data'))
-    : null;
-  const headers = {};
-  // Middleware Log
-  if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
-    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
-  }
-  // Add Session Header (Skip for Registration to prevent Nonce/Session conflicts)
-  if (sessionData && sessionData.token && sessionData.createdTime && operation.operationName !== 'CreateUser') {
-    const { token, createdTime } = sessionData;
-    // Check if the token is older than 7 days
-    if (Date.now() - createdTime > SEVEN_DAYS) {
-      localStorage.removeItem('woo-session');
-    } else {
-      headers['woocommerce-session'] = `Session ${token}`;
-    }
-  }
-  // Add JWT Authorization if available (Skip for Registration)
-  if (authData && authData.authToken && operation.operationName !== 'CreateUser') {
-    headers['Authorization'] = `Bearer ${authData.authToken}`;
-  }
-  operation.setContext({
-    headers,
-  });
-  return forward(operation);
-});
-/**
- * Afterware operation.
- *
- * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
- */
-export const afterware = new ApolloLink((operation, forward) =>
-  forward(operation).map((response) => {
-    /**
-     * Check for session header and update session in local storage accordingly.
-     */
-    const context = operation.getContext();
-    const responseHeaders = context?.response?.headers;
-    const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
-    if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
-      console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session Header:`, session);
-    }
-    if (session && typeof window !== 'undefined') {
-      if ('false' === session) {
-        // Remove session data if session destroyed.
-        localStorage.removeItem('woo-session');
-        // Update session new data if changed.
-      } else {
-        // Always update session data if header is present
-        localStorage.setItem(
-          'woo-session',
-          JSON.stringify({ token: session, createdTime: Date.now() }),
-        );
-      }
-    }
-    // Check for errors in response
-    if (response.errors) {
-      response.errors.forEach(err => {
-        if (err.message === "The 'woocommerce-session' header is invalid") {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('woo-session');
-            window.location.reload();
-          }
-        }
-      })
-    }
-    return response;
-  }),
-);
-const clientSide = typeof window === 'undefined';
-// Apollo GraphQL client.
-const client = new ApolloClient({
-  ssrMode: clientSide,
-  link: middleware.concat(
-    afterware.concat(
-      createHttpLink({
-        // Use proxy on client to avoid CORS, absolute URL on server
-        uri: typeof window === 'undefined' ? process.env.NEXT_PUBLIC_GRAPHQL_URL : '/graphql',
-        fetch,
-        credentials: 'include',
-      }),
-    ),
-  ),
-  cache: new InMemoryCache(),
-});
-export default client;
-````
-
 ## File: src/components/Product/ProductCard.component.tsx
 ````typescript
 import { useState, useEffect } from 'react';
@@ -22210,6 +22100,116 @@ const ProductCard = ({
   );
 };
 export default ProductCard;
+````
+
+## File: src/utils/apollo/ApolloClient.js
+````javascript
+/*eslint complexity: ["error", 8]*/
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  ApolloLink,
+} from '@apollo/client';
+const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+/**
+ * Middleware operation
+ * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
+ */
+export const middleware = new ApolloLink((operation, forward) => {
+  /**
+   * If session data exist in local storage, set value as session header.
+   */
+  const sessionData = typeof window !== 'undefined'
+    ? JSON.parse(localStorage.getItem('woo-session'))
+    : null;
+  const authData = typeof window !== 'undefined'
+    ? JSON.parse(localStorage.getItem('auth-data'))
+    : null;
+  const headers = {};
+  // Middleware Log
+  if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
+    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
+  }
+  // Add Session Header (Skip for Registration to prevent Nonce/Session conflicts)
+  if (sessionData && sessionData.token && sessionData.createdTime && operation.operationName !== 'CreateUser') {
+    const { token, createdTime } = sessionData;
+    // Check if the token is older than 7 days
+    if (Date.now() - createdTime > SEVEN_DAYS) {
+      localStorage.removeItem('woo-session');
+    } else {
+      headers['woocommerce-session'] = `Session ${token}`;
+    }
+  }
+  // Add JWT Authorization if available (Skip for Registration)
+  if (authData && authData.authToken && operation.operationName !== 'CreateUser') {
+    headers['Authorization'] = `Bearer ${authData.authToken}`;
+  }
+  operation.setContext({
+    headers,
+  });
+  return forward(operation);
+});
+/**
+ * Afterware operation.
+ *
+ * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
+ */
+export const afterware = new ApolloLink((operation, forward) =>
+  forward(operation).map((response) => {
+    /**
+     * Check for session header and update session in local storage accordingly.
+     */
+    const context = operation.getContext();
+    const responseHeaders = context?.response?.headers;
+    const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
+    if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
+      console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session Header:`, session);
+    }
+    if (session && typeof window !== 'undefined') {
+      if ('false' === session) {
+        // Remove session data if session destroyed.
+        localStorage.removeItem('woo-session');
+        // Update session new data if changed.
+      } else {
+        // Always update session data if header is present
+        localStorage.setItem(
+          'woo-session',
+          JSON.stringify({ token: session, createdTime: Date.now() }),
+        );
+      }
+    }
+    // Check for errors in response
+    if (response.errors) {
+      response.errors.forEach(err => {
+        if (err.message === "The 'woocommerce-session' header is invalid") {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('woo-session');
+            window.location.reload();
+          }
+        }
+      })
+    }
+    return response;
+  }),
+);
+const clientSide = typeof window === 'undefined';
+// Apollo GraphQL client.
+const client = new ApolloClient({
+  ssrMode: clientSide,
+  link: middleware.concat(
+    afterware.concat(
+      createHttpLink({
+        // Use proxy on client to avoid CORS, absolute URL on server
+        uri: typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql') : '/graphql',
+        fetch,
+        credentials: 'include',
+      }),
+    ),
+  ),
+  cache: new InMemoryCache(),
+});
+export default client;
 ````
 
 ## File: next.config.js
