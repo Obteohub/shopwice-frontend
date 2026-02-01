@@ -2528,138 +2528,6 @@ const MegaMenu = () => {
 export default MegaMenu;
 ````
 
-## File: src/components/Header/Navbar.component.tsx
-````typescript
-import Link from 'next/link';
-import Image from 'next/image';
-import dynamic from 'next/dynamic';
-import { useState } from 'react';
-import Cart from './Cart.component';
-import NativeSearchBox from '../Search/NativeSearchBox.component';
-const MobileNativeSearch = dynamic(() => import('../Search/MobileNativeSearch.component'), { ssr: false });
-const MegaMenu = dynamic(() => import('./MegaMenu.component'), { ssr: false });
-const CategorySidebar = dynamic(() => import('./CategorySidebar.component'), { ssr: false });
-const LocationPicker = dynamic(() => import('./LocationPicker.component'), { ssr: false });
-/**
- * Navigation for the application.
- * Includes mobile menu.
- */
-const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  return (
-    <header className="w-full">
-      <nav id="header" className="z-50 w-full bg-white">
-        <LocationPicker variant="headless" />
-        {/* Mobile Navbar */}
-        <div className="flex flex-col md:hidden w-full border-b border-gray-100">
-          <div className="flex items-center justify-between px-4 py-3 bg-white">
-            <button
-              aria-label="Menu"
-              className="p-1"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="w-7 h-7 text-[#2c3338]"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-                />
-              </svg>
-            </button>
-            <Link href="/" className="ml-2">
-              <Image
-                src="/logo.png"
-                alt="Shopwice"
-                width={120}
-                height={35}
-                className="object-contain"
-                priority
-              />
-            </Link>
-            <div className="flex items-center space-x-4">
-              <Link href="/my-account" aria-label="Account">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#2c3338]">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                </svg>
-              </Link>
-              <Cart />
-            </div>
-          </div>
-          <div className="w-full bg-[#0C6DC9] px-4 py-3">
-            <MobileNativeSearch />
-          </div>
-        </div>
-        {/* Desktop Navbar - Top Bar */}
-        <div className="hidden md:block border-b border-gray-100 py-4">
-          <div className="w-full px-8 flex items-center justify-between gap-12">
-            {/* Logo */}
-            <div className="flex-shrink-0">
-              <Link href="/">
-                <Image
-                  src="/logo.png"
-                  alt="Shopwice"
-                  width={150}
-                  height={45}
-                  className="object-contain"
-                  priority
-                />
-              </Link>
-            </div>
-            {/* Search Bar (Expanded) */}
-            <div className="flex-grow max-w-4xl">
-              <NativeSearchBox />
-            </div>
-            {/* Location Picker */}
-            <div className="block">
-              <LocationPicker />
-            </div>
-            {/* Icons */}
-            <div className="flex items-center space-x-10">
-              {/* Account */}
-              <Link href="/my-account" className="flex items-center gap-2.5 group transition-colors">
-                <div className="transition-colors">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#0C6DC9] group-hover:text-[#0a59a4]">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                  </svg>
-                </div>
-                <div className="hidden lg:flex flex-col">
-                  <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Welcome</span>
-                  <span className="text-sm font-bold text-[#0C6DC9] group-hover:text-[#0a59a4] whitespace-nowrap">My Account</span>
-                </div>
-              </Link>
-              {/* Cart */}
-              <div className="relative group">
-                <div className="flex items-center gap-2.5">
-                  <div className="transition-colors">
-                    <Cart />
-                  </div>
-                  <div className="hidden lg:flex flex-col">
-                    <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Shopping</span>
-                    <span className="text-sm font-bold text-[#0C6DC9] whitespace-nowrap">My Basket</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Desktop Navbar - Mega Menu (Row 2) */}
-        <MegaMenu />
-        {/* Mobile Menu Drawer */}
-        {isMenuOpen && <CategorySidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />}
-      </nav>
-    </header>
-  );
-};
-export default Navbar;
-````
-
 ## File: src/components/Index/CategoryBlock.component.tsx
 ````typescript
 import React from 'react';
@@ -4165,6 +4033,83 @@ const BackButton = () => {
     );
 };
 export default BackButton;
+````
+
+## File: src/components/UI/Button.component.tsx
+````typescript
+import { ReactNode } from 'react';
+import Link from 'next/link';
+type TButtonVariant = 'primary' | 'secondary' | 'hero' | 'filter' | 'reset';
+interface IButtonProps {
+  handleButtonClick?: () => void;
+  buttonDisabled?: boolean;
+  variant?: TButtonVariant;
+  children?: ReactNode;
+  fullWidth?: boolean;
+  href?: string;
+  title?: string;
+  selected?: boolean;
+  className?: string; // Allow custom classes
+}
+/**
+ * Renders a clickable button
+ * @function Button
+ * @param {void} handleButtonClick - Handle button click
+ * @param {boolean?} buttonDisabled - Is button disabled?
+ * @param {TButtonVariant?} variant - Button variant
+ * @param {ReactNode} children - Children for button
+ * @param {boolean?} fullWidth - Whether the button should be full-width on mobile
+ * @param {boolean?} selected - Whether the button is in a selected state
+ * @returns {JSX.Element} - Rendered component
+ */
+const Button = ({
+  handleButtonClick,
+  buttonDisabled,
+  variant = 'primary',
+  children,
+  fullWidth = false,
+  href,
+  title,
+  selected = false,
+  ...props
+}: IButtonProps) => {
+  const getVariantClasses = (variant: TButtonVariant = 'primary') => {
+    switch (variant) {
+      case 'hero':
+        return 'inline-block px-8 py-4 text-sm tracking-wider uppercase bg-white text-gray-900 hover:bg-gray-400 hover:text-white hover:shadow-md';
+      case 'filter':
+        return selected
+          ? 'px-3 py-1 border rounded bg-gray-900 text-white'
+          : 'px-3 py-1 border rounded hover:bg-gray-100 bg-white text-gray-900';
+      case 'reset':
+        return 'w-full mt-8 py-2 px-4 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors';
+      case 'secondary':
+        return 'px-2 lg:px-4 py-2 font-bold border border-gray-400 border-solid rounded text-white bg-red-500 hover:bg-red-600';
+      default: // primary
+        return 'px-2 lg:px-4 py-2 font-bold border border-gray-400 border-solid rounded text-white bg-blue-500 hover:bg-blue-600';
+    }
+  };
+  const classes = `${getVariantClasses(variant)} ease-in-out transition-all duration-300 disabled:opacity-50 ${fullWidth ? 'w-full' : ''
+    } ${props.className || ''}`;
+  if (href) {
+    return (
+      <Link href={href} className={classes}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button
+      onClick={handleButtonClick}
+      disabled={buttonDisabled}
+      className={classes}
+      title={title}
+    >
+      {children}
+    </button>
+  );
+};
+export default Button;
 ````
 
 ## File: src/components/UI/Checkbox.component.tsx
@@ -15406,6 +15351,137 @@ const Cart = ({ stickyNav }: ICartProps) => {
 export default Cart;
 ````
 
+## File: src/components/Header/Navbar.component.tsx
+````typescript
+import Link from 'next/link';
+import Image from 'next/image';
+import { useState } from 'react';
+import Cart from './Cart.component';
+import NativeSearchBox from '../Search/NativeSearchBox.component';
+import MobileNativeSearch from '../Search/MobileNativeSearch.component';
+import MegaMenu from './MegaMenu.component';
+import CategorySidebar from './CategorySidebar.component';
+import LocationPicker from './LocationPicker.component';
+/**
+ * Navigation for the application.
+ * Includes mobile menu.
+ */
+const Navbar = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  return (
+    <header className="w-full">
+      <nav id="header" className="z-50 w-full bg-white">
+        <LocationPicker variant="headless" />
+        {/* Mobile Navbar */}
+        <div className="flex flex-col md:hidden w-full border-b border-gray-100">
+          <div className="flex items-center justify-between px-4 py-3 bg-white">
+            <button
+              aria-label="Menu"
+              className="p-1"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-7 h-7 text-[#2c3338]"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+                />
+              </svg>
+            </button>
+            <Link href="/" className="ml-2">
+              <Image
+                src="/logo.png"
+                alt="Shopwice"
+                width={120}
+                height={35}
+                className="object-contain"
+                priority
+              />
+            </Link>
+            <div className="flex items-center space-x-4">
+              <Link href="/my-account" aria-label="Account">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#2c3338]">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                </svg>
+              </Link>
+              <Cart />
+            </div>
+          </div>
+          <div className="w-full bg-[#0C6DC9] px-4 py-3">
+            <MobileNativeSearch />
+          </div>
+        </div>
+        {/* Desktop Navbar - Top Bar */}
+        <div className="hidden md:block border-b border-gray-100 py-4">
+          <div className="w-full px-8 flex items-center justify-between gap-12">
+            {/* Logo */}
+            <div className="flex-shrink-0">
+              <Link href="/">
+                <Image
+                  src="/logo.png"
+                  alt="Shopwice"
+                  width={150}
+                  height={45}
+                  className="object-contain"
+                  priority
+                />
+              </Link>
+            </div>
+            {/* Search Bar (Expanded) */}
+            <div className="flex-grow max-w-4xl">
+              <NativeSearchBox />
+            </div>
+            {/* Location Picker */}
+            <div className="block">
+              <LocationPicker />
+            </div>
+            {/* Icons */}
+            <div className="flex items-center space-x-10">
+              {/* Account */}
+              <Link href="/my-account" className="flex items-center gap-2.5 group transition-colors">
+                <div className="transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#0C6DC9] group-hover:text-[#0a59a4]">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                  </svg>
+                </div>
+                <div className="hidden lg:flex flex-col">
+                  <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Welcome</span>
+                  <span className="text-sm font-bold text-[#0C6DC9] group-hover:text-[#0a59a4] whitespace-nowrap">My Account</span>
+                </div>
+              </Link>
+              {/* Cart */}
+              <div className="relative group">
+                <div className="flex items-center gap-2.5">
+                  <div className="transition-colors">
+                    <Cart />
+                  </div>
+                  <div className="hidden lg:flex flex-col">
+                    <span className="text-[10px] uppercase text-gray-500 font-bold leading-tight">Shopping</span>
+                    <span className="text-sm font-bold text-[#0C6DC9] whitespace-nowrap">My Basket</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Desktop Navbar - Mega Menu (Row 2) */}
+        <MegaMenu />
+        {/* Mobile Menu Drawer */}
+        {isMenuOpen && <CategorySidebar isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />}
+      </nav>
+    </header>
+  );
+};
+export default Navbar;
+````
+
 ## File: src/components/Index/AirConditionerProducts.component.tsx
 ````typescript
 import { useState, useEffect } from 'react';
@@ -16830,6 +16906,136 @@ const ProductFilters = ({
 export default ProductFilters;
 ````
 
+## File: src/components/Product/ProductGalleryVertical.component.tsx
+````typescript
+// Gallery - Sharp Corners
+import React, { useState, useRef } from 'react';
+import Image from 'next/image';
+interface GalleryImage {
+    id: string;
+    sourceUrl: string;
+    title?: string;
+}
+interface ProductGalleryProps {
+    mainImage?: {
+        sourceUrl: string;
+        title?: string;
+    };
+    galleryImages?: {
+        nodes: GalleryImage[];
+    };
+}
+const ProductGalleryVertical: React.FC<ProductGalleryProps> = ({ mainImage, galleryImages }) => {
+    const [activeIndex, setActiveIndex] = useState(0);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    // Combine main image and gallery images
+    const allImages = [];
+    if (mainImage?.sourceUrl) {
+        allImages.push({
+            id: 'main',
+            sourceUrl: mainImage.sourceUrl,
+            title: mainImage.title || 'Product Image'
+        });
+    }
+    if (galleryImages?.nodes) {
+        allImages.push(...galleryImages.nodes);
+    }
+    if (allImages.length === 0) return null;
+    const scrollToImage = (index: number) => {
+        setActiveIndex(index);
+        if (scrollContainerRef.current) {
+            const width = scrollContainerRef.current.offsetWidth;
+            scrollContainerRef.current.scrollTo({
+                left: index * width,
+                behavior: 'smooth'
+            });
+        }
+    };
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const width = e.currentTarget.offsetWidth;
+        const index = Math.round(e.currentTarget.scrollLeft / width);
+        setActiveIndex(index);
+    };
+    return (
+        <div className="flex flex-col-reverse md:flex-row gap-4 w-full">
+            {/* Desktop Vertical Thumbnails */}
+            {allImages.length > 1 && (
+                <div className="hidden md:flex flex-col gap-3 h-[400px] lg:h-[500px] overflow-y-auto no-scrollbar w-[80px] flex-shrink-0">
+                    {allImages.map((img, index) => (
+                        <div
+                            key={`thumb-${index}`}
+                            onMouseEnter={() => scrollToImage(index)}
+                            onClick={() => scrollToImage(index)}
+                            className={`relative w-full aspect-square cursor-pointer overflow-hidden transition-all duration-200 ${activeIndex === index ? 'ring-2 ring-blue-600 ring-inset opacity-100' : 'opacity-50 hover:opacity-100'
+                                }`}
+                        >
+                            <Image
+                                src={img.sourceUrl}
+                                alt={`Thumbnail ${index + 1}`}
+                                fill
+                                className="object-cover"
+                                sizes="80px"
+                            />
+                        </div>
+                    ))}
+                </div>
+            )}
+            {/* Main Swipeable Container */}
+            <div className="relative flex-1 w-full">
+                <div
+                    ref={scrollContainerRef}
+                    className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide aspect-square md:h-[400px] lg:h-[500px] md:aspect-auto bg-gray-100"
+                    onScroll={handleScroll}
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                    {allImages.map((img, index) => (
+                        <div key={`${img.id}-${index}`} className="flex-none w-full h-full snap-center relative">
+                            <Image
+                                src={img.sourceUrl}
+                                alt={img.title || 'Product image'}
+                                fill
+                                className="object-contain bg-white"
+                                priority={index === 0}
+                                {...(index === 0 ? { fetchPriority: "high" } : {})}
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 800px"
+                                quality={90}
+                            />
+                        </div>
+                    ))}
+                </div>
+                {/* Mobile Pagination Dots */}
+                {allImages.length > 1 && (
+                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10 md:hidden">
+                        {allImages.map((_, index) => (
+                            <button
+                                key={index}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    scrollToImage(index);
+                                }}
+                                className={`w-2 h-2 rounded-full transition-all duration-300 ${index === activeIndex ? 'bg-black w-4' : 'bg-gray-300'
+                                    }`}
+                                aria-label={`Go to image ${index + 1}`}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+            <style jsx>{`
+                .no-scrollbar::-webkit-scrollbar {
+                    display: none;
+                }
+                .no-scrollbar {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
+        </div>
+    );
+};
+export default ProductGalleryVertical;
+````
+
 ## File: src/components/Product/ProductList.component.tsx
 ````typescript
 import { useState } from 'react';
@@ -17625,83 +17831,6 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ categories, productName }) =>
     );
 };
 export default Breadcrumbs;
-````
-
-## File: src/components/UI/Button.component.tsx
-````typescript
-import { ReactNode } from 'react';
-import Link from 'next/link';
-type TButtonVariant = 'primary' | 'secondary' | 'hero' | 'filter' | 'reset';
-interface IButtonProps {
-  handleButtonClick?: () => void;
-  buttonDisabled?: boolean;
-  variant?: TButtonVariant;
-  children?: ReactNode;
-  fullWidth?: boolean;
-  href?: string;
-  title?: string;
-  selected?: boolean;
-  className?: string; // Allow custom classes
-}
-/**
- * Renders a clickable button
- * @function Button
- * @param {void} handleButtonClick - Handle button click
- * @param {boolean?} buttonDisabled - Is button disabled?
- * @param {TButtonVariant?} variant - Button variant
- * @param {ReactNode} children - Children for button
- * @param {boolean?} fullWidth - Whether the button should be full-width on mobile
- * @param {boolean?} selected - Whether the button is in a selected state
- * @returns {JSX.Element} - Rendered component
- */
-const Button = ({
-  handleButtonClick,
-  buttonDisabled,
-  variant = 'primary',
-  children,
-  fullWidth = false,
-  href,
-  title,
-  selected = false,
-  ...props
-}: IButtonProps) => {
-  const getVariantClasses = (variant: TButtonVariant = 'primary') => {
-    switch (variant) {
-      case 'hero':
-        return 'inline-block px-8 py-4 text-sm tracking-wider uppercase bg-white text-gray-900 hover:bg-gray-400 hover:text-white hover:shadow-md';
-      case 'filter':
-        return selected
-          ? 'px-3 py-1 border rounded bg-gray-900 text-white'
-          : 'px-3 py-1 border rounded hover:bg-gray-100 bg-white text-gray-900';
-      case 'reset':
-        return 'w-full mt-8 py-2 px-4 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors';
-      case 'secondary':
-        return 'px-2 lg:px-4 py-2 font-bold border border-gray-400 border-solid rounded text-white bg-red-500 hover:bg-red-600';
-      default: // primary
-        return 'px-2 lg:px-4 py-2 font-bold border border-gray-400 border-solid rounded text-white bg-blue-500 hover:bg-blue-600';
-    }
-  };
-  const classes = `${getVariantClasses(variant)} ease-in-out transition-all duration-300 disabled:opacity-50 ${fullWidth ? 'w-full' : ''
-    } ${props.className || ''}`;
-  if (href) {
-    return (
-      <Link href={href} className={classes}>
-        {children}
-      </Link>
-    );
-  }
-  return (
-    <button
-      onClick={handleButtonClick}
-      disabled={buttonDisabled}
-      className={classes}
-      title={title}
-    >
-      {children}
-    </button>
-  );
-};
-export default Button;
 ````
 
 ## File: src/components/User/CustomerAccount.component.tsx
@@ -19732,6 +19861,202 @@ const AddToCart = ({
 export default AddToCart;
 ````
 
+## File: src/components/Product/DeliveryInfo.component.tsx
+````typescript
+import React, { useState, useEffect } from 'react';
+const DeliveryInfo = () => {
+    const [deliveryData, setDeliveryData] = useState<{
+        text: React.ReactNode;
+        showTimer: boolean;
+        isActive: boolean;
+    } | null>(null);
+    const [timeLeft, setTimeLeft] = useState<string>('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    useEffect(() => {
+        // 1. Calculate Delivery Status
+        const calculateStatus = () => {
+            // Create a date object for the current time in Accra (GMT)
+            // Since Accra is GMT+0, we can use UTC methods directly which is safer than relying on local machine time offset
+            const now = new Date();
+            const day = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
+            const hour = now.getUTCHours();
+            const minute = now.getUTCMinutes();
+            let text: React.ReactNode = '';
+            let showTimer = false;
+            let isActive = false;
+            // Logic from PHP:
+            // 1. SAT 4:01 PM to SUN (Monday Delivery)
+            //    (Day == 6 && Time >= 16:01) OR (Day == 0)
+            if ((day === 6 && (hour > 16 || (hour === 16 && minute >= 1))) || day === 0) {
+                text = (
+                    <>
+                        Order it now and get it on <strong>Monday</strong>
+                    </>
+                );
+            }
+            // 2. MON-FRI EARLY MORNING (Get it Today)
+            //    Day != 6 && Day != 0 && Time >= 00:01 && Time <= 07:59
+            else if (
+                day !== 6 &&
+                day !== 0 &&
+                (hour === 0 && minute >= 1 || (hour > 0 && hour < 8)) // 00:01 to 07:59
+            ) {
+                text = (
+                    <>
+                        <span className="text-gray-700">Order it now and get it <strong>today</strong></span>
+                    </>
+                );
+            }
+            // 3. WORKING HOURS: THE "3 HOURS" WINDOW
+            //    Day != 0 && Time >= 08:00 && Time <= 16:00
+            else if (
+                day !== 0 &&
+                (hour >= 8 && (hour < 16 || (hour === 16 && minute === 0)))
+            ) {
+                text = (
+                    <>
+                        <span className="text-gray-700">Order it now and get it in the <strong>next 3 hours</strong></span>
+                    </>
+                );
+                showTimer = true;
+                isActive = true;
+            }
+            // 4. EVENING (Deliver Tomorrow)
+            else {
+                text = (
+                    <>
+                        <span className="text-gray-700">Order it now and get it tomorrow</span>
+                    </>
+                );
+            }
+            setDeliveryData({ text, showTimer, isActive });
+        };
+        calculateStatus();
+        const statusInterval = setInterval(calculateStatus, 60000); // Update status every minute
+        return () => clearInterval(statusInterval);
+    }, []);
+    // 2. Countdown Timer Logic
+    useEffect(() => {
+        if (!deliveryData?.showTimer) return;
+        const tick = () => {
+            const now = new Date();
+            // Target is today at 16:00 UTC (Accra)
+            const target = new Date();
+            target.setUTCHours(16, 0, 0, 0);
+            const diff = target.getTime() - now.getTime();
+            if (diff <= 0) {
+                setTimeLeft('0h 0m 0s');
+                return;
+            }
+            const sec = Math.floor(diff / 1000);
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            setTimeLeft(`${h}h ${m}m ${s}s`);
+        };
+        tick(); // Initial call
+        const timerInterval = setInterval(tick, 1000);
+        return () => clearInterval(timerInterval);
+    }, [deliveryData?.showTimer]);
+    if (!deliveryData) return null;
+    return (
+        <>
+            <style jsx>{`
+                @keyframes pulse-green {
+                    0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.4); }
+                    70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+                }
+                .accra-delivery-active {
+                    animation: pulse-green 2s infinite;
+                }
+            `}</style>
+            <div className={`${deliveryData.isActive ? 'accra-delivery-active' : ''}`}>
+                <div className="flex items-start gap-1">
+                    <div className="text-xs text-gray-600 leading-relaxed">
+                        Greater Accra: {deliveryData.text}
+                    </div>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="text-gray-600 text-xs font-semibold underline hover:text-gray-800 focus:outline-none flex-shrink-0"
+                        aria-label="Learn more about shipping"
+                    >
+                        details
+                    </button>
+                </div>
+                {deliveryData.showTimer && (
+                    <div className="text-[10px] text-gray-500 mt-1 font-bold">
+                        Order within <span className="font-mono">{timeLeft}</span> for this window!
+                    </div>
+                )}
+            </div>
+            {/* Shipping Information Modal */}
+            {isModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
+                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-bold text-gray-900">Shipping Information</h3>
+                                <button
+                                    onClick={() => setIsModalOpen(false)}
+                                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                                    aria-label="Close modal"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <h4 className="font-semibold text-gray-900 mb-3">Delivery Windows (Accra, Tema, Kasoa, Amasaman, Adenta)</h4>
+                                <div className="space-y-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">🚀</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Same-Day Delivery</p>
+                                            <p className="text-xs text-gray-600">Orders within these hours Mon-Fri: 12:01 AM - 7:59 AM, qualifies for same day delivery</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">⚡</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">3-Hour Express</p>
+                                            <p className="text-xs text-gray-600">Order between these hours: Mon-Sat: 8:00 AM - 4:00 PM qualifies for express sharp delivery.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">📅</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Next Business Day</p>
+                                            <p className="text-xs text-gray-600">Orders made from Mon-Fri: After 4:00 PM automatically qualify for standard next day delivery</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl">🚚</div>
+                                        <div>
+                                            <p className="font-medium text-sm text-gray-900">Monday Delivery</p>
+                                            <p className="text-xs text-gray-600">Orders made on Sat (After 4:01 PM) - Sunday automatically qualify for Monday delivery.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                                <p className="text-xs text-blue-900">
+                                    <strong>Note:</strong> This delivery times apply to Greater Accra region only and Kasoa only. Other regions have different delivery schedules. Please learn more from our delivery page.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+};
+export default DeliveryInfo;
+````
+
 ## File: src/components/Product/PaymentInfo.component.tsx
 ````typescript
 import React, { useState } from 'react';
@@ -19819,134 +20144,105 @@ const PaymentInfo = () => {
 export default PaymentInfo;
 ````
 
-## File: src/components/Product/ProductGalleryVertical.component.tsx
+## File: src/components/Product/ProductLocationDisplay.component.tsx
 ````typescript
-// Gallery - Sharp Corners
-import React, { useState, useRef } from 'react';
-import Image from 'next/image';
-interface GalleryImage {
-    id: string;
-    sourceUrl: string;
-    title?: string;
-}
-interface ProductGalleryProps {
-    mainImage?: {
-        sourceUrl: string;
-        title?: string;
-    };
-    galleryImages?: {
-        nodes: GalleryImage[];
-    };
-}
-const ProductGalleryVertical: React.FC<ProductGalleryProps> = ({ mainImage, galleryImages }) => {
-    const [activeIndex, setActiveIndex] = useState(0);
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-    // Combine main image and gallery images
-    const allImages = [];
-    if (mainImage?.sourceUrl) {
-        allImages.push({
-            id: 'main',
-            sourceUrl: mainImage.sourceUrl,
-            title: mainImage.title || 'Product Image'
-        });
-    }
-    if (galleryImages?.nodes) {
-        allImages.push(...galleryImages.nodes);
-    }
-    if (allImages.length === 0) return null;
-    const scrollToImage = (index: number) => {
-        setActiveIndex(index);
-        if (scrollContainerRef.current) {
-            const width = scrollContainerRef.current.offsetWidth;
-            scrollContainerRef.current.scrollTo({
-                left: index * width,
-                behavior: 'smooth'
-            });
+import { useState, useEffect } from 'react';
+import { useLocationStore } from '@/stores/locationStore';
+import { useQuery } from '@apollo/client';
+import { FETCH_ALL_LOCATIONS_QUERY } from '@/utils/gql/GQL_QUERIES';
+const ProductLocationDisplay = () => {
+    const { selectedLocation, setSelectedLocation } = useLocationStore();
+    const [isDetecting, setIsDetecting] = useState(false);
+    const [geoError, setGeoError] = useState<string | null>(null);
+    const [hasMounted, setHasMounted] = useState(false);
+    const { data } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
+    // ... (rest of logic) ...
+    const locations = data?.productLocations?.nodes || [];
+    const handleDetectLocation = () => {
+        // ... same logic ...
+        setIsDetecting(true);
+        setGeoError(null);
+        if (!navigator.geolocation) {
+            setGeoError('Geolocation is not supported');
+            setIsDetecting(false);
+            return;
         }
-    };
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        const width = e.currentTarget.offsetWidth;
-        const index = Math.round(e.currentTarget.scrollLeft / width);
-        setActiveIndex(index);
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                try {
+                    const { latitude, longitude } = position.coords;
+                    // ... fetch logic ...
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+                    );
+                    const data = await response.json();
+                    const detectedCity = data.address?.city || data.address?.town || data.address?.suburb || data.address?.state;
+                    if (detectedCity) {
+                        const match = locations.find((loc: any) =>
+                            loc.name.toLowerCase().includes(detectedCity.toLowerCase()) ||
+                            detectedCity.toLowerCase().includes(loc.name.toLowerCase())
+                        );
+                        if (match) {
+                            setSelectedLocation({ name: match.name, slug: match.slug });
+                        } else {
+                            setGeoError(`Location "${detectedCity}" not in delivery zones.`);
+                        }
+                    } else {
+                        setGeoError('Could not determine city.');
+                    }
+                } catch (error) {
+                    setGeoError('Failed to fetch address.');
+                } finally {
+                    setIsDetecting(false);
+                }
+            },
+            (error) => {
+                setGeoError('Location access denied.');
+                setIsDetecting(false);
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
     };
     return (
-        <div className="flex flex-col-reverse md:flex-row gap-4 w-full">
-            {/* Desktop Vertical Thumbnails */}
-            {allImages.length > 1 && (
-                <div className="hidden md:flex flex-col gap-3 h-[400px] lg:h-[500px] overflow-y-auto no-scrollbar w-[80px] flex-shrink-0">
-                    {allImages.map((img, index) => (
-                        <div
-                            key={`thumb-${index}`}
-                            onMouseEnter={() => scrollToImage(index)}
-                            onClick={() => scrollToImage(index)}
-                            className={`relative w-full aspect-square cursor-pointer overflow-hidden transition-all duration-200 ${activeIndex === index ? 'ring-2 ring-blue-600 ring-inset opacity-100' : 'opacity-50 hover:opacity-100'
-                                }`}
-                        >
-                            <Image
-                                src={img.sourceUrl}
-                                alt={`Thumbnail ${index + 1}`}
-                                fill
-                                className="object-cover"
-                                sizes="80px"
-                            />
-                        </div>
-                    ))}
-                </div>
-            )}
-            {/* Main Swipeable Container */}
-            <div className="relative flex-1 w-full">
-                <div
-                    ref={scrollContainerRef}
-                    className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide aspect-square md:h-[400px] lg:h-[500px] md:aspect-auto bg-gray-100"
-                    onScroll={handleScroll}
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                >
-                    {allImages.map((img, index) => (
-                        <div key={`${img.id}-${index}`} className="flex-none w-full h-full snap-center relative">
-                            <Image
-                                src={img.sourceUrl}
-                                alt={img.title || 'Product image'}
-                                fill
-                                className="object-contain bg-white"
-                                priority={index === 0}
-                                {...(index === 0 ? { fetchPriority: "high" } : {})}
-                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 800px"
-                                quality={90}
-                            />
-                        </div>
-                    ))}
-                </div>
-                {/* Mobile Pagination Dots */}
-                {allImages.length > 1 && (
-                    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10 md:hidden">
-                        {allImages.map((_, index) => (
-                            <button
-                                key={index}
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    scrollToImage(index);
-                                }}
-                                className={`w-2 h-2 rounded-full transition-all duration-300 ${index === activeIndex ? 'bg-black w-4' : 'bg-gray-300'
-                                    }`}
-                                aria-label={`Go to image ${index + 1}`}
-                            />
-                        ))}
-                    </div>
+        <div>
+            <div className="flex items-center gap-2 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
+                </svg>
+                <span className="text-xs text-gray-600">
+                    Deliver to: <span className="text-gray-600">{hasMounted && selectedLocation ? selectedLocation.name : 'Select Location'}</span>
+                </span>
+                {(!hasMounted || !selectedLocation) && !isDetecting && (
+                    <button
+                        onClick={handleDetectLocation}
+                        className="text-xs text-gray-600 hover:underline ml-2 font-medium"
+                    >
+                        Auto-detect
+                    </button>
+                )}
+                {hasMounted && selectedLocation && !isDetecting && (
+                    <button
+                        onClick={() => window.dispatchEvent(new Event('open-location-picker'))}
+                        className="text-xs text-gray-600 underline ml-2 font-medium"
+                    >
+                        change location
+                    </button>
+                )}
+                {isDetecting && (
+                    <span className="text-xs text-gray-400 ml-2 animate-pulse">detecting...</span>
                 )}
             </div>
-            <style jsx>{`
-                .no-scrollbar::-webkit-scrollbar {
-                    display: none;
-                }
-                .no-scrollbar {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                }
-            `}</style>
+            {geoError && (
+                <p className="text-[10px] text-red-500 ml-7">{geoError}</p>
+            )}
         </div>
     );
 };
-export default ProductGalleryVertical;
+export default ProductLocationDisplay;
 ````
 
 ## File: src/components/Product/ReviewsInitializer.component.tsx
@@ -20997,202 +21293,6 @@ module.exports = nextConfig;
 }
 ````
 
-## File: src/components/Product/DeliveryInfo.component.tsx
-````typescript
-import React, { useState, useEffect } from 'react';
-const DeliveryInfo = () => {
-    const [deliveryData, setDeliveryData] = useState<{
-        text: React.ReactNode;
-        showTimer: boolean;
-        isActive: boolean;
-    } | null>(null);
-    const [timeLeft, setTimeLeft] = useState<string>('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    useEffect(() => {
-        // 1. Calculate Delivery Status
-        const calculateStatus = () => {
-            // Create a date object for the current time in Accra (GMT)
-            // Since Accra is GMT+0, we can use UTC methods directly which is safer than relying on local machine time offset
-            const now = new Date();
-            const day = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
-            const hour = now.getUTCHours();
-            const minute = now.getUTCMinutes();
-            let text: React.ReactNode = '';
-            let showTimer = false;
-            let isActive = false;
-            // Logic from PHP:
-            // 1. SAT 4:01 PM to SUN (Monday Delivery)
-            //    (Day == 6 && Time >= 16:01) OR (Day == 0)
-            if ((day === 6 && (hour > 16 || (hour === 16 && minute >= 1))) || day === 0) {
-                text = (
-                    <>
-                        Order it now and get it on <strong>Monday</strong>
-                    </>
-                );
-            }
-            // 2. MON-FRI EARLY MORNING (Get it Today)
-            //    Day != 6 && Day != 0 && Time >= 00:01 && Time <= 07:59
-            else if (
-                day !== 6 &&
-                day !== 0 &&
-                (hour === 0 && minute >= 1 || (hour > 0 && hour < 8)) // 00:01 to 07:59
-            ) {
-                text = (
-                    <>
-                        <span className="text-gray-700">Order it now and get it <strong>today</strong></span>
-                    </>
-                );
-            }
-            // 3. WORKING HOURS: THE "3 HOURS" WINDOW
-            //    Day != 0 && Time >= 08:00 && Time <= 16:00
-            else if (
-                day !== 0 &&
-                (hour >= 8 && (hour < 16 || (hour === 16 && minute === 0)))
-            ) {
-                text = (
-                    <>
-                        <span className="text-gray-700">Order it now and get it in the <strong>next 3 hours</strong></span>
-                    </>
-                );
-                showTimer = true;
-                isActive = true;
-            }
-            // 4. EVENING (Deliver Tomorrow)
-            else {
-                text = (
-                    <>
-                        <span className="text-gray-700">Order it now and get it tomorrow</span>
-                    </>
-                );
-            }
-            setDeliveryData({ text, showTimer, isActive });
-        };
-        calculateStatus();
-        const statusInterval = setInterval(calculateStatus, 60000); // Update status every minute
-        return () => clearInterval(statusInterval);
-    }, []);
-    // 2. Countdown Timer Logic
-    useEffect(() => {
-        if (!deliveryData?.showTimer) return;
-        const tick = () => {
-            const now = new Date();
-            // Target is today at 16:00 UTC (Accra)
-            const target = new Date();
-            target.setUTCHours(16, 0, 0, 0);
-            const diff = target.getTime() - now.getTime();
-            if (diff <= 0) {
-                setTimeLeft('0h 0m 0s');
-                return;
-            }
-            const sec = Math.floor(diff / 1000);
-            const h = Math.floor(sec / 3600);
-            const m = Math.floor((sec % 3600) / 60);
-            const s = sec % 60;
-            setTimeLeft(`${h}h ${m}m ${s}s`);
-        };
-        tick(); // Initial call
-        const timerInterval = setInterval(tick, 1000);
-        return () => clearInterval(timerInterval);
-    }, [deliveryData?.showTimer]);
-    if (!deliveryData) return null;
-    return (
-        <>
-            <style jsx>{`
-                @keyframes pulse-green {
-                    0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.4); }
-                    70% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
-                    100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
-                }
-                .accra-delivery-active {
-                    animation: pulse-green 2s infinite;
-                }
-            `}</style>
-            <div className={`${deliveryData.isActive ? 'accra-delivery-active' : ''}`}>
-                <div className="flex items-start gap-1">
-                    <div className="text-xs text-gray-600 leading-relaxed">
-                        Greater Accra: {deliveryData.text}
-                    </div>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="text-gray-600 text-xs font-semibold underline hover:text-gray-800 focus:outline-none flex-shrink-0"
-                        aria-label="Learn more about shipping"
-                    >
-                        details
-                    </button>
-                </div>
-                {deliveryData.showTimer && (
-                    <div className="text-[10px] text-gray-500 mt-1 font-bold">
-                        Order within <span className="font-mono">{timeLeft}</span> for this window!
-                    </div>
-                )}
-            </div>
-            {/* Shipping Information Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-2xl">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-bold text-gray-900">Shipping Information</h3>
-                                <button
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                                    aria-label="Close modal"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div className="px-6 py-5 space-y-4">
-                            <div>
-                                <h4 className="font-semibold text-gray-900 mb-3">Delivery Windows (Accra, Tema, Kasoa, Amasaman, Adenta)</h4>
-                                <div className="space-y-3">
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">🚀</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Same-Day Delivery</p>
-                                            <p className="text-xs text-gray-600">Orders within these hours Mon-Fri: 12:01 AM - 7:59 AM, qualifies for same day delivery</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">⚡</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">3-Hour Express</p>
-                                            <p className="text-xs text-gray-600">Order between these hours: Mon-Sat: 8:00 AM - 4:00 PM qualifies for express sharp delivery.</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">📅</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Next Business Day</p>
-                                            <p className="text-xs text-gray-600">Orders made from Mon-Fri: After 4:00 PM automatically qualify for standard next day delivery</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-3">
-                                        <div className="text-2xl">🚚</div>
-                                        <div>
-                                            <p className="font-medium text-sm text-gray-900">Monday Delivery</p>
-                                            <p className="text-xs text-gray-600">Orders made on Sat (After 4:01 PM) - Sunday automatically qualify for Monday delivery.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                                <p className="text-xs text-blue-900">
-                                    <strong>Note:</strong> This delivery times apply to Greater Accra region only and Kasoa only. Other regions have different delivery schedules. Please learn more from our delivery page.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-};
-export default DeliveryInfo;
-````
-
 ## File: src/components/Product/ProductCard.component.tsx
 ````typescript
 import { useState, useEffect } from 'react';
@@ -21385,107 +21485,6 @@ const ProductCard = ({
 export default ProductCard;
 ````
 
-## File: src/components/Product/ProductLocationDisplay.component.tsx
-````typescript
-import { useState, useEffect } from 'react';
-import { useLocationStore } from '@/stores/locationStore';
-import { useQuery } from '@apollo/client';
-import { FETCH_ALL_LOCATIONS_QUERY } from '@/utils/gql/GQL_QUERIES';
-const ProductLocationDisplay = () => {
-    const { selectedLocation, setSelectedLocation } = useLocationStore();
-    const [isDetecting, setIsDetecting] = useState(false);
-    const [geoError, setGeoError] = useState<string | null>(null);
-    const [hasMounted, setHasMounted] = useState(false);
-    const { data } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
-    useEffect(() => {
-        setHasMounted(true);
-    }, []);
-    // ... (rest of logic) ...
-    const locations = data?.productLocations?.nodes || [];
-    const handleDetectLocation = () => {
-        // ... same logic ...
-        setIsDetecting(true);
-        setGeoError(null);
-        if (!navigator.geolocation) {
-            setGeoError('Geolocation is not supported');
-            setIsDetecting(false);
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            async (position) => {
-                try {
-                    const { latitude, longitude } = position.coords;
-                    // ... fetch logic ...
-                    const response = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
-                    );
-                    const data = await response.json();
-                    const detectedCity = data.address?.city || data.address?.town || data.address?.suburb || data.address?.state;
-                    if (detectedCity) {
-                        const match = locations.find((loc: any) =>
-                            loc.name.toLowerCase().includes(detectedCity.toLowerCase()) ||
-                            detectedCity.toLowerCase().includes(loc.name.toLowerCase())
-                        );
-                        if (match) {
-                            setSelectedLocation({ name: match.name, slug: match.slug });
-                        } else {
-                            setGeoError(`Location "${detectedCity}" not in delivery zones.`);
-                        }
-                    } else {
-                        setGeoError('Could not determine city.');
-                    }
-                } catch (error) {
-                    setGeoError('Failed to fetch address.');
-                } finally {
-                    setIsDetecting(false);
-                }
-            },
-            (error) => {
-                setGeoError('Location access denied.');
-                setIsDetecting(false);
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-    };
-    return (
-        <div>
-            <div className="flex items-center gap-2 mb-1">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-500">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
-                </svg>
-                <span className="text-xs text-gray-600">
-                    Deliver to: <span className="text-gray-600">{hasMounted && selectedLocation ? selectedLocation.name : 'Select Location'}</span>
-                </span>
-                {(!hasMounted || !selectedLocation) && !isDetecting && (
-                    <button
-                        onClick={handleDetectLocation}
-                        className="text-xs text-gray-600 hover:underline ml-2 font-medium"
-                    >
-                        Auto-detect
-                    </button>
-                )}
-                {hasMounted && selectedLocation && !isDetecting && (
-                    <button
-                        onClick={() => window.dispatchEvent(new Event('open-location-picker'))}
-                        className="text-xs text-gray-600 underline ml-2 font-medium"
-                    >
-                        change location
-                    </button>
-                )}
-                {isDetecting && (
-                    <span className="text-xs text-gray-400 ml-2 animate-pulse">detecting...</span>
-                )}
-            </div>
-            {geoError && (
-                <p className="text-[10px] text-red-500 ml-7">{geoError}</p>
-            )}
-        </div>
-    );
-};
-export default ProductLocationDisplay;
-````
-
 ## File: src/pages/api/reset-session.ts
 ````typescript
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -21649,138 +21648,6 @@ export const getStaticProps: GetStaticProps = async () => {
     return {
       props: {
         categories: [],
-      },
-      revalidate: 10,
-    };
-  }
-};
-````
-
-## File: src/pages/index.tsx
-````typescript
-import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import Hero from '@/components/Index/Hero.component';
-import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
-// Dynamic Imports for below-the-fold content
-const WhyChooseUs = dynamic(() => import('@/components/Index/WhyChooseUs.component'));
-const PromoBoxes = dynamic(() => import('@/components/Index/PromoBoxes.component'));
-const InfoBanner = dynamic(() => import('@/components/Index/InfoBanner.component'));
-const SEOContent = dynamic(() => import('@/components/Index/SEOContent.component'), { ssr: false });
-const Newsletter = dynamic(() => import('@/components/Index/Newsletter.component'));
-const ProductList = dynamic(() => import('@/components/Product/ProductList.component'));
-const TopRatedProducts = dynamic(() => import('@/components/Index/TopRatedProducts.component'));
-const AirConditionerProducts = dynamic(() => import('@/components/Index/AirConditionerProducts.component'));
-const MobilePhonesOnSale = dynamic(() => import('@/components/Index/MobilePhonesOnSale.component'));
-const LaptopsProducts = dynamic(() => import('@/components/Index/LaptopsProducts.component'));
-const SpeakersProducts = dynamic(() => import('@/components/Index/SpeakersProducts.component'));
-const TelevisionsProducts = dynamic(() => import('@/components/Index/TelevisionsProducts.component'));
-const BestSellingSlider = dynamic(() => import('@/components/Index/BestSellingSlider.component'));
-import Layout from '@/components/Layout/Layout.component';
-// Utilities
-import client from '@/utils/apollo/ApolloClient';
-// Types
-import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
-// GraphQL
-import { FETCH_HOME_PAGE_DATA } from '@/utils/gql/GQL_QUERIES';
-import { useGlobalStore } from '@/stores/globalStore';
-import { useEffect } from 'react';
-/**
- * Main index page
- * @function Index
- * @param {InferGetStaticPropsType<typeof getStaticProps>} products
- * @returns {JSX.Element} - Rendered component
- */
-const Index: NextPage = ({
-  topRatedProducts: initialTopRated,
-  bestSellingProducts: initialBestSelling,
-  airConditionerProducts: initialAir,
-  mobilePhonesOnSale: initialMobile,
-  laptopsProducts: initialLaptops,
-  speakersProducts: initialSpeakers,
-  televisionsProducts: initialTelevisions,
-  promoProduct: initialPromo,
-}: InferGetStaticPropsType<typeof getStaticProps>) => {
-  const setHomeData = useGlobalStore((state) => state.setHomeData);
-  const homeData = useGlobalStore((state) => state.homeData);
-  // If props are empty (build error), fallback to cached data from store
-  const topRatedProducts = initialTopRated?.length > 0 ? initialTopRated : (homeData.topRatedProducts || []);
-  const bestSellingProducts = initialBestSelling?.length > 0 ? initialBestSelling : (homeData.bestSellingProducts || []);
-  const airConditionerProducts = initialAir?.length > 0 ? initialAir : (homeData.airConditionerProducts || []);
-  const mobilePhonesOnSale = initialMobile?.length > 0 ? initialMobile : (homeData.mobilePhonesOnSale || []);
-  const laptopsProducts = initialLaptops?.length > 0 ? initialLaptops : (homeData.laptopsProducts || []);
-  const speakersProducts = initialSpeakers?.length > 0 ? initialSpeakers : (homeData.speakersProducts || []);
-  const televisionsProducts = initialTelevisions?.length > 0 ? initialTelevisions : (homeData.televisionsProducts || []);
-  const promoProduct = initialPromo || homeData.promoProduct;
-  console.log('[Index] initialTopRated:', initialTopRated?.length, initialTopRated?.[0]);
-  useEffect(() => {
-    if (initialTopRated?.length > 0) {
-      setHomeData({
-        topRatedProducts: initialTopRated,
-        bestSellingProducts: initialBestSelling,
-        airConditionerProducts: initialAir,
-        mobilePhonesOnSale: initialMobile,
-        laptopsProducts: initialLaptops,
-        speakersProducts: initialSpeakers,
-        televisionsProducts: initialTelevisions,
-        promoProduct: initialPromo
-      });
-    }
-  }, [initialTopRated, initialBestSelling, initialAir, initialMobile, initialLaptops, initialSpeakers, initialTelevisions, initialPromo, setHomeData]);
-  return (
-    <Layout title="Shop Online In Ghana | Shopwice" fullWidth={true}>
-      <div className="bg-[#F8F8F8]">
-        <Hero />
-        <FeaturedCategories />
-        <TopRatedProducts products={topRatedProducts} />
-        <AirConditionerProducts products={airConditionerProducts} />
-        <MobilePhonesOnSale products={mobilePhonesOnSale} />
-        <LaptopsProducts products={laptopsProducts} />
-        <SpeakersProducts products={speakersProducts} />
-        <TelevisionsProducts products={televisionsProducts} />
-        <WhyChooseUs />
-        <PromoBoxes promoProduct={promoProduct} />
-        <BestSellingSlider products={bestSellingProducts} />
-        <InfoBanner />
-        <SEOContent />
-        <Newsletter />
-      </div>
-    </Layout>
-  );
-};
-export const runtime = 'experimental-edge';
-export default Index;
-export const getStaticProps: GetStaticProps = async () => {
-  try {
-    const { data } = await client.query({
-      query: FETCH_HOME_PAGE_DATA,
-      variables: { promoProductSlug: "microsoft-xbox-x-wireless-controller" }
-    });
-    return {
-      props: {
-        topRatedProducts: data?.topRatedProducts?.nodes || [],
-        bestSellingProducts: data?.bestSellingProducts?.nodes || [],
-        airConditionerProducts: data?.airConditionerProducts?.nodes || [],
-        mobilePhonesOnSale: data?.mobilePhonesOnSale?.nodes || [],
-        laptopsProducts: data?.laptopsProducts?.nodes || [],
-        speakersProducts: data?.speakersProducts?.nodes || [],
-        televisionsProducts: data?.televisionsProducts?.nodes || [],
-        promoProduct: data?.promoProduct || null,
-      },
-      revalidate: 60,
-    };
-  } catch (error) {
-    console.error('Error in getStaticProps:', error);
-    return {
-      props: {
-        topRatedProducts: [],
-        bestSellingProducts: [],
-        airConditionerProducts: [],
-        mobilePhonesOnSale: [],
-        laptopsProducts: [],
-        speakersProducts: [],
-        televisionsProducts: [],
-        promoProduct: null,
       },
       revalidate: 10,
     };
@@ -22056,115 +21923,135 @@ const RecentRefurbishedReviews = () => {
 export default RecentRefurbishedReviews;
 ````
 
-## File: src/utils/apollo/ApolloClient.js
-````javascript
-/*eslint complexity: ["error", 8]*/
-import {
-  ApolloClient,
-  InMemoryCache,
-  createHttpLink,
-  ApolloLink,
-} from '@apollo/client';
-const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+## File: src/pages/index.tsx
+````typescript
+import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import Hero from '@/components/Index/Hero.component';
+import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
+// Dynamic Imports for below-the-fold content
+import WhyChooseUs from '@/components/Index/WhyChooseUs.component';
+import PromoBoxes from '@/components/Index/PromoBoxes.component';
+import InfoBanner from '@/components/Index/InfoBanner.component';
+import SEOContent from '@/components/Index/SEOContent.component';
+import Newsletter from '@/components/Index/Newsletter.component';
+import TopRatedProducts from '@/components/Index/TopRatedProducts.component';
+import AirConditionerProducts from '@/components/Index/AirConditionerProducts.component';
+import MobilePhonesOnSale from '@/components/Index/MobilePhonesOnSale.component';
+import LaptopsProducts from '@/components/Index/LaptopsProducts.component';
+import SpeakersProducts from '@/components/Index/SpeakersProducts.component';
+import TelevisionsProducts from '@/components/Index/TelevisionsProducts.component';
+import BestSellingSlider from '@/components/Index/BestSellingSlider.component';
+import Layout from '@/components/Layout/Layout.component';
+// Utilities
+import client from '@/utils/apollo/ApolloClient';
+// Types
+import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
+// GraphQL
+import { FETCH_HOME_PAGE_DATA } from '@/utils/gql/GQL_QUERIES';
+import { useGlobalStore } from '@/stores/globalStore';
+import { useEffect } from 'react';
 /**
- * Middleware operation
- * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
+ * Main index page
+ * @function Index
+ * @param {InferGetStaticPropsType<typeof getStaticProps>} products
+ * @returns {JSX.Element} - Rendered component
  */
-export const middleware = new ApolloLink((operation, forward) => {
-  /**
-   * If session data exist in local storage, set value as session header.
-   */
-  const sessionData = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('woo-session'))
-    : null;
-  const authData = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('auth-data'))
-    : null;
-  const headers = {};
-  // Middleware Log
-  if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
-    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
+const Index: NextPage = ({
+  topRatedProducts: initialTopRated,
+  bestSellingProducts: initialBestSelling,
+  airConditionerProducts: initialAir,
+  mobilePhonesOnSale: initialMobile,
+  laptopsProducts: initialLaptops,
+  speakersProducts: initialSpeakers,
+  televisionsProducts: initialTelevisions,
+  promoProduct: initialPromo,
+}: InferGetStaticPropsType<typeof getStaticProps>) => {
+  const setHomeData = useGlobalStore((state) => state.setHomeData);
+  const homeData = useGlobalStore((state) => state.homeData);
+  // If props are empty (build error), fallback to cached data from store
+  const topRatedProducts = initialTopRated?.length > 0 ? initialTopRated : (homeData.topRatedProducts || []);
+  const bestSellingProducts = initialBestSelling?.length > 0 ? initialBestSelling : (homeData.bestSellingProducts || []);
+  const airConditionerProducts = initialAir?.length > 0 ? initialAir : (homeData.airConditionerProducts || []);
+  const mobilePhonesOnSale = initialMobile?.length > 0 ? initialMobile : (homeData.mobilePhonesOnSale || []);
+  const laptopsProducts = initialLaptops?.length > 0 ? initialLaptops : (homeData.laptopsProducts || []);
+  const speakersProducts = initialSpeakers?.length > 0 ? initialSpeakers : (homeData.speakersProducts || []);
+  const televisionsProducts = initialTelevisions?.length > 0 ? initialTelevisions : (homeData.televisionsProducts || []);
+  const promoProduct = initialPromo || homeData.promoProduct;
+  console.log('[Index] initialTopRated:', initialTopRated?.length, initialTopRated?.[0]);
+  useEffect(() => {
+    if (initialTopRated?.length > 0) {
+      setHomeData({
+        topRatedProducts: initialTopRated,
+        bestSellingProducts: initialBestSelling,
+        airConditionerProducts: initialAir,
+        mobilePhonesOnSale: initialMobile,
+        laptopsProducts: initialLaptops,
+        speakersProducts: initialSpeakers,
+        televisionsProducts: initialTelevisions,
+        promoProduct: initialPromo
+      });
+    }
+  }, [initialTopRated, initialBestSelling, initialAir, initialMobile, initialLaptops, initialSpeakers, initialTelevisions, initialPromo, setHomeData]);
+  return (
+    <Layout title="Shop Online In Ghana | Shopwice" fullWidth={true}>
+      <div className="bg-[#F8F8F8]">
+        <Hero />
+        <FeaturedCategories />
+        <TopRatedProducts products={topRatedProducts} />
+        <AirConditionerProducts products={airConditionerProducts} />
+        <MobilePhonesOnSale products={mobilePhonesOnSale} />
+        <LaptopsProducts products={laptopsProducts} />
+        <SpeakersProducts products={speakersProducts} />
+        <TelevisionsProducts products={televisionsProducts} />
+        <WhyChooseUs />
+        <PromoBoxes promoProduct={promoProduct} />
+        <BestSellingSlider products={bestSellingProducts} />
+        <InfoBanner />
+        <SEOContent />
+        <Newsletter />
+      </div>
+    </Layout>
+  );
+};
+export const runtime = 'experimental-edge';
+export default Index;
+export const getStaticProps: GetStaticProps = async () => {
+  try {
+    const { data } = await client.query({
+      query: FETCH_HOME_PAGE_DATA,
+      variables: { promoProductSlug: "microsoft-xbox-x-wireless-controller" }
+    });
+    return {
+      props: {
+        topRatedProducts: data?.topRatedProducts?.nodes || [],
+        bestSellingProducts: data?.bestSellingProducts?.nodes || [],
+        airConditionerProducts: data?.airConditionerProducts?.nodes || [],
+        mobilePhonesOnSale: data?.mobilePhonesOnSale?.nodes || [],
+        laptopsProducts: data?.laptopsProducts?.nodes || [],
+        speakersProducts: data?.speakersProducts?.nodes || [],
+        televisionsProducts: data?.televisionsProducts?.nodes || [],
+        promoProduct: data?.promoProduct || null,
+      },
+      revalidate: 60,
+    };
+  } catch (error) {
+    console.error('Error in getStaticProps:', error);
+    return {
+      props: {
+        topRatedProducts: [],
+        bestSellingProducts: [],
+        airConditionerProducts: [],
+        mobilePhonesOnSale: [],
+        laptopsProducts: [],
+        speakersProducts: [],
+        televisionsProducts: [],
+        promoProduct: null,
+      },
+      revalidate: 10,
+    };
   }
-  // Add Session Header (Skip for Registration to prevent Nonce/Session conflicts)
-  if (sessionData && sessionData.token && sessionData.createdTime && operation.operationName !== 'CreateUser') {
-    const { token, createdTime } = sessionData;
-    // Check if the token is older than 7 days
-    if (Date.now() - createdTime > SEVEN_DAYS) {
-      localStorage.removeItem('woo-session');
-    } else {
-      headers['woocommerce-session'] = `Session ${token}`;
-    }
-  }
-  // Add JWT Authorization if available (Skip for Registration)
-  if (authData && authData.authToken && operation.operationName !== 'CreateUser') {
-    headers['Authorization'] = `Bearer ${authData.authToken}`;
-  }
-  operation.setContext({
-    headers,
-  });
-  return forward(operation);
-});
-/**
- * Afterware operation.
- *
- * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
- */
-export const afterware = new ApolloLink((operation, forward) =>
-  forward(operation).map((response) => {
-    /**
-     * Check for session header and update session in local storage accordingly.
-     */
-    const context = operation.getContext();
-    const responseHeaders = context?.response?.headers;
-    const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
-    if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
-      console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session Header:`, session);
-    }
-    if (session && typeof window !== 'undefined') {
-      if ('false' === session) {
-        // Remove session data if session destroyed.
-        localStorage.removeItem('woo-session');
-        // Update session new data if changed.
-      } else {
-        // Always update session data if header is present
-        localStorage.setItem(
-          'woo-session',
-          JSON.stringify({ token: session, createdTime: Date.now() }),
-        );
-      }
-    }
-    // Check for errors in response
-    if (response.errors) {
-      response.errors.forEach(err => {
-        if (err.message === "The 'woocommerce-session' header is invalid") {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('woo-session');
-            window.location.reload();
-          }
-        }
-      })
-    }
-    return response;
-  }),
-);
-const clientSide = typeof window === 'undefined';
-// Apollo GraphQL client.
-const client = new ApolloClient({
-  ssrMode: clientSide,
-  link: middleware.concat(
-    afterware.concat(
-      createHttpLink({
-        // Use proxy on client to avoid CORS, absolute URL on server
-        // Use proxy on client to avoid CORS, absolute URL on server
-        uri: typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql') : '/graphql',
-        fetch,
-        credentials: 'include',
-      }),
-    ),
-  ),
-  cache: new InMemoryCache(),
-});
-export default client;
+};
 ````
 
 ## File: src/pages/product/[slug].tsx
@@ -22337,6 +22224,117 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res }) =>
     return { notFound: true };
   }
 };
+````
+
+## File: src/utils/apollo/ApolloClient.js
+````javascript
+/*eslint complexity: ["error", 8]*/
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  ApolloLink,
+} from '@apollo/client';
+const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+/**
+ * Middleware operation
+ * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
+ */
+export const middleware = new ApolloLink((operation, forward) => {
+  /**
+   * If session data exist in local storage, set value as session header.
+   */
+  const sessionData = typeof window !== 'undefined'
+    ? JSON.parse(localStorage.getItem('woo-session'))
+    : null;
+  const authData = typeof window !== 'undefined'
+    ? JSON.parse(localStorage.getItem('auth-data'))
+    : null;
+  const headers = {};
+  // Middleware Log
+  if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
+    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
+  }
+  // Add Session Header (Skip for Registration to prevent Nonce/Session conflicts)
+  if (sessionData && sessionData.token && sessionData.createdTime && operation.operationName !== 'CreateUser') {
+    const { token, createdTime } = sessionData;
+    // Check if the token is older than 7 days
+    if (Date.now() - createdTime > SEVEN_DAYS) {
+      localStorage.removeItem('woo-session');
+    } else {
+      headers['woocommerce-session'] = `Session ${token}`;
+    }
+  }
+  // Add JWT Authorization if available (Skip for Registration)
+  if (authData && authData.authToken && operation.operationName !== 'CreateUser') {
+    headers['Authorization'] = `Bearer ${authData.authToken}`;
+  }
+  operation.setContext({
+    headers,
+  });
+  return forward(operation);
+});
+/**
+ * Afterware operation.
+ *
+ * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
+ */
+export const afterware = new ApolloLink((operation, forward) =>
+  forward(operation).map((response) => {
+    /**
+     * Check for session header and update session in local storage accordingly.
+     */
+    const context = operation.getContext();
+    const responseHeaders = context?.response?.headers;
+    const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
+    if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
+      console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session Header:`, session);
+    }
+    if (session && typeof window !== 'undefined') {
+      if ('false' === session) {
+        // Remove session data if session destroyed.
+        localStorage.removeItem('woo-session');
+        // Update session new data if changed.
+      } else {
+        // Always update session data if header is present
+        localStorage.setItem(
+          'woo-session',
+          JSON.stringify({ token: session, createdTime: Date.now() }),
+        );
+      }
+    }
+    // Check for errors in response
+    if (response.errors) {
+      response.errors.forEach(err => {
+        if (err.message === "The 'woocommerce-session' header is invalid") {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('woo-session');
+            window.location.reload();
+          }
+        }
+      })
+    }
+    return response;
+  }),
+);
+const clientSide = typeof window === 'undefined';
+// Apollo GraphQL client.
+const client = new ApolloClient({
+  ssrMode: clientSide,
+  link: middleware.concat(
+    afterware.concat(
+      createHttpLink({
+        // Use proxy on client to avoid CORS, absolute URL on server
+        // Use proxy on client to avoid CORS, absolute URL on server
+        uri: typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql') : '/graphql',
+        fetch,
+        credentials: 'include',
+      }),
+    ),
+  ),
+  cache: new InMemoryCache(),
+});
+export default client;
 ````
 
 ## File: src/components/Product/RecentRefurbishedReviewsREST.component.tsx
