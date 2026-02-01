@@ -103,7 +103,7 @@ const Index: NextPage = ({
   );
 };
 
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 export default Index;
 
 export const getStaticProps: GetStaticProps = async () => {
