@@ -1,7 +1,7 @@
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-export const runtime = 'experimental-edge';
+
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // Clear WooCommerce Session Cookies by setting them to expire immediately

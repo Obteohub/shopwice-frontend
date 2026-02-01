@@ -130,7 +130,7 @@ const product: NextPage = ({
   );
 };
 
-export const runtime = 'experimental-edge';
+
 export default withRouter(product);
 
 export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {

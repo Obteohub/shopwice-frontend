@@ -18,7 +18,7 @@ const categories: NextPage = ({
   </Layout>
 );
 
-export const runtime = 'experimental-edge';
+
 export default categories;
 
 export const getStaticProps: GetStaticProps = async () => {

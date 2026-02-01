@@ -40,7 +40,7 @@ const LocationPage = ({
     );
 };
 
-export const runtime = 'experimental-edge';
+
 export default withRouter(LocationPage);
 
 export const getServerSideProps: GetServerSideProps = async ({

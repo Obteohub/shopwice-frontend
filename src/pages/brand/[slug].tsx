@@ -65,7 +65,7 @@ const BrandPage = ({
     );
 };
 
-export const runtime = 'experimental-edge';
+
 export default withRouter(BrandPage);
 
 export const getStaticPaths: GetStaticPaths = async () => {
