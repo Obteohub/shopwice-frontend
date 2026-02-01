@@ -45,6 +45,7 @@ const ShoesPage = ({ category, products, pageInfo, slug }: ShoesPageProps) => {
     );
 };
 
+export const runtime = 'experimental-edge';
 export default ShoesPage;
 
 export const getStaticProps: GetStaticProps = async () => {

@@ -11,6 +11,7 @@ interface Custom404Props {
     topRated: Product[];
 }
 
+export const runtime = 'experimental-edge';
 export default function Custom404({ bestSellers, newest, topRated }: Custom404Props) {
     return (
         <Layout title="Page Not Found" fullWidth={false}>

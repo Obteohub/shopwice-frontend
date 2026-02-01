@@ -46,6 +46,7 @@ const CategoryPage = ({ category, products, pageInfo, slug }: CategoryPageProps)
     );
 };
 
+export const runtime = 'experimental-edge';
 export default CategoryPage;
 
 export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
