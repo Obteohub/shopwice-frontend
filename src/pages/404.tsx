@@ -11,7 +11,6 @@ interface Custom404Props {
     topRated: Product[];
 }
 
-export const runtime = 'experimental-edge';
 export default function Custom404({ bestSellers, newest, topRated }: Custom404Props) {
     return (
         <Layout title="Page Not Found" fullWidth={false}>
@@ -90,7 +89,6 @@ export async function getStaticProps() {
                 newest: data?.newest?.nodes || [],
                 topRated: data?.topRated?.nodes || [],
             },
-            revalidate: 3600, // Revalidate every hour
         };
     } catch (error) {
         console.error('Error fetching 404 page products:', error);

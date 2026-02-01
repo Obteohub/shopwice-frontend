@@ -342,7 +342,7 @@ export const handleQuantityChange = (
   updateCart: (variables: IUpdateCartRootObject) => void,
   updateCartProcessing: boolean,
 ) => {
-  if (process.browser) {
+  if (typeof window !== 'undefined') {
     event.stopPropagation();
 
     // Return if the previous update cart mutation request is still processing
