@@ -5,19 +5,18 @@ import Hero from '@/components/Index/Hero.component';
 import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
 
 // Dynamic Imports for below-the-fold content
-const WhyChooseUs = dynamic(() => import('@/components/Index/WhyChooseUs.component'));
-const PromoBoxes = dynamic(() => import('@/components/Index/PromoBoxes.component'));
-const InfoBanner = dynamic(() => import('@/components/Index/InfoBanner.component'));
-const SEOContent = dynamic(() => import('@/components/Index/SEOContent.component'), { ssr: false });
-const Newsletter = dynamic(() => import('@/components/Index/Newsletter.component'));
-const ProductList = dynamic(() => import('@/components/Product/ProductList.component'));
-const TopRatedProducts = dynamic(() => import('@/components/Index/TopRatedProducts.component'));
-const AirConditionerProducts = dynamic(() => import('@/components/Index/AirConditionerProducts.component'));
-const MobilePhonesOnSale = dynamic(() => import('@/components/Index/MobilePhonesOnSale.component'));
-const LaptopsProducts = dynamic(() => import('@/components/Index/LaptopsProducts.component'));
-const SpeakersProducts = dynamic(() => import('@/components/Index/SpeakersProducts.component'));
-const TelevisionsProducts = dynamic(() => import('@/components/Index/TelevisionsProducts.component'));
-const BestSellingSlider = dynamic(() => import('@/components/Index/BestSellingSlider.component'));
+import WhyChooseUs from '@/components/Index/WhyChooseUs.component';
+import PromoBoxes from '@/components/Index/PromoBoxes.component';
+import InfoBanner from '@/components/Index/InfoBanner.component';
+import SEOContent from '@/components/Index/SEOContent.component';
+import Newsletter from '@/components/Index/Newsletter.component';
+import TopRatedProducts from '@/components/Index/TopRatedProducts.component';
+import AirConditionerProducts from '@/components/Index/AirConditionerProducts.component';
+import MobilePhonesOnSale from '@/components/Index/MobilePhonesOnSale.component';
+import LaptopsProducts from '@/components/Index/LaptopsProducts.component';
+import SpeakersProducts from '@/components/Index/SpeakersProducts.component';
+import TelevisionsProducts from '@/components/Index/TelevisionsProducts.component';
+import BestSellingSlider from '@/components/Index/BestSellingSlider.component';
 import Layout from '@/components/Layout/Layout.component';
 
 // Utilities
