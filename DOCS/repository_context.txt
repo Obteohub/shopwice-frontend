@@ -18857,328 +18857,6 @@ test.describe('Categories Navigation', () => {
 });
 ````
 
-## File: src/utils/functions/functions.tsx
-````typescript
-/*eslint complexity: ["error", 20]*/
-import { v4 as uuidv4 } from 'uuid';
-import type { Product } from '@/stores/cartStore';
-interface RootObject {
-  products: Product[];
-  totalProductsCount: number;
-  totalProductsPrice: number;
-}
-import { ChangeEvent } from 'react';
-import { IVariationNodes } from '@/components/Product/AddToCart.component';
-/* Interface for products*/
-export interface IImage {
-  __typename: string;
-  id: string;
-  sourceUrl?: string;
-  srcSet?: string;
-  altText: string;
-  title: string;
-}
-export interface IGalleryImages {
-  __typename: string;
-  nodes: IImage[];
-}
-interface IProductNode {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  description: string;
-  stockStatus: string;
-  type: string;
-  onSale: boolean;
-  slug: string;
-  averageRating: number;
-  reviewCount: number;
-  image: IImage;
-  galleryImages: IGalleryImages;
-  productId: number;
-  totalSales?: number;
-}
-interface IProduct {
-  __typename: string;
-  node: IProductNode;
-}
-interface IVariationNode {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  description: string;
-  type: string;
-  onSale: boolean;
-  price: string;
-  regularPrice: string;
-  salePrice: string;
-  image: IImage;
-  attributes: {
-    nodes: Array<{
-      id: string;
-      name: string;
-      value: string;
-    }>;
-  };
-}
-interface IVariation {
-  __typename: string;
-  node: IVariationNode;
-}
-export interface IProductRootObject {
-  __typename: string;
-  key: string;
-  product: IProduct;
-  variation?: IVariation;
-  quantity: number;
-  total: string;
-  subtotal: string;
-  subtotalTax: string;
-}
-type TUpdatedItems = { key: string; quantity: number }[];
-export interface IUpdateCartItem {
-  key: string;
-  quantity: number;
-}
-export interface IUpdateCartInput {
-  clientMutationId: string;
-  items: IUpdateCartItem[];
-}
-export interface IUpdateCartVariables {
-  input: IUpdateCartInput;
-}
-export interface IUpdateCartRootObject {
-  variables: IUpdateCartVariables;
-}
-/* Interface for props */
-interface IFormattedCartProps {
-  cart: { contents: { nodes: IProductRootObject[] }; total: number };
-}
-export interface ICheckoutDataProps {
-  firstName: string;
-  lastName: string;
-  address1: string;
-  address2: string;
-  city: string;
-  country: string;
-  state: string;
-  postcode: string;
-  email: string;
-  phone: string;
-  company: string;
-  paymentMethod: string;
-}
-/**
- * Add empty character after currency symbol
- * @param {string} price The price string that we input
- * @param {string} symbol Currency symbol to add empty character/padding after
- */
-export const paddedPrice = (price: string, symbol: string) => {
-  if (!price) return '';
-  return price.split(symbol).join(`${symbol} `);
-};
-/**
- * Shorten inputted string (usually product description) to a maximum of length
- * @param {string} input The string that we input
- * @param {number} length The length that we want to shorten the text to
- */
-export const trimmedStringToLength = (input: string, length: number) => {
-  if (input.length > length) {
-    const subStr = input.substring(0, length);
-    return `${subStr}...`;
-  }
-  return input;
-};
-/**
- * Filter variant price. Changes "kr198.00 - kr299.00" to kr299.00 or kr198 depending on the side variable
- * @param {String} side Which side of the string to return (which side of the "-" symbol)
- * @param {String} price The inputted price that we need to convert
- */
-export const filteredVariantPrice = (price: string, side: string) => {
-  if (!price) {
-    return '';
-  }
-  const dashIndex = price.indexOf('-');
-  if (dashIndex === -1) {
-    // If no dash, it's a single price.
-    // If asking for 'right' (regular/high), return empty or same?
-    // Usually 'right' is used for struck-through regular price in the context of a range.
-    // But in SingleProduct, 'right' is used for regular price.
-    // If there's no range, there's only one price.
-    // Let's assume if side is 'right', we might not want to show it if it's the same as left?
-    // But the current logic returned the WHOLE string for 'right' (due to substring(length, -1)) and EMPTY for 'left'.
-    // We want 'left' (sale/main) to show the price.
-    if (side === 'right') {
-      return ''; // Don't show a "regular" price if there's no range? Or handle in component?
-      // Actually, if we return empty for right, the component might hide the struck-through price.
-      // Let's see SingleProduct usage:
-      // {product.variations ? filteredVariantPrice(price, 'right') : regularPrice}
-      // If we return '', it shows nothing.
-      // {product.variations ? filteredVariantPrice(price, '') : salePrice}
-      // If we return 'GH₵100', it shows 'GH₵100'.
-      // This seems correct for a single price variable product.
-    }
-    return price;
-  }
-  if ('right' === side) {
-    return price.substring(dashIndex + 1).trim();
-  }
-  return price.substring(0, dashIndex).trim();
-};
-/**
- * Returns cart data in the required format.
- * @param {String} data Cart data
- */
-export const getFormattedCart = (data: IFormattedCartProps) => {
-  const formattedCart: RootObject = {
-    products: [],
-    totalProductsCount: 0,
-    totalProductsPrice: 0,
-  };
-  if (!data || !data.cart || !data.cart.contents) {
-    return formattedCart;
-  }
-  const givenProducts = data.cart.contents.nodes;
-  // Create an empty object.
-  formattedCart.products = [];
-  let totalProductsCount = 0;
-  if (!givenProducts.length) {
-    return;
-  }
-  givenProducts.forEach((item) => {
-    console.log(`[getFormattedCart] Processing item key: ${item.key}`);
-    const givenProduct = item.product?.node;
-    if (!givenProduct) {
-      console.warn(`[getFormattedCart] Item ${item.key} skipped: No product node.`, item);
-      return;
-    }
-    // Convert price to a float value
-    const convertedCurrency = item.total.replace(
-      /[^0-9.-]+/g,
-      '',
-    );
-    const product: Product = {
-      productId: givenProduct.databaseId,
-      cartKey: item.key,
-      name: givenProduct.name,
-      qty: item.quantity,
-      price: Number(convertedCurrency) / item.quantity,
-      totalPrice: item.total,
-      image: {
-        sourceUrl: givenProduct.image?.sourceUrl || process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
-        srcSet: givenProduct.image?.srcSet || process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
-        title: givenProduct.image?.title || givenProduct.name,
-      }
-    };
-    totalProductsCount += item.quantity;
-    // Push each item into the products array.
-    formattedCart.products.push(product);
-  });
-  formattedCart.totalProductsCount = totalProductsCount;
-  formattedCart.totalProductsPrice = data.cart.total;
-  return formattedCart;
-};
-export const createCheckoutData = (order: ICheckoutDataProps) => ({
-  clientMutationId: uuidv4(),
-  billing: {
-    firstName: order.firstName,
-    lastName: order.lastName,
-    address1: order.address1,
-    address2: order.address2,
-    city: order.city,
-    country: order.country,
-    state: order.state,
-    postcode: order.postcode,
-    email: order.email,
-    phone: order.phone,
-    company: order.company,
-  },
-  shipping: {
-    firstName: order.firstName,
-    lastName: order.lastName,
-    address1: order.address1,
-    address2: order.address2,
-    city: order.city,
-    country: order.country,
-    state: order.state,
-    postcode: order.postcode,
-    email: order.email,
-    phone: order.phone,
-    company: order.company,
-  },
-  shipToDifferentAddress: false,
-  paymentMethod: order.paymentMethod,
-  isPaid: false,
-  transactionId: 'fhggdfjgfi',
-});
-/**
- * Get the updated items in the below format required for mutation input.
- *
- * Creates an array in above format with the newQty (updated Qty ).
- *
- */
-export const getUpdatedItems = (
-  products: IProductRootObject[],
-  newQty: number,
-  cartKey: string,
-) => {
-  // Create an empty array.
-  const updatedItems: TUpdatedItems = [];
-  // Loop through the product array.
-  products.forEach((cartItem) => {
-    // If you find the cart key of the product user is trying to update, push the key and new qty.
-    if (cartItem.key === cartKey) {
-      updatedItems.push({
-        key: cartItem.key,
-        quantity: newQty,
-      });
-      // Otherwise just push the existing qty without updating.
-    } else {
-      updatedItems.push({
-        key: cartItem.key,
-        quantity: cartItem.quantity,
-      });
-    }
-  });
-  // Return the updatedItems array with new Qtys.
-  return updatedItems;
-};
-/*
- * When user changes the quantity, update the cart in localStorage
- * Also update the cart in the global Context
- */
-export const handleQuantityChange = (
-  event: ChangeEvent<HTMLInputElement>,
-  cartKey: string,
-  cart: IProductRootObject[],
-  updateCart: (variables: IUpdateCartRootObject) => void,
-  updateCartProcessing: boolean,
-) => {
-  if (process.browser) {
-    event.stopPropagation();
-    // Return if the previous update cart mutation request is still processing
-    if (updateCartProcessing || !cart) {
-      return;
-    }
-    // If the user tries to delete the count of product, set that to 1 by default ( This will not allow him to reduce it less than zero )
-    const newQty = event.target.value ? parseInt(event.target.value, 10) : 1;
-    if (cart.length) {
-      const updatedItems = getUpdatedItems(cart, newQty, cartKey);
-      updateCart({
-        variables: {
-          input: {
-            clientMutationId: uuidv4(),
-            items: updatedItems,
-          },
-        },
-      });
-    }
-  }
-};
-````
-
 ## File: src/utils/gql/GQL_MUTATIONS.ts
 ````typescript
 import { gql } from '@apollo/client';
@@ -20534,108 +20212,6 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res }) =>
 };
 ````
 
-## File: src/pages/404.tsx
-````typescript
-import Link from 'next/link';
-import Layout from '@/components/Layout/Layout.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
-import ProductCard from '@/components/Product/ProductCard.component';
-import { Product } from '@/types/product';
-interface Custom404Props {
-    bestSellers: Product[];
-    newest: Product[];
-    topRated: Product[];
-}
-export const runtime = 'experimental-edge';
-export default function Custom404({ bestSellers, newest, topRated }: Custom404Props) {
-    return (
-        <Layout title="Page Not Found" fullWidth={false}>
-            <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 text-center border-b border-gray-100 pb-12">
-                <h1 className="text-[150px] leading-none font-bold text-gray-100 select-none">404</h1>
-                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 -mt-8 mb-4">
-                    Oops! Page Not Found
-                </h2>
-                <p className="text-gray-500 max-w-md mx-auto mb-8">
-                    The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
-                </p>
-                <Link
-                    href="/"
-                    className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-0.5"
-                >
-                    Go Back Home
-                </Link>
-            </div>
-            <div className="py-12 space-y-16">
-                {/* Best Sellers */}
-                {bestSellers?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-blue-600 pl-3">
-                            Best Sellers
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {bestSellers.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-                {/* New Arrivals */}
-                {newest?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-green-500 pl-3">
-                            New Arrivals
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {newest.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-                {/* Top Rated */}
-                {topRated?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-yellow-500 pl-3">
-                            Top Rated Products
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {topRated.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-            </div>
-        </Layout>
-    );
-}
-export async function getStaticProps() {
-    try {
-        const { data } = await client.query({
-            query: GET_404_PAGE_PRODUCTS,
-        });
-        return {
-            props: {
-                bestSellers: data?.bestSellers?.nodes || [],
-                newest: data?.newest?.nodes || [],
-                topRated: data?.topRated?.nodes || [],
-            },
-            revalidate: 3600, // Revalidate every hour
-        };
-    } catch (error) {
-        console.error('Error fetching 404 page products:', error);
-        return {
-            props: {
-                bestSellers: [],
-                newest: [],
-                topRated: [],
-            },
-        };
-    }
-}
-````
-
 ## File: src/pages/products.tsx
 ````typescript
 import Head from 'next/head';
@@ -20860,6 +20436,328 @@ export const useReviewsStore = create<ReviewsState>()(
         }
     )
 );
+````
+
+## File: src/utils/functions/functions.tsx
+````typescript
+/*eslint complexity: ["error", 20]*/
+import { v4 as uuidv4 } from 'uuid';
+import type { Product } from '@/stores/cartStore';
+interface RootObject {
+  products: Product[];
+  totalProductsCount: number;
+  totalProductsPrice: number;
+}
+import { ChangeEvent } from 'react';
+import { IVariationNodes } from '@/components/Product/AddToCart.component';
+/* Interface for products*/
+export interface IImage {
+  __typename: string;
+  id: string;
+  sourceUrl?: string;
+  srcSet?: string;
+  altText: string;
+  title: string;
+}
+export interface IGalleryImages {
+  __typename: string;
+  nodes: IImage[];
+}
+interface IProductNode {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  description: string;
+  stockStatus: string;
+  type: string;
+  onSale: boolean;
+  slug: string;
+  averageRating: number;
+  reviewCount: number;
+  image: IImage;
+  galleryImages: IGalleryImages;
+  productId: number;
+  totalSales?: number;
+}
+interface IProduct {
+  __typename: string;
+  node: IProductNode;
+}
+interface IVariationNode {
+  __typename: string;
+  id: string;
+  databaseId: number;
+  name: string;
+  description: string;
+  type: string;
+  onSale: boolean;
+  price: string;
+  regularPrice: string;
+  salePrice: string;
+  image: IImage;
+  attributes: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      value: string;
+    }>;
+  };
+}
+interface IVariation {
+  __typename: string;
+  node: IVariationNode;
+}
+export interface IProductRootObject {
+  __typename: string;
+  key: string;
+  product: IProduct;
+  variation?: IVariation;
+  quantity: number;
+  total: string;
+  subtotal: string;
+  subtotalTax: string;
+}
+type TUpdatedItems = { key: string; quantity: number }[];
+export interface IUpdateCartItem {
+  key: string;
+  quantity: number;
+}
+export interface IUpdateCartInput {
+  clientMutationId: string;
+  items: IUpdateCartItem[];
+}
+export interface IUpdateCartVariables {
+  input: IUpdateCartInput;
+}
+export interface IUpdateCartRootObject {
+  variables: IUpdateCartVariables;
+}
+/* Interface for props */
+interface IFormattedCartProps {
+  cart: { contents: { nodes: IProductRootObject[] }; total: number };
+}
+export interface ICheckoutDataProps {
+  firstName: string;
+  lastName: string;
+  address1: string;
+  address2: string;
+  city: string;
+  country: string;
+  state: string;
+  postcode: string;
+  email: string;
+  phone: string;
+  company: string;
+  paymentMethod: string;
+}
+/**
+ * Add empty character after currency symbol
+ * @param {string} price The price string that we input
+ * @param {string} symbol Currency symbol to add empty character/padding after
+ */
+export const paddedPrice = (price: string, symbol: string) => {
+  if (!price) return '';
+  return price.split(symbol).join(`${symbol} `);
+};
+/**
+ * Shorten inputted string (usually product description) to a maximum of length
+ * @param {string} input The string that we input
+ * @param {number} length The length that we want to shorten the text to
+ */
+export const trimmedStringToLength = (input: string, length: number) => {
+  if (input.length > length) {
+    const subStr = input.substring(0, length);
+    return `${subStr}...`;
+  }
+  return input;
+};
+/**
+ * Filter variant price. Changes "kr198.00 - kr299.00" to kr299.00 or kr198 depending on the side variable
+ * @param {String} side Which side of the string to return (which side of the "-" symbol)
+ * @param {String} price The inputted price that we need to convert
+ */
+export const filteredVariantPrice = (price: string, side: string) => {
+  if (!price) {
+    return '';
+  }
+  const dashIndex = price.indexOf('-');
+  if (dashIndex === -1) {
+    // If no dash, it's a single price.
+    // If asking for 'right' (regular/high), return empty or same?
+    // Usually 'right' is used for struck-through regular price in the context of a range.
+    // But in SingleProduct, 'right' is used for regular price.
+    // If there's no range, there's only one price.
+    // Let's assume if side is 'right', we might not want to show it if it's the same as left?
+    // But the current logic returned the WHOLE string for 'right' (due to substring(length, -1)) and EMPTY for 'left'.
+    // We want 'left' (sale/main) to show the price.
+    if (side === 'right') {
+      return ''; // Don't show a "regular" price if there's no range? Or handle in component?
+      // Actually, if we return empty for right, the component might hide the struck-through price.
+      // Let's see SingleProduct usage:
+      // {product.variations ? filteredVariantPrice(price, 'right') : regularPrice}
+      // If we return '', it shows nothing.
+      // {product.variations ? filteredVariantPrice(price, '') : salePrice}
+      // If we return 'GH₵100', it shows 'GH₵100'.
+      // This seems correct for a single price variable product.
+    }
+    return price;
+  }
+  if ('right' === side) {
+    return price.substring(dashIndex + 1).trim();
+  }
+  return price.substring(0, dashIndex).trim();
+};
+/**
+ * Returns cart data in the required format.
+ * @param {String} data Cart data
+ */
+export const getFormattedCart = (data: IFormattedCartProps) => {
+  const formattedCart: RootObject = {
+    products: [],
+    totalProductsCount: 0,
+    totalProductsPrice: 0,
+  };
+  if (!data || !data.cart || !data.cart.contents) {
+    return formattedCart;
+  }
+  const givenProducts = data.cart.contents.nodes;
+  // Create an empty object.
+  formattedCart.products = [];
+  let totalProductsCount = 0;
+  if (!givenProducts.length) {
+    return;
+  }
+  givenProducts.forEach((item) => {
+    console.log(`[getFormattedCart] Processing item key: ${item.key}`);
+    const givenProduct = item.product?.node;
+    if (!givenProduct) {
+      console.warn(`[getFormattedCart] Item ${item.key} skipped: No product node.`, item);
+      return;
+    }
+    // Convert price to a float value
+    const convertedCurrency = item.total.replace(
+      /[^0-9.-]+/g,
+      '',
+    );
+    const product: Product = {
+      productId: givenProduct.databaseId,
+      cartKey: item.key,
+      name: givenProduct.name,
+      qty: item.quantity,
+      price: Number(convertedCurrency) / item.quantity,
+      totalPrice: item.total,
+      image: {
+        sourceUrl: givenProduct.image?.sourceUrl || process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+        srcSet: givenProduct.image?.srcSet || process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+        title: givenProduct.image?.title || givenProduct.name,
+      }
+    };
+    totalProductsCount += item.quantity;
+    // Push each item into the products array.
+    formattedCart.products.push(product);
+  });
+  formattedCart.totalProductsCount = totalProductsCount;
+  formattedCart.totalProductsPrice = data.cart.total;
+  return formattedCart;
+};
+export const createCheckoutData = (order: ICheckoutDataProps) => ({
+  clientMutationId: uuidv4(),
+  billing: {
+    firstName: order.firstName,
+    lastName: order.lastName,
+    address1: order.address1,
+    address2: order.address2,
+    city: order.city,
+    country: order.country,
+    state: order.state,
+    postcode: order.postcode,
+    email: order.email,
+    phone: order.phone,
+    company: order.company,
+  },
+  shipping: {
+    firstName: order.firstName,
+    lastName: order.lastName,
+    address1: order.address1,
+    address2: order.address2,
+    city: order.city,
+    country: order.country,
+    state: order.state,
+    postcode: order.postcode,
+    email: order.email,
+    phone: order.phone,
+    company: order.company,
+  },
+  shipToDifferentAddress: false,
+  paymentMethod: order.paymentMethod,
+  isPaid: false,
+  transactionId: 'fhggdfjgfi',
+});
+/**
+ * Get the updated items in the below format required for mutation input.
+ *
+ * Creates an array in above format with the newQty (updated Qty ).
+ *
+ */
+export const getUpdatedItems = (
+  products: IProductRootObject[],
+  newQty: number,
+  cartKey: string,
+) => {
+  // Create an empty array.
+  const updatedItems: TUpdatedItems = [];
+  // Loop through the product array.
+  products.forEach((cartItem) => {
+    // If you find the cart key of the product user is trying to update, push the key and new qty.
+    if (cartItem.key === cartKey) {
+      updatedItems.push({
+        key: cartItem.key,
+        quantity: newQty,
+      });
+      // Otherwise just push the existing qty without updating.
+    } else {
+      updatedItems.push({
+        key: cartItem.key,
+        quantity: cartItem.quantity,
+      });
+    }
+  });
+  // Return the updatedItems array with new Qtys.
+  return updatedItems;
+};
+/*
+ * When user changes the quantity, update the cart in localStorage
+ * Also update the cart in the global Context
+ */
+export const handleQuantityChange = (
+  event: ChangeEvent<HTMLInputElement>,
+  cartKey: string,
+  cart: IProductRootObject[],
+  updateCart: (variables: IUpdateCartRootObject) => void,
+  updateCartProcessing: boolean,
+) => {
+  if (typeof window !== 'undefined') {
+    event.stopPropagation();
+    // Return if the previous update cart mutation request is still processing
+    if (updateCartProcessing || !cart) {
+      return;
+    }
+    // If the user tries to delete the count of product, set that to 1 by default ( This will not allow him to reduce it less than zero )
+    const newQty = event.target.value ? parseInt(event.target.value, 10) : 1;
+    if (cart.length) {
+      const updatedItems = getUpdatedItems(cart, newQty, cartKey);
+      updateCart({
+        variables: {
+          input: {
+            clientMutationId: uuidv4(),
+            items: updatedItems,
+          },
+        },
+      });
+    }
+  }
+};
 ````
 
 ## File: CLOUDFLARE_DEPLOY.md
@@ -21613,6 +21511,106 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         res.setHeader('Set-Cookie', serializedCookies);
     }
     res.status(200).json({ message: 'Session reset', cleared: cookiesToClear });
+}
+````
+
+## File: src/pages/404.tsx
+````typescript
+import Link from 'next/link';
+import Layout from '@/components/Layout/Layout.component';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
+import ProductCard from '@/components/Product/ProductCard.component';
+import { Product } from '@/types/product';
+interface Custom404Props {
+    bestSellers: Product[];
+    newest: Product[];
+    topRated: Product[];
+}
+export default function Custom404({ bestSellers, newest, topRated }: Custom404Props) {
+    return (
+        <Layout title="Page Not Found" fullWidth={false}>
+            <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 text-center border-b border-gray-100 pb-12">
+                <h1 className="text-[150px] leading-none font-bold text-gray-100 select-none">404</h1>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 -mt-8 mb-4">
+                    Oops! Page Not Found
+                </h2>
+                <p className="text-gray-500 max-w-md mx-auto mb-8">
+                    The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+                </p>
+                <Link
+                    href="/"
+                    className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-0.5"
+                >
+                    Go Back Home
+                </Link>
+            </div>
+            <div className="py-12 space-y-16">
+                {/* Best Sellers */}
+                {bestSellers?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-blue-600 pl-3">
+                            Best Sellers
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {bestSellers.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {/* New Arrivals */}
+                {newest?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-green-500 pl-3">
+                            New Arrivals
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {newest.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {/* Top Rated */}
+                {topRated?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-yellow-500 pl-3">
+                            Top Rated Products
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {topRated.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+            </div>
+        </Layout>
+    );
+}
+export async function getStaticProps() {
+    try {
+        const { data } = await client.query({
+            query: GET_404_PAGE_PRODUCTS,
+        });
+        return {
+            props: {
+                bestSellers: data?.bestSellers?.nodes || [],
+                newest: data?.newest?.nodes || [],
+                topRated: data?.topRated?.nodes || [],
+            },
+        };
+    } catch (error) {
+        console.error('Error fetching 404 page products:', error);
+        return {
+            props: {
+                bestSellers: [],
+                newest: [],
+                topRated: [],
+            },
+        };
+    }
 }
 ````
 
