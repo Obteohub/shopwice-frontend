@@ -113,10 +113,8 @@ const client = new ApolloClient({
     afterware.concat(
       createHttpLink({
         // Use proxy on client to avoid CORS, absolute URL on server
-        // Enhanced check for Node.js/Build environment where window might be mocked
-        uri: (typeof window === 'undefined' || (typeof process !== 'undefined' && process.release && process.release.name === 'node'))
-          ? (process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql')
-          : '/graphql',
+        // Use proxy on client to avoid CORS, absolute URL on server
+        uri: typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql') : '/graphql',
         fetch,
         credentials: 'include',
       }),
