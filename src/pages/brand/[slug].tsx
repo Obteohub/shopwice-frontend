@@ -65,6 +65,7 @@ const BrandPage = ({
     );
 };
 
+export const runtime = 'edge';
 export default withRouter(BrandPage);
 
 export const getStaticPaths: GetStaticPaths = async () => {

@@ -46,6 +46,7 @@ const Products: NextPage = ({
   );
 };
 
+export const runtime = 'edge';
 export default Products;
 
 export const getStaticProps: GetStaticProps = async () => {

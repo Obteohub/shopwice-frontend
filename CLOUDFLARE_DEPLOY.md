@@ -13,12 +13,23 @@
    - **Output Directory**: `.vercel/output/static` (Important: next-on-pages outputs here)
    - **Node Version**: Set an Environment Variable `NODE_VERSION` to `20` (or compatible).
 
-4. **Environment Variables**:
-   - Add all your `.env` variables (e.g., `NEXT_PUBLIC_GRAPHQL_URL`, `NEXT_PUBLIC_REST_API_URL`, etc.) to the Cloudflare Pages settings.
+4. **Environment Variables** (CRITICAL):
+   - You noted "Environment variables: None". **This will cause the app to fail.**
+   - You MUST add your keys (e.g., `NEXT_PUBLIC_GRAPHQL_URL`, `NEXT_PUBLIC_REST_API_URL`).
+   - Copy them from your local `.env` file.
 
-5. **Deploy**: Click "Save and Deploy".
+5. **Deploy**:
+   - Save the settings.
+   - Go to "Deployments" and trigger a new deployment (or push a commit).
 
-## Important Notes
-- **Images**: We have disabled Next.js Image Optimization (`unoptimized: true`) in `next.config.js`. Images will work but won't be auto-optimized by the server. To optimize, use Cloudflare's Image Resizing service or a third-party loader (Cloudinary, Imgix).
-- **Edge Runtime**: The API routes and `getServerSideProps` will run on Cloudflare Workers (Edge). Ensure no Node.js-only modules are used in these paths.
+## Troubleshooting Your Current Error
+You received `[ERROR] Missing entry-point`. This happened because your configuration was:
+- Build command: `npm run build` (WRONG - this is for standard Node servers)
+- Deploy command: `npx wrangler deploy` (WRONG - Pages handles this)
+
+**Correct Configuration:**
+- **Build command:** `npm run pages:build`
+- **Build output directory:** `.vercel/output/static`
+- **Deploy command:** (Leave empty / default)
+
 
