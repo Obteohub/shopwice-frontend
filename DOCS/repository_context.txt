@@ -237,6 +237,7 @@ src/
 .prettierrc
 check_pagination_support.js
 CLOUDFLARE_DEPLOY.md
+CNAME
 debug_output.txt
 debug_reviews.js
 deploy.sh
@@ -19288,6 +19289,11 @@ export async function logout() {
     window.location.href = '/login';
   }
 }
+````
+
+## File: CNAME
+````
+web.shopwice.com
 ````
 
 ## File: debug_output.txt
