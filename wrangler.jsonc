@@ -7,6 +7,10 @@
 		"nodejs_compat",
 		"global_fetch_strictly_public"
 	],
+	"vars": {
+		"NEXT_PUBLIC_SITE_URL": "https://shopwice.com",
+		"NEXT_PUBLIC_GRAPHQL_URL": "https://shopwice.com/graphql"
+	},
 	"assets": {
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"
