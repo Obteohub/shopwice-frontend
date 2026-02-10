@@ -30,9 +30,11 @@
 			"bucket_name": "cache"
 		}
 	],
+	/*
 	"images": {
 		// Enable image optimization
 		// see https://opennext.js.org/cloudflare/howtos/image
 		"binding": "IMAGES"
 	}
+	*/
 }
