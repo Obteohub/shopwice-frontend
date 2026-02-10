@@ -1,6 +1,5 @@
 // Gallery - Sharp Corners
 import React, { useState, useRef } from 'react';
-import Image from 'next/image';
 
 interface GalleryImage {
     id: string;
@@ -33,7 +32,8 @@ const ProductGalleryVertical: React.FC<ProductGalleryProps> = ({ mainImage, gall
     }
 
     if (galleryImages?.nodes) {
-        allImages.push(...galleryImages.nodes);
+        const validGalleryImages = galleryImages.nodes.filter((img) => !!img?.sourceUrl);
+        allImages.push(...validGalleryImages);
     }
 
     if (allImages.length === 0) return null;
@@ -68,12 +68,12 @@ const ProductGalleryVertical: React.FC<ProductGalleryProps> = ({ mainImage, gall
                             className={`relative w-full aspect-square cursor-pointer overflow-hidden transition-all duration-200 ${activeIndex === index ? 'ring-2 ring-blue-600 ring-inset opacity-100' : 'opacity-50 hover:opacity-100'
                                 }`}
                         >
-                            <Image
+                            <img
                                 src={img.sourceUrl}
                                 alt={`Thumbnail ${index + 1}`}
-                                fill
-                                className="object-cover"
-                                sizes="80px"
+                                loading="lazy"
+                                decoding="async"
+                                className="absolute inset-0 w-full h-full object-cover"
                             />
                         </div>
                     ))}
@@ -90,15 +90,12 @@ const ProductGalleryVertical: React.FC<ProductGalleryProps> = ({ mainImage, gall
                 >
                     {allImages.map((img, index) => (
                         <div key={`${img.id}-${index}`} className="flex-none w-full h-full snap-center relative">
-                            <Image
+                            <img
                                 src={img.sourceUrl}
                                 alt={img.title || 'Product image'}
-                                fill
-                                className="object-contain bg-white"
-                                priority={index === 0}
-                                {...(index === 0 ? { fetchPriority: "high" } : {})}
-                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 800px"
-                                quality={90}
+                                loading={index === 0 ? 'eager' : 'lazy'}
+                                decoding="async"
+                                className="absolute inset-0 w-full h-full object-contain bg-white"
                             />
                         </div>
                     ))}

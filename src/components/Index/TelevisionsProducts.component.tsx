@@ -54,7 +54,7 @@ const TelevisionsProducts = ({ products }: TelevisionsProductsProps) => {
                 {/* Mobile View: Horizontal Scroll */}
                 <div className="md:hidden flex overflow-x-auto snap-x snap-mandatory gap-1 pb-4 no-scrollbar">
                     {products.map((product, index) => (
-                        <div key={`mob-tvs-${product.databaseId || index}`} className="snap-start shrink-0" style={{ width: '40vw' }}>
+                        <div key={`mob-tvs-${product.databaseId || index}`} className="snap-start shrink-0 w-[40vw]">
                             <ProductCard
                                 databaseId={product.databaseId}
                                 name={product.name}
@@ -77,19 +77,19 @@ const TelevisionsProducts = ({ products }: TelevisionsProductsProps) => {
                 {/* Desktop View: Carousel */}
                 <div className="hidden md:block overflow-hidden relative min-h-[400px]">
                     <div
-                        className="flex transition-transform duration-500 ease-out"
+                        className="flex transition-transform duration-500 ease-out [transform:var(--slide-transform)] [width:var(--slide-width)]"
                         style={{
-                            transform: mounted ? `translateX(-${currentIndex * (100 / slidesPerView)}%)` : 'translateX(0%)',
-                            width: mounted ? `${(products.length / slidesPerView) * 100}%` : '100%'
-                        }}
+                            '--slide-transform': mounted ? `translateX(-${currentIndex * (100 / slidesPerView)}%)` : 'translateX(0%)',
+                            '--slide-width': mounted ? `${(products.length / slidesPerView) * 100}%` : '100%'
+                        } as React.CSSProperties}
                     >
                         {products.map((product, index) => (
                             <div
                                 key={`desk-tvs-${product.databaseId || index}`}
-                                className="px-2"
+                                className="px-2 [width:var(--item-width)]"
                                 style={{
-                                    width: mounted ? `${100 / products.length}%` : '100%',
-                                }}
+                                    '--item-width': mounted ? `${100 / products.length}%` : '100%',
+                                } as React.CSSProperties}
                             >
                                 <ProductCard
                                     databaseId={product.databaseId}

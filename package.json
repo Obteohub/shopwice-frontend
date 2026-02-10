@@ -7,7 +7,7 @@
     "lhci:perf": "lhci autorun --collect.settings.preset=perf",
     "lhci:desktop": "lhci autorun --collect.settings.preset=desktop",
     "dev": "next dev --turbopack",
-    "pages:build": "npx @opennextjs/cloudflare",
+    "pages:build": "npx @opennextjs/cloudflare build --openNextConfigPath ./open-next.config.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -54,8 +54,8 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "latest",
     "@lhci/cli": "^0.15.1",
+    "@opennextjs/cloudflare": "latest",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/google.maps": "^3.58.1",
@@ -71,7 +71,8 @@
     "postcss-preset-env": "^10.5.0",
     "prettier": "^3.7.4",
     "tailwindcss": "^3.4.19",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^4.63.0"
   },
   "browserslist": [
     "defaults",

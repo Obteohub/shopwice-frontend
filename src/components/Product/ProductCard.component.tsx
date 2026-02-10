@@ -1,203 +1,246 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { paddedPrice } from '@/utils/functions/functions';
 import StarRating from '../UI/StarRating.component';
-import { ProductCategory, AttributeNode } from '@/types/product';
+import { ProductCategory } from '@/types/product';
 
 interface ProductCardProps {
   databaseId: number;
   name: string;
-  price: string;
-  regularPrice: string;
-  salePrice?: string;
-  onSale: boolean;
-  slug: string;
-  image?: {
-    sourceUrl?: string;
-  };
+  price?: string | number | null;
+  regularPrice?: string | number | null;
+  salePrice?: string | number | null;
+  onSale?: boolean;
+  slug?: string;
+  image?: { sourceUrl?: string | null } | null;
   averageRating?: number;
-  productCategories?: {
-    nodes: ProductCategory[];
-  };
-  attributes?: {
-    nodes: Array<{ name: string; options: string[] }>;
-  };
-  stockQuantity?: number;
+  productCategories?: { nodes?: ProductCategory[] | null };
+  attributes?: { nodes?: Array<{ name: string; options?: string[] | null }> | null };
+  stockQuantity?: number | null;
   reviewCount?: number;
 }
 
-const ProductCard = ({
-  databaseId,
-  name,
-  price,
-  regularPrice,
-  salePrice,
-  onSale,
-  slug,
-  image,
-  averageRating = 0,
-  productCategories,
-  attributes,
-  stockQuantity,
-  reviewCount,
-}: ProductCardProps) => {
-  // Add padding/empty character after currency symbol
-  const formattedPrice = price ? paddedPrice(price, 'GH₵') : price;
-  const formattedRegularPrice = regularPrice ? paddedPrice(regularPrice, 'GH₵') : regularPrice;
-  const formattedSalePrice = salePrice ? paddedPrice(salePrice, 'GH₵') : salePrice;
+/* ---------- Helpers ---------- */
 
-  // Debugging log
-  useEffect(() => {
-    if (!slug) {
-      console.warn(`[ProductCard] Missing slug for product: ${name}`, { databaseId, slug });
-    }
-  }, [slug, name, databaseId]);
+const parseMoney = (value?: any) => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
 
-  // Check if product is in "Mobile Phones" category
-  const isMobilePhone = productCategories?.nodes?.some(
-    (cat) => cat.name.toLowerCase() === 'mobile phones' || cat.slug === 'mobile-phones'
-  );
-
-  // Check if product has ANY attribute with an option containing "Refurbish"
-  // We ignore the attribute name to be more robust (e.g. it could be "Grade", "Condition", "State")
-  const isRefurbished = attributes?.nodes?.some(
-    (attr) => attr.options?.some((opt) => opt.toLowerCase().includes('refurbish'))
-  );
-
-  const showRefurbishedBadge = isMobilePhone && isRefurbished;
-  const showWarrantyBadge = isMobilePhone && isRefurbished;
-
-  // Calculate savings
-  let savingsAmount = '';
-  let savingsPercentage = 0;
-  if (onSale && regularPrice && salePrice) {
-    const regPriceNum = parseFloat(regularPrice.replace(/[^0-9.]/g, ''));
-    const salePriceNum = parseFloat(salePrice.replace(/[^0-9.]/g, ''));
-    if (!isNaN(regPriceNum) && !isNaN(salePriceNum)) {
-      const savings = regPriceNum - salePriceNum;
-      if (savings > 0) {
-        savingsAmount = `GH₵${savings.toFixed(2)}`;
-        savingsPercentage = Math.round((savings / regPriceNum) * 100);
-      }
-    }
+  // Debug log for unexpected values
+  if (typeof value !== 'string') {
+    // console.log('[ProductCard] parseMoney received non-string:', value);
   }
 
-  // Stock Scarcity Logic
-  const showStockWarning = stockQuantity !== undefined && stockQuantity !== null && stockQuantity > 0 && stockQuantity < 5;
+  // Safety: cast to string to handle unexpected objects/types
+  const strVal = String(value);
+  return Number(strVal.replace(/[^\d.]/g, '')) || 0;
+};
+
+const hasRefurbishKeyword = (value?: any) => {
+  if (!value) return false;
+  const strVal = String(value);
+  return strVal.toLowerCase().includes('refurbish') ||
+    strVal.toLowerCase().includes('renewed');
+};
+
+/* ---------- Component ---------- */
+
+const ProductCard = (props: ProductCardProps) => {
+  const {
+    name,
+    price,
+    regularPrice,
+    salePrice,
+    onSale,
+    slug,
+    image,
+    averageRating = 0,
+    productCategories,
+    attributes,
+    stockQuantity,
+    reviewCount,
+  } = props;
+
+  const safeSlug = slug ? String(slug).split('/').filter(Boolean).pop() : '';
+
+  /* ---------- Price Formatting ---------- */
+
+  const formattedPrice = useMemo(
+    () => (price && price !== null) ? paddedPrice(price, 'GH₵') : null,
+    [price]
+  );
+
+  const formattedRegularPrice = useMemo(
+    () => (regularPrice && regularPrice !== null) ? paddedPrice(regularPrice, 'GH₵') : null,
+    [regularPrice]
+  );
+
+  const formattedSalePrice = useMemo(
+    () => (salePrice && salePrice !== null) ? paddedPrice(salePrice, 'GH₵') : null,
+    [salePrice]
+  );
+
+  /* ---------- Category + Attribute Checks ---------- */
+
+  const isRefurbished = useMemo(() => {
+    return attributes?.nodes?.some(attr =>
+      attr.options?.some(opt => hasRefurbishKeyword(opt))
+    );
+  }, [attributes]);
+
+  /* ---------- Savings ---------- */
+
+  const savingsAmount = useMemo(() => {
+    if (!onSale) return '';
+
+    const reg = parseMoney(regularPrice);
+    const sale = parseMoney(salePrice);
+
+    if (reg > sale) {
+      return `GH₵${(reg - sale).toFixed(2)}`;
+    }
+
+    return '';
+  }, [onSale, regularPrice, salePrice]);
+
+  /* ---------- Stock Warning ---------- */
+
+  const showStockWarning = useMemo(() => {
+    return (
+      typeof stockQuantity === 'number' &&
+      stockQuantity > 0 &&
+      stockQuantity < 5 &&
+      isRefurbished
+    );
+  }, [stockQuantity, isRefurbished]);
+
+  /* ---------- Shared Product Info ---------- */
+
+  const renderInfo = () => (
+    <>
+      <p className="text-sm leading-tight min-h-[34px] line-clamp-2 text-gray-800 group-hover:text-blue-700 transition-colors">
+        {name}
+      </p>
+
+      <div className="flex items-center gap-1 mt-0.5">
+        <StarRating rating={averageRating} size={14} />
+        {!!reviewCount && (
+          <span className="text-xs text-gray-500">
+            ({reviewCount})
+          </span>
+        )}
+      </div>
+    </>
+  );
+
+  /* ---------- Image Component ---------- */
+
+  const ProductImage = () => {
+    const imgSrc = image?.sourceUrl;
+    return imgSrc ? (
+      <img
+        src={imgSrc}
+        alt={name || 'Product image'}
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-110"
+      />
+    ) : (
+      <div className="flex items-center justify-center h-full text-gray-400 text-xs italic">
+        No image
+      </div>
+    );
+  };
+
+  /* ---------- Render ---------- */
 
   return (
-    <div className="group relative h-full flex flex-col w-full overflow-hidden bg-white">
-      <div className="aspect-square overflow-hidden bg-gray-100 relative shrink-0">
-        {slug ? (
-          <Link href={`/product/${slug}`} className="relative block w-full h-full">
-            {image?.sourceUrl ? (
-              <Image
-                src={image.sourceUrl}
-                alt={name}
-                fill className="w-full h-full object-cover object-center transition duration-300 group-hover:scale-105"
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              />
-            ) : (
-              <div className="h-full w-full bg-gray-100 flex items-center justify-center">
-                <span className="text-gray-400">No image</span>
-              </div>
-            )}
+    <article className="group relative flex flex-col h-full w-full bg-white border border-transparent hover:border-gray-100 transition-all rounded-sm">
+
+      {/* IMAGE */}
+      <div className="aspect-square relative bg-gray-100 overflow-hidden rounded-sm">
+
+        {safeSlug ? (
+          <Link
+            href={`/product/${safeSlug}`}
+            aria-label={`View product ${name}`}
+            className="block w-full h-full"
+          >
+            <ProductImage />
           </Link>
         ) : (
-          <div className="relative block w-full h-full pointer-events-none">
-            {image?.sourceUrl ? (
-              <Image
-                src={image.sourceUrl}
-                alt={name}
-                fill className="w-full h-full object-cover object-center"
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-              />
-            ) : (
-              <div className="h-full w-full bg-gray-100 flex items-center justify-center">
-                <span className="text-gray-400">No image</span>
-              </div>
-            )}
+          <ProductImage />
+        )}
+
+        {/* BADGES */}
+        {isRefurbished && (
+          <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+            <span className="bg-green-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shadow-sm">
+              Renewed
+            </span>
+
+            <span className="bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase shadow-sm">
+              12 Month Warranty
+            </span>
           </div>
         )}
 
-        {/* Refurbished Badge */}
-        {showRefurbishedBadge && (
-          <div className="absolute top-2 left-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 uppercase tracking-wide">
-            Renewed
-          </div>
-        )}
-
-        {/* Warranty Badge - Only for Refurbished Phones */}
-        {showWarrantyBadge && (
-          <div className="absolute top-8 left-2 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 uppercase tracking-wide">
-            12 Month Warranty
-          </div>
-        )}
-
-        {/* Stock Scarcity Warning - Only for Refurbished */}
-        {showStockWarning && isRefurbished && (
-          <div className="absolute bottom-2 left-2 right-2 bg-red-500/90 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 text-center">
-            Only {stockQuantity} left in stock!
+        {showStockWarning && (
+          <div className="absolute bottom-2 left-2 right-2 bg-red-600/90 text-white text-[10px] font-bold text-center py-1 rounded shadow-md">
+            Only {stockQuantity} left!
           </div>
         )}
       </div>
 
-      <div className="flex flex-col flex-grow mt-2 justify-between">
-        {slug ? (
-          <Link href={`/product/${slug}`}>
-            <div>
-              <p
-                className="text-sm font-normal text-left cursor-pointer hover:text-gray-600 transition-colors leading-[1.2] tracking-tighter min-h-[34px] break-words"
-                style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineClamp: 2 }}
-              >
-                {name}
-              </p>
-              <div className="flex justify-start items-center gap-1 mt-0.5">
-                <StarRating rating={averageRating} size={14} />
-                {reviewCount !== undefined && reviewCount > 0 && (
-                  <span className="text-xs text-gray-500">({reviewCount})</span>
-                )}
-              </div>
-            </div>
+      {/* BODY */}
+      <div className="flex flex-col flex-grow mt-2 px-1 pb-2">
+
+        {safeSlug ? (
+          <Link href={`/product/${safeSlug}`}>
+            {renderInfo()}
           </Link>
         ) : (
-          <div>
-            <p
-              className="text-sm font-normal text-left text-gray-900 leading-[1.2] tracking-tighter min-h-[34px] break-words"
-              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineClamp: 2 }}
-            >
-              {name}
-            </p>
-            <div className="flex justify-start items-center gap-1 mt-0.5">
-              <StarRating rating={averageRating} size={14} />
-              {reviewCount !== undefined && reviewCount > 0 && (
-                <span className="text-xs text-gray-500">({reviewCount})</span>
-              )}
-            </div>
-          </div>
+          renderInfo()
         )}
-        <div className="mt-1 text-left">
-          {onSale ? (
-            <div className="flex flex-col items-start gap-0.5">
-              <div className="flex items-center justify-start gap-1.5">
-                <span className="text-xs font-bold text-blue-600 tracking-tighter">{formattedSalePrice}</span>
-                <span className="text-xs text-gray-500 line-through tracking-tighter">{formattedRegularPrice}</span>
+
+        {/* PRICE */}
+        <div className="mt-2">
+
+          {onSale && formattedSalePrice ? (
+            <div className="flex flex-col">
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-blue-600">
+                  {formattedSalePrice}
+                </span>
+
+                {formattedRegularPrice && (
+                  <span className="text-xs line-through text-gray-400">
+                    {formattedRegularPrice}
+                  </span>
+                )}
               </div>
+
               {savingsAmount && (
-                <span className="text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded tracking-tighter inline-block mt-0.5">
-                  Save - {savingsAmount}
+                <span className="text-[10px] font-semibold text-green-700 mt-0.5">
+                  Save {savingsAmount}
                 </span>
               )}
             </div>
+          ) : formattedPrice ? (
+            <span className="text-sm font-bold text-blue-600">
+              {formattedPrice}
+            </span>
           ) : (
-            <span className="text-sm font-bold text-blue-600">{formattedPrice}</span>
+            <span className="text-xs text-gray-400">
+              Price unavailable
+            </span>
           )}
+
         </div>
       </div>
-    </div>
+    </article>
   );
 };
-
 
 export default ProductCard;

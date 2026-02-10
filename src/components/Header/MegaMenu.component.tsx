@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
  * MegaMenu component for desktop navigation
  * Displays top-level categories with hover dropdowns for subcategories
  */
+import { print } from 'graphql/language/printer';
 import DesktopSideMenu from './DesktopSideMenu.component';
 
 const MegaMenu = () => {
@@ -40,7 +41,7 @@ const MegaMenu = () => {
                 credentials: 'omit',
                 cache: 'force-cache',
                 body: JSON.stringify({
-                    query: require('graphql').print(FETCH_ALL_CATEGORIES_QUERY)
+                    query: print(FETCH_ALL_CATEGORIES_QUERY)
                 }),
             })
                 .then(res => res.json())
@@ -86,27 +87,25 @@ const MegaMenu = () => {
                     </li>
 
                     {/* Quick Category Links */}
-                    <div className="flex items-center space-x-8">
-                        {quickLinks.map((category: any) => (
-                            <li key={category.id} className="h-full flex items-center">
-                                <Link
-                                    href={`/product-category/${category.slug}`}
-                                    className="text-[13px] font-bold text-white hover:text-white/80 transition-colors whitespace-nowrap"
-                                >
-                                    {category.name}
-                                </Link>
-                            </li>
-                        ))}
-
-                        <li className="h-full flex items-center">
+                    {quickLinks.map((category: any) => (
+                        <li key={category.id} className="h-full flex items-center mr-8 last:mr-0">
                             <Link
-                                href="/products"
-                                className="text-[13px] font-bold text-white hover:text-white/80 transition-colors whitespace-nowrap border-b border-transparent hover:border-white/40"
+                                href={`/product-category/${category.slug}`}
+                                className="text-[13px] font-bold text-white hover:text-white/80 transition-colors whitespace-nowrap"
                             >
-                                Shop All
+                                {category.name}
                             </Link>
                         </li>
-                    </div>
+                    ))}
+
+                    <li className="h-full flex items-center ml-8">
+                        <Link
+                            href="/products"
+                            className="text-[13px] font-bold text-white hover:text-white/80 transition-colors whitespace-nowrap border-b border-transparent hover:border-white/40"
+                        >
+                            Shop All
+                        </Link>
+                    </li>
                 </ul>
             </div>
 

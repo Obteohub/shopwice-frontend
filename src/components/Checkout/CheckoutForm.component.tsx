@@ -18,6 +18,7 @@ import {
   createCheckoutData,
   ICheckoutDataProps,
 } from '@/utils/functions/functions';
+import { getStoreApiHeaders } from '@/utils/wc-store-api/nonceManager';
 
 export interface IBilling {
   firstName: string;
@@ -69,8 +70,9 @@ const CheckoutForm = () => {
 
   const fetchCheckoutState = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_REST_API_URL}/checkout/state`, {
-        headers: getAuthHeaders()
+      const headers = await getStoreApiHeaders();
+      const response = await fetch('/api/wc-store/cart', {
+        headers
       });
       const data = await response.json();
       if (response.ok) {
@@ -86,14 +88,16 @@ const CheckoutForm = () => {
 
   const fetchGateways = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_REST_API_URL}/payment-gateways`, {
-        headers: getAuthHeaders()
+      const headers = await getStoreApiHeaders();
+      const response = await fetch('/api/wc-store/checkout', {
+        headers
       });
       const data = await response.json();
       if (response.ok) {
-        setAvailableGateways(data);
-        if (data.length > 0 && !selectedPaymentMethod) {
-          setSelectedPaymentMethod(data[0].id);
+        // Store API returns payment methods/gateways in the checkout response
+        setAvailableGateways(data.payment_methods || []);
+        if (data.payment_methods?.length > 0 && !selectedPaymentMethod) {
+          setSelectedPaymentMethod(data.payment_methods[0].id);
         }
       }
     } catch (error) {
@@ -101,10 +105,8 @@ const CheckoutForm = () => {
     }
   };
 
-  const getAuthHeaders = () => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+  const getAuthHeaders = async () => {
+    const headers = await getStoreApiHeaders();
     if (typeof window !== 'undefined') {
       const authData = JSON.parse(localStorage.getItem('auth-data') || 'null');
       if (authData?.authToken) {
@@ -125,9 +127,10 @@ const CheckoutForm = () => {
     setRequestError(null);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_REST_API_URL}/checkout/cart/update-customer`, {
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/wc-store/cart/update-customer', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({
           shipping_address: {
             first_name: submitData.firstName,
@@ -174,13 +177,10 @@ const CheckoutForm = () => {
 
     setIsUpdatingShipping(true);
     try {
-      // Standard WooCommerce Store API expects this to update the cart
-      // The middleware might have a specific path or we just use general cart update
-      // Given the list, if no specific select rate endpoint, we might pass it to checkout
-      // OR try the standard Store API path /api/checkout/cart/select-shipping-rate
-      const response = await fetch(`${process.env.NEXT_PUBLIC_REST_API_URL}/checkout/cart/select-shipping-rate`, {
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/wc-store/cart/select-shipping-rate', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({
           rate_id: selectedShippingRate
         })
@@ -202,9 +202,10 @@ const CheckoutForm = () => {
 
     setCheckoutLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_REST_API_URL}/checkout`, {
+      const headers = await getAuthHeaders();
+      const response = await fetch('/api/wc-store/checkout', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers,
         body: JSON.stringify({
           payment_method: selectedPaymentMethod,
           billing_address: cartData.billing_address,
@@ -376,7 +377,7 @@ const CheckoutForm = () => {
                       handleButtonClick={handleShippingSubmit}
                       buttonDisabled={!selectedShippingRate || isUpdatingShipping}
                     >
-                      {isUpdatingShipping ? '...' : 'Next'}
+                      {isUpdatingShipping ? <LoadingSpinner color="white" size="sm" /> : 'Next'}
                     </Button>
                   </div>
                 </div>
@@ -389,15 +390,15 @@ const CheckoutForm = () => {
 
                   <div className="space-y-2 mb-3">
                     {availableGateways.length === 0 ? (
-                      <div className="p-2 border border-blue-500 bg-blue-50 rounded flex items-start gap-2 ring-1 ring-blue-500">
+                      <label className="p-2 border border-blue-500 bg-blue-50 rounded flex items-start gap-2 ring-1 ring-blue-500 cursor-default">
                         <div className="flex-shrink-0 mt-0.5">
-                          <input type="radio" checked readOnly className="w-3 h-3 text-blue-600" />
+                          <input type="radio" checked readOnly className="w-3 h-3 text-blue-600" aria-label="Cash on Delivery" />
                         </div>
                         <div>
                           <span className="block font-bold text-gray-900 text-xs">Cash on Delivery</span>
                           <p className="mt-0.5 text-[10px] text-gray-600">Pay safely with cash when your order is delivered.</p>
                         </div>
-                      </div>
+                      </label>
                     ) : (
                       availableGateways.map((gateway: any) => (
                         <label
@@ -444,7 +445,7 @@ const CheckoutForm = () => {
                       handleButtonClick={handlePaymentSubmit}
                       buttonDisabled={checkoutLoading}
                     >
-                      {checkoutLoading ? 'Processing...' : 'Place Order'}
+                      {checkoutLoading ? <LoadingSpinner color="white" size="sm" /> : 'Place Order'}
                     </Button>
                   </div>
                 </div>

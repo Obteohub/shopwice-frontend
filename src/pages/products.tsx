@@ -2,6 +2,7 @@ import Head from 'next/head';
 import Layout from '@/components/Layout/Layout.component';
 import ProductList from '@/components/Product/ProductList.component';
 import client from '@/utils/apollo/ApolloClient';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
 import { FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
 import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
 
@@ -14,7 +15,7 @@ const Products: NextPage = ({
     return (
       <Layout title="Products">
         <div className="flex justify-center items-center min-h-screen">
-          <div className="text-xl">Loading...</div>
+          <LoadingSpinner />
         </div>
       </Layout>
     );
@@ -50,17 +51,30 @@ const Products: NextPage = ({
 export default Products;
 
 export const getStaticProps: GetStaticProps = async () => {
-  const { data, loading, networkStatus } = await client.query({
-    query: FETCH_ALL_PRODUCTS_QUERY,
-  });
+  try {
+    const { data, loading, networkStatus } = await client.query({
+      query: FETCH_ALL_PRODUCTS_QUERY,
+    });
 
-  return {
-    props: {
-      products: data.products.nodes,
-      pageInfo: data.products.pageInfo,
-      loading,
-      networkStatus,
-    },
-    revalidate: 60,
-  };
+    return {
+      props: {
+        products: data?.products?.nodes || [],
+        pageInfo: data?.products?.pageInfo || {},
+        loading,
+        networkStatus,
+      },
+      revalidate: 60,
+    };
+  } catch (error) {
+    console.warn('Failed to fetch products during build:', error);
+    return {
+      props: {
+        products: [],
+        pageInfo: {},
+        loading: false,
+        networkStatus: 8, // Error status
+      },
+      revalidate: 60,
+    };
+  }
 };

@@ -19,11 +19,9 @@ import DeliveryInfo from './DeliveryInfo.component';
 import PaymentInfo from './PaymentInfo.component';
 import ProductLocationDisplay from './ProductLocationDisplay.component';
 import ProductActions from './ProductActions.component';
+import ProductReviews from './ProductReviews.component';
 
 // Dynamic Imports for Performance
-const ProductReviewsREST = dynamic(() => import('./ProductReviewsREST.component'), {
-    loading: () => <p className="p-4 text-center text-gray-500">Loading reviews...</p>
-});
 const ComparePriceModal = dynamic(() => import('./ComparePriceModal.component'), { ssr: false });
 const WhatIsRefurbishedModal = dynamic(() => import('./WhatIsRefurbishedModal.component'), { ssr: false });
 
@@ -32,14 +30,13 @@ import QuantityControl from '@/components/Cart/QuantityControl.component';
 const SingleProductFinal = ({
     product,
     loading = false,
-    isMobilePhone = false,
     isRefurbished = false
 }: {
     product: any;
     loading?: boolean;
-    isMobilePhone?: boolean;
     isRefurbished?: boolean;
 }) => {
+
     const [selectedVariation, setSelectedVariation] = useState<number>();
     const [quantity, setQuantity] = useState<number>(1);
     const [isShortDescriptionExpanded, setIsShortDescriptionExpanded] = useState(false);
@@ -50,13 +47,13 @@ const SingleProductFinal = ({
     const placeholderFallBack = 'https://via.placeholder.com/600';
 
     useEffect(() => {
-        if (product.variations && product.variations.nodes && product.variations.nodes.length > 0) {
+        if (product?.variations?.nodes?.length > 0) {
             const firstVariant = product.variations.nodes[0].databaseId;
             setSelectedVariation(firstVariant);
         }
-    }, [product.variations]);
+    }, [product?.variations]);
 
-    let { description, shortDescription, image, name, onSale, price, regularPrice, salePrice, productCategories, productBrand, averageRating, reviewCount, galleryImages, reviews, attributes, sku, stockStatus, stockQuantity, totalSales } =
+    let { description, shortDescription, image, name, onSale, price, regularPrice, salePrice, productCategories, productBrand, averageRating, reviewCount, galleryImages, reviews, attributes, sku, stockStatus, stockQuantity, totalSales, metaData, productLocation } =
         product;
 
 
@@ -85,9 +82,7 @@ const SingleProductFinal = ({
             ? boxContentAttr.options.join(', ')
             : String(boxContentAttr.options);
     } else if (isRefurbished) {
-        boxContentText = isMobilePhone
-            ? "Device, Charging Cable, User Manual, SIM Ejector Tool "
-            : "Device, Compatible Essential Accessories (Generic Box)";
+        boxContentText = "Device, Compatible Essential Accessories (Generic Box)";
     }
 
     const showRefurbishedBadge = !!isRefurbished;
@@ -103,7 +98,10 @@ const SingleProductFinal = ({
         return 'text-green-700 bg-green-50 border-green-100';
     };
 
-    const selectedVariationNode = product.variations?.nodes.find(
+    const isVariableProduct = (product?.variations?.nodes?.length || 0) > 0;
+    const isSelectionMissing = isVariableProduct && !selectedVariation;
+
+    const selectedVariationNode = product.variations?.nodes?.find(
         (node: any) => node.databaseId === selectedVariation,
     );
 
@@ -118,6 +116,10 @@ const SingleProductFinal = ({
     const currentSku = selectedVariationNode && selectedVariationNode.sku
         ? selectedVariationNode.sku
         : sku;
+
+    const currentImage = selectedVariationNode && selectedVariationNode.image && selectedVariationNode.image.sourceUrl
+        ? selectedVariationNode.image
+        : image;
 
     const currentFormattedStockStatus = currentStockStatus?.replace(/_/g, ' ').toLowerCase();
 
@@ -136,7 +138,7 @@ const SingleProductFinal = ({
                     {/* Left Column: Gallery & Images - lg:col-span-3 (30%) */}
                     <div className="lg:col-span-3 w-full flex flex-col gap-8">
                         <div className="relative group overflow-hidden bg-gray-50">
-                            <ProductGallery key="vertical-gallery" mainImage={image} galleryImages={galleryImages} />
+                            <ProductGallery key="vertical-gallery" mainImage={currentImage || { sourceUrl: placeholderFallBack }} galleryImages={galleryImages} />
                             <div className="absolute bottom-4 right-4 z-[50]">
                                 <ProductActions productName={name} productUrl={`/product/${product.slug}`} productId={product.databaseId} orientation="col" />
                             </div>
@@ -171,18 +173,33 @@ const SingleProductFinal = ({
                             )}
                             <div ref={reviewsRef} className="scroll-mt-24">
                                 <Accordion title={`Reviews (${reviewCount || 0})`}>
-                                    <ProductReviewsREST
-                                        productId={product.databaseId}
-                                        productImage={image?.sourceUrl || placeholderFallBack}
-                                        productName={name}
-                                    />
+                                    <ProductReviews reviews={reviews?.nodes || []} />
                                 </Accordion>
                             </div>
-                            {((productCategories?.nodes && productCategories.nodes.length > 0) || sku) && (
+                            {((productCategories?.nodes && productCategories.nodes.length > 0) || currentSku || (Array.isArray(metaData) && metaData.length > 0)) && (
                                 <Accordion title="More Information">
                                     <div className="flex flex-col gap-2">
-                                        {sku && (
-                                            <p><span className="font-semibold text-gray-900">SKU:</span> {sku}</p>
+                                        {currentSku && (
+                                            <p><span className="font-semibold text-gray-900">SKU:</span> {currentSku}</p>
+                                        )}
+                                        {typeof totalSales === 'number' && (
+                                            <p><span className="font-semibold text-gray-900">Units Sold:</span> {totalSales}</p>
+                                        )}
+                                        {productBrand?.nodes?.[0] && (
+                                            <p>
+                                                <span className="font-semibold text-gray-900">Brand: </span>
+                                                <Link href={`/brand/${productBrand.nodes[0].slug}`} className="text-blue-600 hover:underline">
+                                                    {productBrand.nodes[0].name}
+                                                </Link>
+                                            </p>
+                                        )}
+                                        {productLocation?.nodes?.[0] && (
+                                            <p>
+                                                <span className="font-semibold text-gray-900">Location: </span>
+                                                <Link href={`/location/${productLocation.nodes[0].slug}`} className="text-blue-600 hover:underline">
+                                                    {productLocation.nodes[0].name}
+                                                </Link>
+                                            </p>
                                         )}
                                         {productCategories?.nodes && productCategories.nodes.length > 0 && (
                                             <p>
@@ -197,6 +214,21 @@ const SingleProductFinal = ({
                                                 ))}
                                             </p>
                                         )}
+                                        {Array.isArray(metaData) && metaData.length > 0 && (
+                                            <div className="pt-2 border-t border-gray-100">
+                                                <p className="font-semibold text-gray-900">Product Meta</p>
+                                                <div className="text-sm text-gray-500 space-y-1 mt-1">
+                                                    {metaData
+                                                        .filter((m: any) => m?.key && !String(m.key).startsWith('_'))
+                                                        .slice(0, 6)
+                                                        .map((m: any, index: number) => (
+                                                            <p key={`${m.key}-${index}`}>
+                                                                <span className="font-medium text-gray-700">{m.key}:</span> {String(m.value)}
+                                                            </p>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </Accordion>
                             )}
@@ -204,7 +236,7 @@ const SingleProductFinal = ({
                     </div>
 
                     <div className="lg:col-span-7 w-full">
-                        <div className="sticky top-24 flex flex-col gap-4">
+                        <div className="lg:sticky lg:top-24 flex flex-col gap-4">
                             {/* Header Info */}
                             <div className="flex flex-col gap-2" suppressHydrationWarning>
                                 <div className="flex justify-start items-center gap-4">
@@ -228,11 +260,17 @@ const SingleProductFinal = ({
                                     {name}
                                 </h1>
 
+                                {currentSku && (
+                                    <p className="text-xs text-gray-500 font-mono mt-1">
+                                        SKU: <span className="text-gray-700">{currentSku}</span>
+                                    </p>
+                                )}
+
                                 {showRefurbishedBadge ? (
                                     <div className="flex items-center gap-2 mt-2" suppressHydrationWarning>
                                         <div className="inline-flex items-center gap-1.5 bg-green-50 px-2.5 py-1 rounded-full border border-green-100">
                                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                            <p className="text-xs text-green-700 font-bold uppercase tracking-wide">Refurbished - Excellent</p>
+                                            <p className="text-xs text-green-700 font-bold uppercase tracking-wide">Refurbished - Fresh In Box</p>
                                         </div>
                                         <button
                                             onClick={() => setShowWhatIsRefurbishedModal(true)}
@@ -327,7 +365,7 @@ const SingleProductFinal = ({
                                                             <span className="text-[10px] uppercase font-extrabold text-blue-700 mb-0.5">Refurbished Price</span>
                                                         )}
                                                         <p className="text-3xl font-bold text-blue-600 leading-none">
-                                                            {product.variations
+                                                            {isVariableProduct
                                                                 ? price
                                                                 : salePrice}
                                                         </p>
@@ -342,8 +380,8 @@ const SingleProductFinal = ({
                                                     </div>
                                                 </div>
                                                 {(() => {
-                                                    const currentSale = (product.variations ? filteredVariantPrice(price, '') : salePrice) || '';
-                                                    const currentReg = (product.variations ? filteredVariantPrice(price, 'right') : regularPrice) || '';
+                                                    const currentSale = (isVariableProduct ? filteredVariantPrice(price, '') : salePrice) || '';
+                                                    const currentReg = (isVariableProduct ? filteredVariantPrice(price, 'right') : regularPrice) || '';
 
                                                     if (currentSale && currentReg) {
                                                         const saleVal = parseFloat(currentSale.replace(/[^0-9.]/g, ''));
@@ -377,7 +415,7 @@ const SingleProductFinal = ({
                                     </div>
 
                                     {/* Variations */}
-                                    {product.variations && (
+                                    {isVariableProduct && product?.variations?.nodes && (
                                         <div>
                                             <label className="block text-sm font-semibold mb-2 text-gray-900">
                                                 Select Option
@@ -442,15 +480,22 @@ const SingleProductFinal = ({
 
 
 
+                                    {isSelectionMissing && (
+                                        <p className="text-xs text-red-600 mt-2">
+                                            Please select a variation to add this item to cart.
+                                        </p>
+                                    )}
+
                                     {/* Buttons */}
                                     <div className="flex flex-col gap-3 pt-2">
-                                        {product.variations ? (
+                                        {isVariableProduct ? (
                                             <div className="flex flex-col md:flex-row gap-2">
                                                 <div className="w-full md:flex-1">
                                                     <AddToCart
                                                         product={product}
                                                         variationId={selectedVariation}
                                                         fullWidth={true}
+                                                        disabled={isSelectionMissing}
                                                         quantity={quantity}
                                                     />
                                                 </div>
@@ -460,6 +505,7 @@ const SingleProductFinal = ({
                                                         variationId={selectedVariation}
                                                         fullWidth={true}
                                                         buyNow={true}
+                                                        disabled={isSelectionMissing}
                                                         quantity={quantity}
                                                     />
                                                 </div>
@@ -479,9 +525,6 @@ const SingleProductFinal = ({
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                </div>
 
                 {/* Row 3: Accordions (Mobile Only) */}
                 <div className="lg:hidden mt-8 space-y-6">
@@ -513,24 +556,39 @@ const SingleProductFinal = ({
                     {/* Reviews Mobile */}
                     <div ref={reviewsRef} className="scroll-mt-24">
                         <Accordion title={`Reviews (${reviewCount || 0})`}>
-                            <ProductReviewsREST
-                                productId={product.databaseId}
-                                productImage={image?.sourceUrl || placeholderFallBack}
-                                productName={name}
-                            />
+                            <ProductReviews reviews={reviews?.nodes || []} />
                         </Accordion>
                     </div>
-                    {((productCategories?.nodes && productCategories.nodes.length > 0) || sku) && (
+                    {((productCategories?.nodes && productCategories.nodes.length > 0) || currentSku || (Array.isArray(metaData) && metaData.length > 0)) && (
                         <Accordion title="More Information">
                             <div className="flex flex-col gap-2">
-                                {sku && (
-                                    <p><span className="font-semibold text-gray-900">SKU:</span> {sku}</p>
+                                {currentSku && (
+                                    <p><span className="font-semibold text-gray-900">SKU:</span> {currentSku}</p>
+                                )}
+                                {typeof totalSales === 'number' && (
+                                    <p><span className="font-semibold text-gray-900">Units Sold:</span> {totalSales}</p>
+                                )}
+                                {productBrand?.nodes?.[0] && (
+                                    <p>
+                                        <span className="font-semibold text-gray-900">Brand: </span>
+                                        <Link href={`/brand/${productBrand.nodes[0].slug}`} className="text-blue-600 hover:underline">
+                                            {productBrand.nodes[0].name}
+                                        </Link>
+                                    </p>
+                                )}
+                                {productLocation?.nodes?.[0] && (
+                                    <p>
+                                        <span className="font-semibold text-gray-900">Location: </span>
+                                        <Link href={`/location/${productLocation.nodes[0].slug}`} className="text-blue-600 hover:underline">
+                                            {productLocation.nodes[0].name}
+                                        </Link>
+                                    </p>
                                 )}
                                 {productCategories?.nodes && productCategories.nodes.length > 0 && (
                                     <p>
                                         <span className="font-semibold text-gray-900">Categories: </span>
                                         {productCategories.nodes.map((cat: any, index: number) => (
-                                            <span key={cat.slug}>
+                                            <span key={`${cat.slug || 'cat'}-${index}`}>
                                                 {index > 0 && ', '}
                                                 <Link href={`/product-category/${cat.slug}`} className="text-blue-600 hover:underline">
                                                     {cat.name}
@@ -539,34 +597,62 @@ const SingleProductFinal = ({
                                         ))}
                                     </p>
                                 )}
+                                {Array.isArray(metaData) && metaData.length > 0 && (
+                                    <div className="pt-2 border-t border-gray-100">
+                                        <p className="font-semibold text-gray-900">Product Meta</p>
+                                        <div className="text-sm text-gray-500 space-y-1 mt-1">
+                                            {metaData
+                                                .filter((m: any) => m?.key && !String(m.key).startsWith('_'))
+                                                .slice(0, 6)
+                                                .map((m: any, index: number) => (
+                                                    <p key={`${m.key}-${index}`}>
+                                                        <span className="font-medium text-gray-700">{m.key}:</span> {String(m.value)}
+                                                    </p>
+                                                ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </Accordion>
                     )}
                 </div>
 
 
-                {/* Row 4: Related Products Sliders */}
-                <div className="mt-8 pt-6 border-t border-gray-100 space-y-6">
-                    {/* Moved CrossSell to top */}
-                    {product.crossSell?.nodes && product.crossSell.nodes.length > 0 && (
-                        <div>
-                            <h3 className="text-xl font-bold mb-4 text-gray-900">Mostly Bought Together</h3>
-                            <div className="flex gap-4 overflow-x-auto pb-4 snap-x hide-scrollbar">
-                                {product.crossSell.nodes.map((crossSellProduct: any) => (
-                                    <div key={crossSellProduct.id} className="min-w-[160px] md:min-w-[220px] snap-start">
-                                        <ProductCard
-                                            {...crossSellProduct}
-                                            stockQuantity={crossSellProduct.stockQuantity}
-                                            reviewCount={crossSellProduct.reviewCount}
-                                            productCategories={crossSellProduct.productCategories}
-                                            attributes={crossSellProduct.attributes}
+            </div> {/* Close lg:col-span-7 */}
+        </div> {/* Close grid */}
+        </div> {/* Close Wrapper */}
+
+
+        {/* Row 4: Cross-sells - Full Width */}
+        <div className="w-full px-2 md:px-4">
+                {product.crossSell?.nodes && product.crossSell.nodes.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-100">
+                        <h3 className="text-xl font-bold mb-4 text-gray-900">Mostly Bought Together</h3>
+                        <div className="flex gap-4 overflow-x-auto pb-4 snap-x hide-scrollbar">
+                            {product.crossSell.nodes.map((crossSellProduct: any) => (
+                                <div key={crossSellProduct.id} className="min-w-[160px] md:min-w-[220px] snap-start">
+                                    <ProductCard
+                                        {...crossSellProduct}
+                                        stockQuantity={crossSellProduct.stockQuantity}
+                                        reviewCount={crossSellProduct.reviewCount}
+                                        productCategories={crossSellProduct.productCategories}
+                                        attributes={crossSellProduct.attributes}
+                                    />
+                                    <div className="mt-2">
+                                        <AddToCart
+                                            product={crossSellProduct}
+                                            fullWidth={true}
+                                            quantity={1}
                                         />
                                     </div>
-                                ))}
-                            </div>
+                                </div>
+                            ))}
                         </div>
-                    )}
+                    </div>
+                )}
 
+                {/* Row 5: Related Products Sliders */}
+                <div className="mt-6 pt-6 border-t border-gray-100 space-y-6">
                     {product.upsell?.nodes && product.upsell.nodes.length > 0 && (
                         <div>
                             <h3 className="text-xl font-bold mb-4 text-gray-900">You May Also Like</h3>
@@ -586,7 +672,6 @@ const SingleProductFinal = ({
                         </div>
                     )}
 
-                    {/* Moved Related to bottom */}
                     {product.related?.nodes && product.related.nodes.length > 0 && (
                         <div>
                             <h3 className="text-xl font-bold mb-4 text-gray-900">Related Products</h3>
@@ -605,13 +690,18 @@ const SingleProductFinal = ({
                             </div>
                         </div>
                     )}
-
                 </div>
+            </div>
 
                 <style jsx>{`
+            /* Ensure the horizontal carousels hide their scrollbars.
+               The JSX uses the 'hide-scrollbar' class, so we target that here.
+               Keep 'no-scrollbar' as an alias for any legacy usage. */
+            .hide-scrollbar::-webkit-scrollbar,
             .no-scrollbar::-webkit-scrollbar {
                 display: none;
             }
+            .hide-scrollbar,
             .no-scrollbar {
                 -ms-overflow-style: none;
                 scrollbar-width: none;
@@ -624,8 +714,8 @@ const SingleProductFinal = ({
                     </div>
                 )}
                 {(() => {
-                    const currentSale = (product.variations ? filteredVariantPrice(price, '') : salePrice) || '';
-                    const currentReg = (product.variations ? filteredVariantPrice(price, 'right') : regularPrice) || '';
+                    const currentSale = (isVariableProduct ? filteredVariantPrice(price, '') : salePrice) || '';
+                    const currentReg = (isVariableProduct ? filteredVariantPrice(price, 'right') : regularPrice) || '';
                     const saleVal = parseFloat(currentSale.replace(/[^0-9.]/g, ''));
                     const regVal = parseFloat(currentReg.replace(/[^0-9.]/g, ''));
                     const savings = regVal - saleVal;
@@ -648,7 +738,6 @@ const SingleProductFinal = ({
                         </>
                     );
                 })()}
-            </div>
         </section>
     );
 };

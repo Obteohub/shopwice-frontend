@@ -3,11 +3,8 @@ import Router from 'next/router';
 import NProgress from 'nprogress';
 import { ApolloProvider } from '@apollo/client';
 
-import { Inter } from 'next/font/google';
-
 import client from '@/utils/apollo/ApolloClient';
 import CartInitializer from '@/components/Cart/CartInitializer.component';
-import ReviewsInitializer from '@/components/Product/ReviewsInitializer.component';
 import GlobalInitializer from '@/components/GlobalInitializer.component';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
@@ -24,13 +21,6 @@ Router.events.on('routeChangeComplete', () => NProgress.done());
 Router.events.on('routeChangeError', () => NProgress.done());
 
 import { DefaultSeo } from 'next-seo';
-
-// Font configuration
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  variable: '--font-inter',
-});
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
@@ -52,9 +42,8 @@ function MyApp({ Component, pageProps }: AppProps) {
           }}
         />
         <CartInitializer />
-        <ReviewsInitializer />
         <GlobalInitializer />
-        <main className={`${inter.variable} font-sans`}>
+        <main className="font-sans">
           <Component {...pageProps} />
         </main>
       </GoogleOAuthProvider>

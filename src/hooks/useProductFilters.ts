@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Product, ProductType } from '@/types/product';
-import { getUniqueProductTypes } from '@/utils/functions/productUtils';
+import {
+  getUniqueProductTypes,
+  parsePrice,
+} from '@/utils/functions/productUtils';
 
 export const useProductFilters = (products: Product[]) => {
   const [sortBy, setSortBy] = useState('popular');
@@ -10,10 +13,13 @@ export const useProductFilters = (products: Product[]) => {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
   const [minRating, setMinRating] = useState<number>(0);
-  const [showOnSaleOnly, setShowOnSaleOnly] = useState<boolean>(false);
+  const [showOnSaleOnly, setShowOnSaleOnly] = useState(false);
+
   const [productTypes, setProductTypes] = useState<ProductType[]>(() =>
     products ? getUniqueProductTypes(products) : [],
   );
+
+  /* ---------------- Toggle Functions ---------------- */
 
   const toggleProductType = (id: string) => {
     setProductTypes((prev) =>
@@ -26,18 +32,21 @@ export const useProductFilters = (products: Product[]) => {
   const toggleAttribute = (attributeName: string, value: string) => {
     setSelectedAttributes((prev) => {
       const current = prev[attributeName] || [];
-      const newValues = current.includes(value)
+
+      const updated = current.includes(value)
         ? current.filter((v) => v !== value)
         : [...current, value];
 
-      if (newValues.length === 0) {
+      if (!updated.length) {
         const { [attributeName]: _, ...rest } = prev;
         return rest;
       }
 
-      return { ...prev, [attributeName]: newValues };
+      return { ...prev, [attributeName]: updated };
     });
   };
+
+  /* ---------------- Reset Filters ---------------- */
 
   const resetFilters = () => {
     setSelectedAttributes({});
@@ -47,127 +56,157 @@ export const useProductFilters = (products: Product[]) => {
     setPriceRange([0, 50000]);
     setMinRating(0);
     setShowOnSaleOnly(false);
+
     setProductTypes((prev) =>
       prev.map((type) => ({ ...type, checked: false })),
     );
   };
 
-  const filterProducts = (products: Product[]) => {
-    const filtered = products?.filter((product: Product) => {
-      // Filter by price
-      const priceString = product.price || '0';
-      const productPrice = parseFloat(priceString.replace(/[^0-9.]/g, ''));
-      const withinPriceRange =
-        productPrice >= priceRange[0] && productPrice <= priceRange[1];
-      if (!withinPriceRange) return false;
+  /* ---------------- Filtering Logic ---------------- */
 
-      // Filter by product type
-      const selectedTypes = productTypes
-        .filter((t) => t.checked)
-        .map((t) => t.name.toLowerCase());
-      if (selectedTypes.length > 0) {
-        const productCategories =
-          product.productCategories?.nodes.map((cat) =>
-            cat.name.toLowerCase(),
-          ) || [];
-        if (!selectedTypes.some((type) => productCategories.includes(type)))
-          return false;
-      }
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
 
-      // Filter by dynamic attributes
-      for (const [attrName, selectedValues] of Object.entries(selectedAttributes)) {
-        if (selectedValues.length > 0) {
-          const productAttr = product.attributes?.nodes.find(
-            (attr) => attr.name === attrName
-          );
-          const productOptions = productAttr?.options || [];
+    const selectedTypes = productTypes
+      .filter((t) => t.checked)
+      .map((t) => t.name.toLowerCase());
 
-          if (!selectedValues.some((value) => productOptions.includes(value))) {
-            return false;
-          }
-        }
-      }
+    const filtered = products.filter((product) => {
+      const price = parsePrice(product.price);
 
-      // Filter by brand
-      if (selectedBrands.length > 0) {
-        const productBrands =
-          product.productBrand?.nodes.map((node) => node.name) || [];
-        if (!selectedBrands.some((brand) => productBrands.includes(brand)))
-          return false;
-      }
+      /* Price */
+      if (price < priceRange[0] || price > priceRange[1]) return false;
 
-      // Filter by location
-      if (selectedLocations.length > 0) {
-        const productLocations =
-          product.productLocation?.nodes.map((node) => node.name) || [];
-        if (!selectedLocations.some((location) => productLocations.includes(location)))
-          return false;
-      }
-
-      // Filter by category
-      if (selectedCategories.length > 0) {
+      /* Product Type */
+      if (selectedTypes.length) {
         const productCats =
-          product.productCategories?.nodes.map((cat) => cat.name) || [];
-        if (!selectedCategories.some((category) => productCats.includes(category)))
+          product.productCategories?.nodes?.map((c) =>
+            c.name.toLowerCase(),
+          ) || [];
+
+        if (!selectedTypes.some((type) => productCats.includes(type)))
           return false;
       }
 
-      // Filter by minimum rating
-      if (minRating > 0) {
-        const rating = product.averageRating || 0;
-        if (rating < minRating) return false;
+      /* Attributes */
+      for (const [attrName, values] of Object.entries(selectedAttributes)) {
+        const productAttr = product.attributes?.nodes?.find(
+          (a) => a.name === attrName,
+        );
+
+        const optionsRaw = productAttr?.options || [];
+        const options = optionsRaw
+          .map((opt: any) => {
+            if (opt === null || opt === undefined) return null;
+            if (typeof opt === 'string' || typeof opt === 'number') return String(opt);
+            if (typeof opt === 'object') return opt.name || opt.label || opt.value || null;
+            return null;
+          })
+          .filter(Boolean) as string[];
+
+        if (!values.some((v) => options.includes(v))) return false;
       }
 
-      // Filter by on-sale
-      if (showOnSaleOnly && !product.onSale) {
-        return false;
+      /* Brands */
+      if (selectedBrands.length) {
+        const brands =
+          product.productBrand?.nodes?.map((b) => b.name) || [];
+
+        if (!selectedBrands.some((b) => brands.includes(b))) return false;
       }
+
+      /* Locations */
+      if (selectedLocations.length) {
+        const locations =
+          product.productLocation?.nodes?.map((l) => l.name) || [];
+
+        if (!selectedLocations.some((l) => locations.includes(l)))
+          return false;
+      }
+
+      /* Categories */
+      if (selectedCategories.length) {
+        const cats =
+          product.productCategories?.nodes?.map((c) => c.name) || [];
+
+        if (!selectedCategories.some((c) => cats.includes(c))) return false;
+      }
+
+      /* Rating */
+      if (minRating && (product.averageRating || 0) < minRating)
+        return false;
+
+      /* Sale */
+      if (showOnSaleOnly && !product.onSale) return false;
 
       return true;
     });
 
-    // Sort products
-    return [...(filtered || [])].sort((a, b) => {
-      const priceAString = a.price || '0';
-      const priceBString = b.price || '0';
-      const priceA = parseFloat(priceAString.replace(/[^0-9.]/g, ''));
-      const priceB = parseFloat(priceBString.replace(/[^0-9.]/g, ''));
+    /* ---------------- Sorting ---------------- */
+
+    return [...filtered].sort((a, b) => {
+      const priceA = parsePrice(a.price);
+      const priceB = parsePrice(b.price);
 
       switch (sortBy) {
         case 'price-low':
           return priceA - priceB;
+
         case 'price-high':
           return priceB - priceA;
+
         case 'newest':
           return b.databaseId - a.databaseId;
+
         case 'avg-rating':
           return (b.averageRating || 0) - (a.averageRating || 0);
-        default: // 'popular'
+
+        default:
           return 0;
       }
     });
-  };
+  }, [
+    products,
+    productTypes,
+    selectedAttributes,
+    selectedBrands,
+    selectedLocations,
+    selectedCategories,
+    priceRange,
+    minRating,
+    showOnSaleOnly,
+    sortBy,
+  ]);
 
   return {
     sortBy,
     setSortBy,
+
     selectedAttributes,
     toggleAttribute,
+
     selectedBrands,
     setSelectedBrands,
+
     selectedLocations,
     setSelectedLocations,
+
     selectedCategories,
     setSelectedCategories,
+
     priceRange,
     setPriceRange,
+
     minRating,
     setMinRating,
+
     showOnSaleOnly,
     setShowOnSaleOnly,
+
     productTypes,
     toggleProductType,
+
     resetFilters,
-    filterProducts,
+    filteredProducts,
   };
 };

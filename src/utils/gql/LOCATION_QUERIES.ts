@@ -1,4 +1,5 @@
 import { gql } from '@apollo/client';
+import { PRODUCT_CARD_FIELDS_FRAGMENT } from './GQL_QUERIES';
 
 // For location pages - fetch products and filter client-side
 export const GET_LOCATION_PRODUCTS = gql`
@@ -9,85 +10,11 @@ export const GET_LOCATION_PRODUCTS = gql`
         endCursor
       }
       nodes {
-        id
-        databaseId
-        onSale
-        averageRating
-        slug
-        description
-        image {
-          id
-          uri
-          title
-          srcSet
-          sourceUrl
-        }
-        name
-        ... on SimpleProduct {
-          salePrice
-          regularPrice
-          onSale
-          price
-          id
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-          productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          attributes {
-            nodes {
-              name
-              options
-            }
-          }
-        }
-        ... on VariableProduct {
-          salePrice
-          regularPrice
-          onSale
-          price
-          id
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-          productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          attributes {
-            nodes {
-              name
-              options
-            }
-          }
-        }
+        ...ProductCardFields
       }
     }
   }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
 `;
 
 export const GET_LOCATION_DATA_BY_SLUG = gql`
@@ -110,99 +37,47 @@ export const GET_LOCATION_DATA_BY_SLUG = gql`
         endCursor
       }
       nodes {
-        id
-        databaseId
-        onSale
-        averageRating
-        slug
-        description
-        image {
-          id
-          uri
-          title
-          srcSet
-          sourceUrl
-        }
-        name
-        ... on SimpleProduct {
-          salePrice
-          regularPrice
-          onSale
-          price
-          id
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-          productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          attributes {
-            nodes {
-              name
-              options
-            }
-          }
-        }
-        ... on VariableProduct {
-          salePrice
-          regularPrice
-          onSale
-          price
-          id
-          productCategories {
-            nodes {
-              name
-              slug
-            }
-          }
-          productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
-            nodes {
-              name
-              slug
-            }
-          }
-          attributes {
-            nodes {
-              name
-              options
-            }
-          }
-        }
-        ... on ExternalProduct {
-          price
-          id
-          externalUrl
-        }
-        ... on GroupProduct {
-          products {
-            nodes {
-              ... on SimpleProduct {
-                id
-                price
-              }
-            }
-          }
-          id
-        }
+        ...ProductCardFields
       }
     }
   }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
+`;
+
+export const GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE = gql`
+  query LocationDataWithAttribute($slug: ID!, $attrTax: TaxonomyEnum!, $attrTerm: [String]!, $after: String) {
+    productLocation(id: $slug, idType: SLUG) {
+      id
+      name
+    }
+    products(
+      first: 50
+      after: $after
+      where: {
+        taxQuery: {
+          taxArray: [
+            {
+              taxonomy: PRODUCTLOCATION
+              field: SLUG
+              terms: [$slug]
+            }
+            {
+              taxonomy: $attrTax
+              field: NAME
+              terms: $attrTerm
+            }
+          ]
+        }
+      }
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ...ProductCardFields
+      }
+    }
+  }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
 `;

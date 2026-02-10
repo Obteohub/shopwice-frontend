@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import Link from 'next/link';
 import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
 
 interface Category {
     id: string;
@@ -128,7 +129,7 @@ const DesktopSideMenu = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                             <span className="font-bold text-lg">Hello, Sign In</span>
                         </div>
                     )}
-                    <button onClick={onClose} className="absolute right-[-45px] top-4 text-white hover:text-gray-300 p-1">
+                    <button onClick={onClose} aria-label="Close menu" className="absolute right-[-45px] top-4 text-white hover:text-gray-300 p-1">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -139,7 +140,7 @@ const DesktopSideMenu = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
                         <div className="flex justify-center items-center h-40">
-                            <div className="text-lg text-[#0C6DC9]">Loading...</div>
+                            <LoadingSpinner color="blue" />
                         </div>
                     ) : (
                         <div className="py-2">

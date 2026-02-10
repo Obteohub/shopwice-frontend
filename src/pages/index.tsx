@@ -1,22 +1,8 @@
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
 import Hero from '@/components/Index/Hero.component';
 import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
-
-// Dynamic Imports for below-the-fold content
-import WhyChooseUs from '@/components/Index/WhyChooseUs.component';
-import PromoBoxes from '@/components/Index/PromoBoxes.component';
-import InfoBanner from '@/components/Index/InfoBanner.component';
 import SEOContent from '@/components/Index/SEOContent.component';
-import Newsletter from '@/components/Index/Newsletter.component';
-import TopRatedProducts from '@/components/Index/TopRatedProducts.component';
-import AirConditionerProducts from '@/components/Index/AirConditionerProducts.component';
-import MobilePhonesOnSale from '@/components/Index/MobilePhonesOnSale.component';
-import LaptopsProducts from '@/components/Index/LaptopsProducts.component';
-import SpeakersProducts from '@/components/Index/SpeakersProducts.component';
-import TelevisionsProducts from '@/components/Index/TelevisionsProducts.component';
-import BestSellingSlider from '@/components/Index/BestSellingSlider.component';
 import Layout from '@/components/Layout/Layout.component';
 
 // Utilities
@@ -26,9 +12,60 @@ import client from '@/utils/apollo/ApolloClient';
 import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
 
 // GraphQL
-import { FETCH_HOME_PAGE_DATA } from '@/utils/gql/GQL_QUERIES';
+import { FETCH_HOME_PAGE_SSG } from '@/utils/gql/GQL_QUERIES';
 import { useGlobalStore } from '@/stores/globalStore';
 import { useEffect } from 'react';
+
+const SectionSkeleton = ({ title }: { title: string }) => (
+  <div className="px-4 md:px-6 py-6">
+    <div className="h-5 w-48 bg-gray-200 rounded animate-pulse mb-4" aria-hidden="true" />
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="h-40 bg-gray-100 rounded animate-pulse" aria-hidden="true" />
+      ))}
+    </div>
+  </div>
+);
+
+const TopRatedProducts = dynamic(() => import('@/components/Index/TopRatedProducts.component'), {
+  loading: () => <SectionSkeleton title="Top Rated" />,
+});
+const AirConditionerProducts = dynamic(() => import('@/components/Index/AirConditionerProducts.component'), {
+  loading: () => <SectionSkeleton title="Air Conditioners" />,
+});
+const MobilePhonesOnSale = dynamic(() => import('@/components/Index/MobilePhonesOnSale.component'), {
+  loading: () => <SectionSkeleton title="Mobile Phones" />,
+});
+const LaptopsProducts = dynamic(() => import('@/components/Index/LaptopsProducts.component'), {
+  loading: () => <SectionSkeleton title="Laptops" />,
+});
+const SpeakersProducts = dynamic(() => import('@/components/Index/SpeakersProducts.component'), {
+  loading: () => <SectionSkeleton title="Speakers" />,
+});
+const TelevisionsProducts = dynamic(() => import('@/components/Index/TelevisionsProducts.component'), {
+  loading: () => <SectionSkeleton title="Televisions" />,
+});
+const BestSellingSlider = dynamic(() => import('@/components/Index/BestSellingSlider.component'), {
+  loading: () => <SectionSkeleton title="Best Selling" />,
+});
+const WhyChooseUs = dynamic(() => import('@/components/Index/WhyChooseUs.component'), {
+  loading: () => <SectionSkeleton title="Why Choose Us" />,
+});
+const PromoBoxes = dynamic(() => import('@/components/Index/PromoBoxes.component'), {
+  loading: () => <SectionSkeleton title="Promotions" />,
+});
+const InfoBanner = dynamic(() => import('@/components/Index/InfoBanner.component'), {
+  loading: () => <SectionSkeleton title="Info" />,
+});
+const Newsletter = dynamic(() => import('@/components/Index/Newsletter.component'), {
+  loading: () => <SectionSkeleton title="Newsletter" />,
+});
+const RecentRefurbishedReviewsREST = dynamic(
+  () => import('@/components/Product/RecentRefurbishedReviewsREST.component'),
+  {
+    loading: () => <SectionSkeleton title="Reviews" />,
+  }
+);
 
 /**
  * Main index page
@@ -59,8 +96,6 @@ const Index: NextPage = ({
   const speakersProducts = initialSpeakers?.length > 0 ? initialSpeakers : (homeData.speakersProducts || []);
   const televisionsProducts = initialTelevisions?.length > 0 ? initialTelevisions : (homeData.televisionsProducts || []);
   const promoProduct = initialPromo || homeData.promoProduct;
-
-  console.log('[Index] initialTopRated:', initialTopRated?.length, initialTopRated?.[0]);
 
   useEffect(() => {
     if (initialTopRated?.length > 0) {
@@ -93,6 +128,10 @@ const Index: NextPage = ({
 
         <BestSellingSlider products={bestSellingProducts} />
 
+        <div className="container mx-auto px-4 mb-8">
+          <RecentRefurbishedReviewsREST />
+        </div>
+
         <InfoBanner />
 
         <SEOContent />
@@ -108,19 +147,19 @@ export default Index;
 export const getStaticProps: GetStaticProps = async () => {
   try {
     const { data } = await client.query({
-      query: FETCH_HOME_PAGE_DATA,
+      query: FETCH_HOME_PAGE_SSG,
       variables: { promoProductSlug: "microsoft-xbox-x-wireless-controller" }
     });
 
     return {
       props: {
         topRatedProducts: data?.topRatedProducts?.nodes || [],
-        bestSellingProducts: data?.bestSellingProducts?.nodes || [],
-        airConditionerProducts: data?.airConditionerProducts?.nodes || [],
-        mobilePhonesOnSale: data?.mobilePhonesOnSale?.nodes || [],
-        laptopsProducts: data?.laptopsProducts?.nodes || [],
-        speakersProducts: data?.speakersProducts?.nodes || [],
-        televisionsProducts: data?.televisionsProducts?.nodes || [],
+        bestSellingProducts: [],
+        airConditionerProducts: [],
+        mobilePhonesOnSale: [],
+        laptopsProducts: [],
+        speakersProducts: [],
+        televisionsProducts: [],
         promoProduct: data?.promoProduct || null,
       },
       revalidate: 60,

@@ -25,13 +25,6 @@ interface ProductFiltersProps {
   toggleProductType: (id: string) => void;
   products: Product[];
   resetFilters: () => void;
-  options?: {
-    brands?: string[];
-    locations?: string[];
-    categories?: string[];
-    attributes?: Array<{ name: string; options: string[] }>;
-    price_range?: { min: number; max: number };
-  };
 }
 
 const ProductFilters = ({
@@ -53,10 +46,19 @@ const ProductFilters = ({
   toggleProductType,
   products,
   resetFilters,
-  options,
 }: ProductFiltersProps) => {
   // Get all unique attributes and their options
   const derivedAttributesMap = new Map<string, Set<string>>();
+
+  const normalizeOption = (option: unknown) => {
+    if (option === null || option === undefined) return null;
+    if (typeof option === 'string' || typeof option === 'number') return String(option);
+    if (typeof option === 'object') {
+      const maybe = option as { name?: string; label?: string; value?: string };
+      return maybe.name || maybe.label || maybe.value || null;
+    }
+    return null;
+  };
 
   products.forEach((product) => {
     product.attributes?.nodes?.forEach((attr) => {
@@ -65,45 +67,46 @@ const ProductFilters = ({
         derivedAttributesMap.set(attr.name, new Set());
       }
       attr.options?.forEach((option) => {
-        if (option) derivedAttributesMap.get(attr.name)!.add(option);
+        const normalized = normalizeOption(option);
+        if (normalized) derivedAttributesMap.get(attr.name)!.add(normalized);
       });
     });
   });
 
-  const attributes = (options?.attributes || Array.from(derivedAttributesMap.entries()).map(([name, optionsSet]) => ({
+  const attributes = Array.from(derivedAttributesMap.entries()).map(([name, optionsSet]) => ({
     name,
-    options: Array.from(optionsSet).sort((a, b) => (a || '').localeCompare(b || '')),
-  }))).filter(attr => attr?.name && Array.isArray(attr?.options) && attr.options.length > 0);
+    options: Array.from(optionsSet).sort((a, b) => String(a ?? '').localeCompare(String(b ?? ''))),
+  })).filter(attr => attr?.name && Array.isArray(attr?.options) && attr.options.length > 0);
 
   // Get unique brands
-  const brands = options?.brands || Array.from(
+  const brands = Array.from(
     new Set(
       products.flatMap(
         (product: Product) =>
           product.productBrand?.nodes?.map((node) => node.name) || [],
       ),
     ),
-  ).sort((a, b) => (a || '').localeCompare(b || ''));
+  ).sort((a, b) => String(a ?? '').localeCompare(String(b ?? '')));
 
   // Get unique locations
-  const locations = options?.locations || Array.from(
+  const locations = Array.from(
     new Set(
       products.flatMap(
         (product: Product) =>
           product.productLocation?.nodes?.map((node) => node.name) || [],
       ),
     ),
-  ).sort((a, b) => (a || '').localeCompare(b || ''));
+  ).sort((a, b) => String(a ?? '').localeCompare(String(b ?? '')));
 
   // Get unique categories
-  const categories = options?.categories || Array.from(
+  const categories = Array.from(
     new Set(
       products.flatMap(
         (product: Product) =>
           product.productCategories?.nodes?.map((cat) => cat.name) || [],
       ),
     ),
-  ).sort((a, b) => (a || '').localeCompare(b || ''));
+  ).sort((a, b) => String(a ?? '').localeCompare(String(b ?? '')));
 
   const toggleBrand = (brand: string) => {
     setSelectedBrands((prev) =>
@@ -198,9 +201,9 @@ const ProductFilters = ({
             <div key={attribute.name} className="mb-0">
               <Accordion title={capitalizedName}>
                 <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                  {attribute.options.map((option) => (
+                  {attribute.options.map((option, index) => (
                     <Checkbox
-                      key={option}
+                      key={`${attribute.name}-${option}-${index}`}
                       id={`${attribute.name}-${option}`}
                       label={option}
                       checked={selectedAttributes[attribute.name]?.includes(option) || false}
@@ -217,9 +220,9 @@ const ProductFilters = ({
           <div className="mb-0">
             <Accordion title="Brand">
               <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                {brands.map((brand) => (
+                {brands.map((brand, index) => (
                   <Checkbox
-                    key={brand}
+                    key={`${brand}-${index}`}
                     id={`brand-${brand}`}
                     label={brand}
                     checked={selectedBrands.includes(brand)}
@@ -235,9 +238,9 @@ const ProductFilters = ({
           <div className="mb-0">
             <Accordion title="Location">
               <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                {locations.map((location) => (
+                {locations.map((location, index) => (
                   <Checkbox
-                    key={location}
+                    key={`${location}-${index}`}
                     id={`location-${location}`}
                     label={location}
                     checked={selectedLocations.includes(location)}
@@ -253,9 +256,9 @@ const ProductFilters = ({
           <div className="mb-0">
             <Accordion title="Category" defaultOpen={true}>
               <div className="space-y-0.5 max-h-48 overflow-y-auto custom-scrollbar">
-                {categories.map((category) => (
+                {categories.map((category, index) => (
                   <Checkbox
-                    key={category}
+                    key={`${category}-${index}`}
                     id={`category-${category}`}
                     label={category}
                     checked={selectedCategories.includes(category)}

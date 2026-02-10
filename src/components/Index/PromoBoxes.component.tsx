@@ -1,6 +1,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
 
 interface PromoBoxesProps {
     promoProduct?: any;
@@ -67,7 +68,9 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
                                 </div>
                             </>
                         ) : (
-                            <div className="flex items-center justify-center h-full text-gray-400">Loading...</div>
+                            <div className="flex items-center justify-center h-full">
+                                <LoadingSpinner color="orange" />
+                            </div>
                         )}
                     </div>
 

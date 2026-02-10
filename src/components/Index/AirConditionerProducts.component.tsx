@@ -8,12 +8,10 @@ interface AirConditionerProductsProps {
 }
 
 const AirConditionerProducts = ({ products }: AirConditionerProductsProps) => {
-    const [mounted, setMounted] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [slidesPerView, setSlidesPerView] = useState(1);
 
     useEffect(() => {
-        setMounted(true);
         const handleResize = () => {
             if (window.innerWidth >= 1024) {
                 setSlidesPerView(8);
@@ -54,7 +52,7 @@ const AirConditionerProducts = ({ products }: AirConditionerProductsProps) => {
                 {/* Mobile View: Horizontal Scroll */}
                 <div className="md:hidden flex overflow-x-auto snap-x snap-mandatory gap-1 pb-4 no-scrollbar">
                     {products.map((product, index) => (
-                        <div key={`mob-ac-${product.databaseId || index}`} className="snap-start shrink-0" style={{ width: '40vw' }}>
+                        <div key={`mob-ac-${product.databaseId || index}`} className="snap-start shrink-0 w-[40vw]">
                             <ProductCard
                                 databaseId={product.databaseId}
                                 name={product.name}
@@ -77,19 +75,15 @@ const AirConditionerProducts = ({ products }: AirConditionerProductsProps) => {
                 {/* Desktop View: Carousel */}
                 <div className="hidden md:block overflow-hidden relative min-h-[400px]">
                     <div
-                        className="flex transition-transform duration-500 ease-out"
+                        className="flex w-full transition-transform duration-500 ease-out [transform:var(--slide-transform)]"
                         style={{
-                            transform: mounted ? `translateX(-${currentIndex * (100 / slidesPerView)}%)` : 'translateX(0%)',
-                            width: mounted ? `${(products.length / slidesPerView) * 100}%` : '100%'
-                        }}
+                            '--slide-transform': `translateX(-${currentIndex * (100 / slidesPerView)}%)`,
+                        } as React.CSSProperties}
                     >
                         {products.map((product, index) => (
                             <div
                                 key={`desk-ac-${product.databaseId || index}`}
-                                className="px-2"
-                                style={{
-                                    width: mounted ? `${100 / products.length}%` : '100%',
-                                }}
+                                className="px-2 shrink-0 md:w-1/5 lg:w-[12.5%]"
                             >
                                 <ProductCard
                                     databaseId={product.databaseId}

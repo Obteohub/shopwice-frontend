@@ -85,8 +85,7 @@ export interface IProductRootObject {
   variation?: IVariation;
   quantity: number;
   total: string;
-  subtotal: string;
-  subtotalTax: string;
+  subtotal?: string;
 }
 
 type TUpdatedItems = { key: string; quantity: number }[];
@@ -112,7 +111,20 @@ export interface IUpdateCartRootObject {
 /* Interface for props */
 
 interface IFormattedCartProps {
-  cart: { contents: { nodes: IProductRootObject[] }; total: number };
+  cart: {
+    contents?: { nodes: IProductRootObject[] };
+    items?: Array<{
+      id: string;
+      name: string;
+      quantity: number;
+      line_total: string | number;
+      price: string | number;
+      variation?: any;
+      key?: string;
+    }>;
+    total: number | string;
+    itemCount?: number;
+  };
 }
 
 export interface ICheckoutDataProps {
@@ -136,9 +148,13 @@ export interface ICheckoutDataProps {
  * @param {string} symbol Currency symbol to add empty character/padding after
  */
 
-export const paddedPrice = (price: string, symbol: string) => {
-  if (!price) return '';
-  return price.split(symbol).join(`${symbol} `);
+export const paddedPrice = (price?: string | number | null, symbol?: string) => {
+  if (price === null || price === undefined || !symbol) return '';
+  const priceStr = String(price);
+  if (priceStr.includes(symbol)) {
+    return priceStr.split(symbol).join(`${symbol} `);
+  }
+  return `${symbol} ${priceStr}`;
 };
 
 /**
@@ -159,12 +175,13 @@ export const trimmedStringToLength = (input: string, length: number) => {
  * @param {String} side Which side of the string to return (which side of the "-" symbol)
  * @param {String} price The inputted price that we need to convert
  */
-export const filteredVariantPrice = (price: string, side: string) => {
+export const filteredVariantPrice = (price: string | number, side: string) => {
   if (!price) {
     return '';
   }
 
-  const dashIndex = price.indexOf('-');
+  const priceStr = String(price);
+  const dashIndex = priceStr.indexOf('-');
 
   if (dashIndex === -1) {
     // If no dash, it's a single price.
@@ -185,14 +202,14 @@ export const filteredVariantPrice = (price: string, side: string) => {
       // If we return 'GH₵100', it shows 'GH₵100'.
       // This seems correct for a single price variable product.
     }
-    return price;
+    return priceStr;
   }
 
   if ('right' === side) {
-    return price.substring(dashIndex + 1).trim();
+    return priceStr.substring(dashIndex + 1).trim();
   }
 
-  return price.substring(0, dashIndex).trim();
+  return priceStr.substring(0, dashIndex).trim();
 };
 
 /**
@@ -207,55 +224,69 @@ export const getFormattedCart = (data: IFormattedCartProps) => {
     totalProductsPrice: 0,
   };
 
-  if (!data || !data.cart || !data.cart.contents) {
+  if (!data || !data.cart) {
     return formattedCart;
   }
-  const givenProducts = data.cart.contents.nodes;
 
-  // Create an empty object.
-  formattedCart.products = [];
+  const givenProducts = data.cart.contents?.nodes;
+  const simpleProducts = data.cart.items;
 
-  let totalProductsCount = 0;
+  // 1. Handle Standard Schema (contents.nodes)
+  if (givenProducts && givenProducts.length > 0) {
+    givenProducts.forEach((item) => {
+      console.log(`[getFormattedCart] Processing item key: ${item.key}`);
+      const givenProduct = item.product?.node;
+      if (!givenProduct) {
+        console.warn(`[getFormattedCart] Item ${item.key} skipped: No product node.`, item);
+        return;
+      }
 
-  if (!givenProducts.length) {
-    return;
+      // Convert price to a float value
+      const totalStr = String(item.total);
+      const convertedCurrency = totalStr.replace(/[^0-9.-]+/g, '');
+
+      const product: Product = {
+        productId: givenProduct.databaseId,
+        cartKey: item.key || uuidv4(),
+        name: givenProduct.name,
+        qty: item.quantity,
+        price: Number(convertedCurrency) / item.quantity,
+        totalPrice: item.total,
+        image: {
+          sourceUrl: givenProduct.image?.sourceUrl || process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+          srcSet: givenProduct.image?.srcSet || process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+          title: givenProduct.image?.title || givenProduct.name,
+        }
+      };
+
+      formattedCart.products.push(product);
+    });
+    formattedCart.totalProductsCount = data.cart.itemCount || data.cart.contents?.nodes?.reduce((acc, item) => acc + item.quantity, 0) || 0;
+  } 
+  // 2. Handle Simplified Schema (items) - Fallback
+  else if (simpleProducts && simpleProducts.length > 0) {
+     simpleProducts.forEach((item) => {
+       const product: Product = {
+         productId: parseInt(item.id, 10) || 0,
+         cartKey: item.key || item.id || uuidv4(),
+         name: item.name,
+         qty: item.quantity,
+         price: typeof item.price === 'string' ? parseFloat(item.price.replace(/[^0-9.-]+/g, '')) / 100 : Number(item.price) / 100, // Assuming cents if number, or string format
+         totalPrice: String(item.line_total),
+         image: {
+           sourceUrl: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+           srcSet: process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
+           title: item.name,
+         }
+       };
+       formattedCart.products.push(product);
+     });
+     formattedCart.totalProductsCount = data.cart.itemCount || simpleProducts.reduce((acc, item) => acc + item.quantity, 0);
   }
 
-  givenProducts.forEach((item) => {
-    console.log(`[getFormattedCart] Processing item key: ${item.key}`);
-    const givenProduct = item.product?.node;
-    if (!givenProduct) {
-      console.warn(`[getFormattedCart] Item ${item.key} skipped: No product node.`, item);
-      return;
-    }
-
-    // Convert price to a float value
-    const convertedCurrency = item.total.replace(
-      /[^0-9.-]+/g,
-      '',
-    );
-
-    const product: Product = {
-      productId: givenProduct.databaseId,
-      cartKey: item.key,
-      name: givenProduct.name,
-      qty: item.quantity,
-      price: Number(convertedCurrency) / item.quantity,
-      totalPrice: item.total,
-      image: {
-        sourceUrl: givenProduct.image?.sourceUrl || process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
-        srcSet: givenProduct.image?.srcSet || process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL,
-        title: givenProduct.image?.title || givenProduct.name,
-      }
-    };
-
-    totalProductsCount += item.quantity;
-
-    // Push each item into the products array.
-    formattedCart.products.push(product);
-  });
-  formattedCart.totalProductsCount = totalProductsCount;
-  formattedCart.totalProductsPrice = data.cart.total;
+  // Final Totals
+  const totalVal = String(data.cart.total).replace(/[^0-9.-]+/g, '');
+  formattedCart.totalProductsPrice = Number(totalVal);
 
   return formattedCart;
 };

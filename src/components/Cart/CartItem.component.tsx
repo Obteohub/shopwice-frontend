@@ -22,7 +22,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onUpdateQuantity, onRemove, l
     }
 
     return (
-        <div className="flex flex-row items-center p-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors gap-4">
+        <div className={`flex flex-row items-center p-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-all gap-4 ${loading ? 'opacity-40 pointer-events-none grayscale-[0.5]' : ''}`}>
             {/* Image */}
             <div className="relative w-24 h-24 flex-shrink-0 bg-white border border-gray-200 rounded-md overflow-hidden">
                 <Image

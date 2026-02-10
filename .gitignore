@@ -11,6 +11,7 @@
 # next.js
 /.next/
 /out/
+/.open-next/
 
 # sitemap and robots
 public/sitemap*.xml
@@ -28,6 +29,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+debug-*.js
+debug-*.mjs
+test-*.js
+scripts/
+*.md
 
 # local env files
 .env

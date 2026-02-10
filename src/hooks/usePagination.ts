@@ -64,8 +64,8 @@ export const usePagination = ({
                 first: 24,
                 ...queryVariables,
                 after: afterCursor,
-                ...(slug && !queryVariables.slug ? { slug } : {}),
-                ...(slug && !queryVariables.id ? { id: slug } : {}),
+                ...(slug && !('slug' in queryVariables) ? { slug } : {}),
+                ...(slug && !('id' in queryVariables) && !('categoryId' in queryVariables) ? { id: slug } : {}),
             };
 
             let data;
@@ -107,9 +107,6 @@ export const usePagination = ({
             } else if (data?.productLocation?.products) {
                 newProducts = data.productLocation.products.nodes;
                 newPageInfo = data.productLocation.products.pageInfo;
-            } else if (data?.productCategory?.products) {
-                newProducts = data.productCategory.products.nodes;
-                newPageInfo = data.productCategory.products.pageInfo;
             } else if (data?.products) {
                 newProducts = data.products.nodes;
                 newPageInfo = data.products.pageInfo;

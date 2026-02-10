@@ -1,63 +1,138 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import { useGlobalStore } from '@/stores/globalStore';
-import { FETCH_ALL_CATEGORIES_QUERY, FETCH_HOME_PAGE_DATA } from '@/utils/gql/GQL_QUERIES';
+import {
+    FETCH_ALL_CATEGORIES_QUERY,
+    FETCH_HOME_PAGE_DATA,
+} from '@/utils/gql/GQL_QUERIES';
+// import StoreApiCartInitializer from '@/components/Cart/StoreApiCartInitializer.component';
 
 /**
- * GlobalInitializer component to prefetch and cache common data on the client.
- * This ensures data is available for instant navigation without SSR overhead
- * or hydration mismatches.
+ * GlobalInitializer
+ * =================
+ * Client-only bootstrapper for Shopwice.
+ * - Warms Apollo cache
+ * - Syncs shared data into Zustand
+ * - Prevents hydration mismatches
+ * - Avoids redundant store updates
  */
 const GlobalInitializer = () => {
     const [isMounted, setIsMounted] = useState(false);
+
+    // Prevent duplicate store writes
+    const categoriesHydrated = useRef(false);
+    const homeDataHydrated = useRef(false);
+
     const setCategories = useGlobalStore((state) => state.setCategories);
     const setHomeData = useGlobalStore((state) => state.setHomeData);
 
+    /**
+     * Ensure this only runs on the client
+     */
     useEffect(() => {
         setIsMounted(true);
     }, []);
 
-    // Fetch Categories for navigation
-    const { data: categoryData } = useQuery(FETCH_ALL_CATEGORIES_QUERY, {
+    /**
+     * Fetch navigation categories
+     */
+    const {
+        data: categoryData,
+        error: categoryError,
+    } = useQuery(FETCH_ALL_CATEGORIES_QUERY, {
         fetchPolicy: 'cache-first',
         skip: !isMounted,
     });
 
-    // Prefetch Home Page data to warm the cache
-    const { data: homeData } = useQuery(FETCH_HOME_PAGE_DATA, {
-        variables: { promoProductSlug: "microsoft-xbox-x-wireless-controller" },
+    /**
+     * Fetch homepage sections (cache warming)
+     */
+    const {
+        data: homeData,
+        error: homeError,
+    } = useQuery(FETCH_HOME_PAGE_DATA, {
+        variables: {
+            promoProductSlug: 'microsoft-xbox-x-wireless-controller',
+        },
         fetchPolicy: 'cache-and-network',
         skip: !isMounted,
     });
 
+    /**
+     * Sync categories → Zustand (once)
+     */
     useEffect(() => {
-        if (categoryData?.productCategories?.nodes) {
-            setCategories(categoryData.productCategories.nodes);
+        if (
+            categoriesHydrated.current ||
+            !categoryData?.productCategories?.nodes?.length
+        ) {
+            return;
         }
+
+        setCategories(categoryData.productCategories.nodes);
+        categoriesHydrated.current = true;
     }, [categoryData, setCategories]);
 
+    /**
+     * Sync homepage data → Zustand (once)
+     */
     useEffect(() => {
-        if (homeData) {
-            console.log('[GlobalInitializer] Fetched homeData:', homeData);
-            const topRated = homeData.topRatedProducts?.nodes || [];
-            if (topRated.length > 0 && !topRated[0].slug) {
-                console.warn('[GlobalInitializer] Fetched data missing slugs!', topRated[0]);
-            }
+        if (homeDataHydrated.current || !homeData) return;
 
-            setHomeData({
-                topRatedProducts: topRated,
-                bestSellingProducts: homeData.bestSellingProducts?.nodes || [],
-                airConditionerProducts: homeData.airConditionerProducts?.nodes || [],
-                mobilePhonesOnSale: homeData.mobilePhonesOnSale?.nodes || [],
-                laptopsProducts: homeData.laptopsProducts?.nodes || [],
-                speakersProducts: homeData.speakersProducts?.nodes || [],
-                televisionsProducts: homeData.televisionsProducts?.nodes || [],
-                promoProduct: homeData.promoProduct || null,
-            });
+        const topRated = homeData.topRatedProducts?.nodes || [];
+
+        if (topRated.length > 0 && !topRated[0]?.slug) {
+            console.warn(
+                '[GlobalInitializer] Top rated product missing slug',
+                topRated[0]
+            );
         }
+
+        setHomeData({
+            topRatedProducts: topRated,
+            bestSellingProducts:
+                homeData.bestSellingProducts?.nodes || [],
+            airConditionerProducts:
+                homeData.airConditionerProducts?.nodes || [],
+            mobilePhonesOnSale:
+                homeData.mobilePhonesOnSale?.nodes || [],
+            laptopsProducts:
+                homeData.laptopsProducts?.nodes || [],
+            speakersProducts:
+                homeData.speakersProducts?.nodes || [],
+            televisionsProducts:
+                homeData.televisionsProducts?.nodes || [],
+            promoProduct: homeData.promoProduct || null,
+        });
+
+        homeDataHydrated.current = true;
     }, [homeData, setHomeData]);
 
-    return null;
+    /**
+     * Optional: Log network errors (no UI crash)
+     */
+    useEffect(() => {
+        if (categoryError) {
+            console.error(
+                '[GlobalInitializer] Category fetch error:',
+                categoryError
+            );
+        }
+
+        if (homeError) {
+            console.error(
+                '[GlobalInitializer] Home data fetch error:',
+                homeError
+            );
+        }
+    }, [categoryError, homeError]);
+
+    return (
+        <>
+            {/* Cart bootstrap (disabled until Store API stabilizes) */}
+            {/* <StoreApiCartInitializer /> */}
+        </>
+    );
 };
 
 export default GlobalInitializer;

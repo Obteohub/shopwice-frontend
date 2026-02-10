@@ -25,11 +25,7 @@ const QuantityControl: React.FC<QuantityControlProps> = ({
                 &minus;
             </button>
             <div className="w-12 text-center text-sm font-medium text-gray-900">
-                {loading ? (
-                    <span className="text-gray-400">...</span>
-                ) : (
-                    quantity
-                )}
+                {quantity}
             </div>
             <button
                 onClick={onIncrease}

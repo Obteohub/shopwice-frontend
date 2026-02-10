@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Cart from './Cart.component';
 import NativeSearchBox from '../Search/NativeSearchBox.component';
 import MobileNativeSearch from '../Search/MobileNativeSearch.component';
@@ -14,6 +14,26 @@ import LocationPicker from './LocationPicker.component';
  */
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [wooSession, setWooSession] = useState<string | null>(null);
+  const [storeNonce, setStoreNonce] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const readValues = () => {
+      try {
+        const sessionData = JSON.parse(localStorage.getItem('woo-session') || 'null');
+        setWooSession(sessionData?.token || null);
+      } catch {
+        setWooSession(null);
+      }
+      setStoreNonce(localStorage.getItem('wc_store_api_nonce'));
+    };
+
+    readValues();
+    const interval = window.setInterval(readValues, 3000);
+    return () => window.clearInterval(interval);
+  }, []);
   return (
     <header className="w-full">
       <nav id="header" className="z-50 w-full bg-white">
@@ -54,6 +74,15 @@ const Navbar = () => {
             </Link>
 
             <div className="flex items-center space-x-4">
+              {(wooSession || storeNonce) && (
+                <div
+                  className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-full border border-gray-200 bg-gray-50 text-[10px] text-gray-600"
+                  title="Session debug"
+                >
+                  {wooSession && <span>WS: {wooSession.slice(0, 6)}…</span>}
+                  {storeNonce && <span>NS: {storeNonce.slice(0, 6)}…</span>}
+                </div>
+              )}
               <Link href="/my-account" aria-label="Account">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#2c3338]">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
@@ -96,7 +125,7 @@ const Navbar = () => {
             </div>
 
             {/* Icons */}
-            <div className="flex items-center space-x-10">
+            <div className="flex items-center space-x-6">
               {/* Account */}
               <Link href="/my-account" className="flex items-center gap-2.5 group transition-colors">
                 <div className="transition-colors">
@@ -122,6 +151,16 @@ const Navbar = () => {
                   </div>
                 </div>
               </div>
+
+              {(wooSession || storeNonce) && (
+                <div
+                  className="hidden xl:flex items-center gap-2 px-2 py-1 rounded-full border border-gray-200 bg-gray-50 text-[10px] text-gray-600"
+                  title="Session debug"
+                >
+                  {wooSession && <span>WS: {wooSession.slice(0, 8)}…</span>}
+                  {storeNonce && <span>NS: {storeNonce.slice(0, 8)}…</span>}
+                </div>
+              )}
             </div>
           </div>
         </div>

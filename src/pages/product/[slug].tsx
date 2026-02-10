@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 // Components
 import SingleProduct from '@/components/Product/SingleProductFinal.component';
 import Layout from '@/components/Layout/Layout.component';
+import { gql } from '@apollo/client';
 
 // Utilities
 import client from '@/utils/apollo/ApolloClient';
@@ -17,7 +18,8 @@ import type {
 } from 'next';
 
 // GraphQL
-import { GET_SINGLE_PRODUCT, FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
+import { GET_SINGLE_PRODUCT, PRODUCT_CARD_FIELDS_FRAGMENT } from '@/utils/gql/GQL_QUERIES';
+import { VARIATION_FIELDS } from '@/utils/gql/FRAGMENTS';
 import { NextSeo, ProductJsonLd } from 'next-seo';
 
 /**
@@ -30,7 +32,6 @@ const product: NextPage = ({
   product,
   loading,
   networkStatus,
-  isMobilePhone,
   isRefurbished
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const router = useRouter();
@@ -51,8 +52,8 @@ const product: NextPage = ({
 
   // Price & Currency (Assuming simple product for base price, or low price for variable)
   // Converting 'GH₵100' -> 100
-  const rawPrice = product?.price || product?.salePrice || product?.regularPrice || '0';
-  const priceAmount = parseFloat(rawPrice.replace(/[^0-9.]/g, '')) || 0;
+  const priceStr = String(product?.price || product?.salePrice || product?.regularPrice || '0');
+  const priceAmount = parseFloat(priceStr.replace(/[^0-9.]/g, '')) || 0;
   const currency = 'GHS'; // Ghana Cedis
 
   // Stock
@@ -114,7 +115,6 @@ const product: NextPage = ({
           <SingleProduct
             product={product}
             loading={loading}
-            isMobilePhone={isMobilePhone}
             isRefurbished={isRefurbished}
           />
         ) : (
@@ -136,48 +136,72 @@ export default withRouter(product);
 export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
   try {
     // Cache control for Server Side Rendering (s-maxage=60, stale-while-revalidate=59)
+
     res.setHeader(
       'Cache-Control',
       'public, s-maxage=60, stale-while-revalidate=59'
     );
 
-    console.log('Fetching product for slug:', params?.slug);
-    const { data, loading, networkStatus } = await client.query({
-      query: GET_SINGLE_PRODUCT,
-      variables: { slug: params?.slug },
-      fetchPolicy: 'no-cache'
-    });
+    const slug = params?.slug as string;
+    console.log('Fetching product for slug:', slug);
 
-    const product = data.product;
+    let product = null;
+    let loading = true;
+    let networkStatus;
+
+    // 1. Try Direct Lookup
+    try {
+      const result = await client.query({
+        query: GET_SINGLE_PRODUCT,
+        variables: { slug },
+        fetchPolicy: 'no-cache'
+      });
+      product = result.data.product;
+      loading = result.loading;
+      networkStatus = result.networkStatus;
+    } catch (e) {
+      console.error(`[SSR] Direct lookup failed for ${slug}`, e);
+    }
+
+    // 2. Fallback: Search by Slug if direct lookup returned null
+    // REMOVED: Fallback search was causing timeouts and returning incorrect results.
+    // If direct lookup fails, the product likely does not exist or the slug is incorrect.
+    
+    console.log(`[SSR] Final product result for ${slug}:`, product ? 'Found' : 'Not Found');
 
     if (!product) {
+      console.log(`[SSR] 404 Triggered for product: ${params?.slug}. Product is null.`);
       return { notFound: true };
     }
 
     // Server-side calculation for stability
-    const isMobilePhone = product.productCategories?.nodes?.some(
-      (cat: any) =>
-        (cat.name && cat.name.toLowerCase() === 'mobile phones') ||
-        (cat.slug && cat.slug === 'mobile-phones')
-    ) || false;
-
-    // Permissive check for refurbished status
-    const isRefurbished = product.attributes?.nodes?.some((attr: any) =>
-      attr.options?.some((opt: any) =>
-        String(opt).toLowerCase().includes('refurbish')
-      )
-    ) || false;
+    // Enhanced Refurbished Check: Attributes OR Category
+    const isRefurbished =
+      product.attributes?.nodes?.some((attr: any) =>
+        attr.options?.some((opt: any) =>
+          String(opt).toLowerCase().includes('refurbish')
+        )
+      ) ||
+      product.productCategories?.nodes?.some((cat: any) =>
+        (cat.name && cat.name.toLowerCase().includes('refurbish')) ||
+        (cat.slug && cat.slug.toLowerCase().includes('refurbish'))
+      ) ||
+      false;
 
     console.log(`[SSR] Product: ${product.name}`);
-    console.log(`[SSR] Attributes:`, JSON.stringify(product.attributes?.nodes || [], null, 2));
-    console.log(`[SSR] isMobilePhone: ${isMobilePhone}, isRefurbished: ${isRefurbished}`);
+    console.log(`[SSR] Type: ${product.__typename}`);
+    if (product.variations) {
+        console.log(`[SSR] Variations found: ${product.variations.nodes?.length || 0}`);
+    } else {
+        console.log(`[SSR] No variations field on product object`);
+    }
+    console.log(`[SSR] isRefurbished: ${isRefurbished}`);
 
     return {
       props: {
         product,
         loading,
         networkStatus,
-        isMobilePhone,
         isRefurbished
       },
     };

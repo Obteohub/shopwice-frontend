@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Product } from '@/types/product';
 import { useProductFilters } from '@/hooks/useProductFilters';
 import { usePagination } from '@/hooks/usePagination';
 import ProductCard from './ProductCard.component';
 import ProductFilters from './ProductFilters.component';
-import { useCollectionData } from '@/hooks/useCollectionData';
+import client from '@/utils/apollo/ApolloClient';
+import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
 
 interface ProductListProps {
   products: Product[];
@@ -18,6 +19,7 @@ interface ProductListProps {
   queryVariables?: Record<string, any>;
   context?: any;
   totalCount?: number;
+  fetchAllForSort?: boolean;
 }
 
 const ProductList = ({
@@ -27,24 +29,21 @@ const ProductList = ({
   slug,
   query,
   queryVariables,
-  context = { useDirectFetch: true, fetchOptions: { credentials: 'omit' } },
-  totalCount
+  context = { useDirectFetch: false, fetchOptions: { credentials: 'omit' } },
+  totalCount,
+  fetchAllForSort = false
 }: ProductListProps) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
-  const { data: collectionData } = useCollectionData();
 
-  // Pagination hook
-  const {
-    products: allProducts,
-    hasNextPage,
-    hasPreviousPage,
-    isLoading,
-    error,
-    loadNext,
-    loadPrevious,
-    currentPage
-  } = usePagination({
+  const pageSize = 24;
+  const [allProducts, setAllProducts] = useState<Product[]>(initialProducts);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  const pagination = usePagination({
     initialProducts,
     initialHasNextPage: pageInfo?.hasNextPage || false,
     initialEndCursor: pageInfo?.endCursor || null,
@@ -53,6 +52,107 @@ const ProductList = ({
     queryVariables,
     context
   });
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!fetchAllForSort) {
+      setAllProducts(pagination.products);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchAllProducts = async () => {
+      if (!query) {
+        setAllProducts(initialProducts);
+        return;
+      }
+
+      // Optimization: If SSR already fetched everything (hasNextPage is false), skip re-fetch.
+      if (pageInfo && !pageInfo.hasNextPage && initialProducts.length > 0) {
+        setAllProducts(initialProducts);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // Optimization: Start from where SSR left off
+        let after: string | null = pageInfo?.endCursor || null;
+        let hasNext = pageInfo?.hasNextPage ?? true;
+        const collected: Product[] = [...initialProducts];
+
+        // If we don't have pageInfo, start from scratch (safety fallback)
+        if (!pageInfo) {
+            collected.length = 0;
+            after = null;
+            hasNext = true;
+        }
+
+        // Only show loading state if we don't have initial products to show
+        if (initialProducts.length === 0) {
+            setIsLoading(true);
+        }
+
+        while (hasNext) {
+          const variables = {
+            ...queryVariables,
+            first: pageSize,
+            after,
+            ...(slug && !(queryVariables || {}).slug ? { slug } : {}),
+          };
+
+          const result = await client.query({
+            query,
+            variables,
+            fetchPolicy: 'network-only',
+          });
+
+          const data = result.data;
+
+          let nodes: Product[] = [];
+          let pageInfoLocal = { hasNextPage: false, endCursor: null as string | null };
+
+          if (data?.productBrand?.products) {
+            nodes = data.productBrand.products.nodes || [];
+            pageInfoLocal = data.productBrand.products.pageInfo;
+          } else if (data?.productLocation?.products) {
+            nodes = data.productLocation.products.nodes || [];
+            pageInfoLocal = data.productLocation.products.pageInfo;
+          } else if (data?.products) {
+            nodes = data.products.nodes || [];
+            pageInfoLocal = data.products.pageInfo;
+          }
+
+          collected.push(...nodes);
+          hasNext = pageInfoLocal.hasNextPage;
+          after = pageInfoLocal.endCursor;
+          if (!after) hasNext = false;
+        }
+
+        if (!cancelled) {
+          setAllProducts(collected.length > 0 ? collected : initialProducts);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e);
+          setAllProducts(initialProducts);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    fetchAllProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchAllForSort, query, queryVariables, slug, initialProducts, pagination.products, pageSize, pageInfo]);
 
   const {
     sortBy,
@@ -74,10 +174,38 @@ const ProductList = ({
     productTypes,
     toggleProductType,
     resetFilters,
-    filterProducts
+    filteredProducts
   } = useProductFilters(allProducts);
 
-  const filteredProducts = filterProducts(allProducts);
+  const pagedProducts = fetchAllForSort
+    ? filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : filteredProducts;
+
+  const ssrHasNext = pageInfo?.hasNextPage || false;
+  const hasNextPage = fetchAllForSort
+    ? (isHydrated ? currentPage * pageSize < filteredProducts.length : ssrHasNext)
+    : pagination.hasNextPage;
+  const hasPreviousPage = fetchAllForSort
+    ? (isHydrated ? currentPage > 1 : false)
+    : pagination.hasPreviousPage;
+
+  const displayPage = fetchAllForSort ? (isHydrated ? currentPage : 1) : pagination.currentPage;
+
+  const loadNext = () => {
+    if (fetchAllForSort) {
+      if (hasNextPage) setCurrentPage((p) => p + 1);
+    } else {
+      pagination.loadNext();
+    }
+  };
+
+  const loadPrevious = () => {
+    if (fetchAllForSort) {
+      if (hasPreviousPage) setCurrentPage((p) => p - 1);
+    } else {
+      pagination.loadPrevious();
+    }
+  };
 
   return (
     <div className="w-full px-1 md:px-4 lg:grid lg:grid-cols-[240px_1fr] lg:gap-4 py-1" id="results-header">
@@ -104,7 +232,6 @@ const ProductList = ({
             toggleProductType={toggleProductType}
             products={allProducts}
             resetFilters={resetFilters}
-            options={collectionData || undefined}
           />
         </div>
       </aside>
@@ -114,13 +241,14 @@ const ProductList = ({
         <div className="flex items-center justify-between mb-2 gap-2">
           {/* Results Count - Compact on mobile */}
           <div className="flex items-center flex-shrink-1 min-w-0 overflow-hidden">
-            <p className="text-xs md:text-sm text-gray-500 font-normal truncate">
+            <p className="text-xs md:text-sm text-gray-500 font-normal truncate" suppressHydrationWarning>
               <span className="md:inline hidden">Found </span>
-              <span className="font-semibold text-gray-900">{totalCount || filteredProducts.length}</span>
+              <span className="font-semibold text-gray-900">
+                {typeof totalCount === 'number' ? totalCount : filteredProducts.length}
+              </span>
               <span className="md:inline hidden"> products</span>
               <span className="md:hidden inline"> items found</span>
             </p>
-
           </div>
 
           {/* Sorting & Filter Button */}
@@ -129,6 +257,7 @@ const ProductList = ({
             <div className="hidden lg:block relative">
               <select
                 id="sort-select-desktop"
+                aria-label="Sort products"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="border rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
@@ -206,7 +335,11 @@ const ProductList = ({
               {/* Header */}
               <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
                 <h2 className="text-lg font-semibold">Filters</h2>
-                <button onClick={() => setIsFilterOpen(false)} className="p-1">
+                <button 
+                  onClick={() => setIsFilterOpen(false)} 
+                  className="p-1"
+                  aria-label="Close filters"
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -234,7 +367,6 @@ const ProductList = ({
                   toggleProductType={toggleProductType}
                   products={allProducts}
                   resetFilters={resetFilters}
-                  options={collectionData || undefined}
                 />
               </div>
             </div>
@@ -243,9 +375,9 @@ const ProductList = ({
 
         {/* Product Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-x-1 gap-y-2 md:gap-x-3 md:gap-y-6">
-          {filteredProducts.map((product: Product, index: number) => (
+          {pagedProducts.map((product: Product, index: number) => (
             <ProductCard
-              key={product.databaseId}
+              key={product.databaseId || `${product.slug}-${index}`}
               databaseId={product.databaseId}
               name={product.name}
               price={product.price}
@@ -264,14 +396,14 @@ const ProductList = ({
         </div>
 
         {/* Loading Indicator */}
-        {isLoading && (
+        {(isLoading || pagination.isLoading) && (
           <div className="flex justify-center items-center py-12">
-            <div className="text-lg text-gray-500 font-medium animate-pulse">Loading products...</div>
+            <LoadingSpinner color="orange" size="md" />
           </div>
         )}
 
         {/* Error State */}
-        {error && (
+        {(error || pagination.error) && (
           <div className="flex flex-col justify-center items-center py-8 gap-2">
             <p className="text-red-500">Failed to load products</p>
             <div className="flex gap-2">
@@ -308,7 +440,7 @@ const ProductList = ({
             </button>
 
             <span className="text-sm font-medium text-gray-600">
-              Page {currentPage}
+              Page {displayPage}
             </span>
 
             <button

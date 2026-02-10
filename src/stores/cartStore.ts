@@ -49,13 +49,6 @@ export const useCartStore = create<CartState>()(
         set({ cart: null });
         localStorage.removeItem('woo-session');
         localStorage.removeItem('woocommerce-cart');
-
-        // Aggressively clear all cookies to prevent session re-hydration
-        if (typeof document !== 'undefined') {
-          document.cookie.split(";").forEach((c) => {
-            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-          });
-        }
       },
     }),
     {

@@ -1,21 +1,21 @@
 // Imports
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useQuery, useMutation } from '@apollo/client';
+import { useMutation } from '@apollo/client';
 import { v4 as uuidv4 } from 'uuid';
 
 // Components
 import Button from '@/components/UI/Button.component';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
 
 // State
 import { useCartStore } from '@/stores/cartStore';
 
 // Utils
 import { getFormattedCart } from '@/utils/functions/functions';
+import { ADD_TO_CART } from '@/utils/gql/GQL_MUTATIONS';
+import { clearCart } from '@/utils/wc-store-api/cartService'; // Keep clearCart for Buy Now logic if needed, or remove if we want full GraphQL
 
-// GraphQL
-import { GET_CART } from '@/utils/gql/GQL_QUERIES';
-import { ADD_TO_CART, UPDATE_CART } from '@/utils/gql/GQL_MUTATIONS';
 
 interface IImage {
   __typename: string;
@@ -125,6 +125,7 @@ export interface IProductRootObject {
   fullWidth?: boolean;
   buyNow?: boolean;
   quantity?: number;
+  disabled?: boolean;
 }
 
 /**
@@ -141,58 +142,34 @@ const AddToCart = ({
   fullWidth = false,
   buyNow = false,
   quantity = 1,
+  disabled = false,
 }: IProductRootObject) => {
   const router = useRouter();
-  const { syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
+  const { cart, syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
   const [requestError, setRequestError] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+  const [isAdding, setIsAdding] = useState<boolean>(false);
 
-  const productId = product?.databaseId ? product?.databaseId : variationId;
+  const productId = product?.databaseId ?? variationId;
 
-  const productQueryInput = {
-    clientMutationId: uuidv4(), // Generate a unique id.
-    productId,
-    quantity,
-    variationId: variationId || undefined,
-  };
-
-  // Get cart data query
-  const { data, refetch } = useQuery(GET_CART, {
-    notifyOnNetworkStatusChange: true,
-    fetchPolicy: 'network-only',
-  });
-
-  useEffect(() => {
-    if (data) {
-      console.log("AddToCart: New Cart Data received", data);
-      const updatedCart = getFormattedCart(data);
-      console.log("AddToCart: Formatted Cart", updatedCart);
-      if (updatedCart) {
-        syncWithWooCommerce(updatedCart);
-        console.log("AddToCart: Synced with Store");
+  const [addToCart, { loading: mutationLoading }] = useMutation(ADD_TO_CART, {
+    onCompleted: (data) => {
+      if (data?.addToCart) {
+        const formattedCart = getFormattedCart(data.addToCart);
+        syncWithWooCommerce(formattedCart);
+        setIsSuccess(true);
       }
-    }
-  }, [data, syncWithWooCommerce]);
-
-  console.log('AddToCart Input:', productQueryInput);
-
-  // Add to cart mutation
-  const [addToCart, { loading: addToCartLoading, data: addToCartData, error: addToCartError }] = useMutation(ADD_TO_CART, {
-    variables: {
-      input: productQueryInput,
+      setIsAdding(false);
     },
-    // Refetch all GET_CART queries to update cart across all components
-    refetchQueries: [{ query: GET_CART }],
-    awaitRefetchQueries: true,
+    onError: (error) => {
+      console.error('Add to cart error:', error);
+      setRequestError(true);
+      setIsAdding(false);
+    }
   });
 
-  // Helper Mutation for clearing cart (Buy Now)
-  const [updateCart] = useMutation(UPDATE_CART);
-
   useEffect(() => {
-    if (addToCartData) {
-      // Update the cart with new values in React context.
-      setIsSuccess(true);
+    if (isSuccess) {
       const timer = setTimeout(() => setIsSuccess(false), 2000);
 
       if (buyNow) {
@@ -201,51 +178,57 @@ const AddToCart = ({
 
       return () => clearTimeout(timer);
     }
-  }, [addToCartData, buyNow, router]);
-
-  useEffect(() => {
-    if (addToCartError) {
-      console.log('Add to cart error:', addToCartError);
-      setRequestError(true);
-    }
-  }, [addToCartError]);
-
-
+  }, [isSuccess, buyNow, router]);
 
   const handleAddToCart = async () => {
-    // If Buy Now, try to clear cart first to remove "ghosts" and ensure clean checkout
-    if (buyNow && data?.cart?.contents?.nodes?.length > 0) {
-      try {
-        const currentItems = data.cart.contents.nodes;
-        const emptyItems = currentItems.map((item: any) => ({
-          key: item.key,
-          quantity: 0
-        }));
+    if (isAdding || mutationLoading) return;
+    setIsAdding(true);
+    setRequestError(false);
 
-        await updateCart({
-          variables: {
-            input: {
-              clientMutationId: uuidv4(),
-              items: emptyItems
-            }
-          }
-        });
+    // If Buy Now, try to clear cart first to remove "ghosts" and ensure clean checkout
+    // Use global store state to check if cart has items
+    if (buyNow && cart?.products && cart.products.length > 0) {
+      try {
+        await clearCart();
         console.log("AddToCart: Cart cleared for Buy Now");
       } catch (e) {
         console.error("AddToCart: Failed to clear cart before Buy Now", e);
-        // Verify if we should proceed or stop? Proceeding might mix items.
-        // But usually safe to proceed as the user wants to buy THIS item.
       }
     }
 
-    addToCart();
+    try {
+      if (!productId) {
+        console.warn('AddToCart: Missing productId');
+        setRequestError(true);
+        setIsAdding(false);
+        return;
+      }
+
+      const input: any = {
+        clientMutationId: uuidv4(),
+        productId: productId,
+        quantity: quantity,
+      };
+
+      if (variationId) {
+        input.variationId = variationId;
+      }
+
+      await addToCart({ variables: { input } });
+      
+    } catch (e) {
+      // Error handled in onError
+      console.log('Add to cart execution error:', e);
+    }
   };
+
+  const isButtonDisabled = isAdding || mutationLoading || requestError || isCartLoading || isSuccess || disabled;
 
   return (
     <>
       <Button
         handleButtonClick={() => handleAddToCart()}
-        buttonDisabled={addToCartLoading || requestError || isCartLoading || isSuccess}
+        buttonDisabled={isButtonDisabled}
         fullWidth={fullWidth}
         className={
           isSuccess
@@ -255,7 +238,7 @@ const AddToCart = ({
               : ''
         }
       >
-        {isCartLoading ? 'Loading...' : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
+        {isCartLoading ? <LoadingSpinner color="white" size="sm" /> : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
       </Button>
     </>
   );

@@ -1,32 +1,20 @@
-
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-
+const buildExpiredCookie = (name: string) =>
+  `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax`;
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-    // Clear WooCommerce Session Cookies by setting them to expire immediately
-    // We need to target the specific session cookies WC uses.
-    // Since the hash/ID in the cookie name varies, we ideally need to know the exact names.
-    // However, we can try to "guess" or simply instruct the browser to clear them via header if we knew the names.
+  const cookieHeader = req.headers.cookie || '';
+  const cookieNames = cookieHeader
+    .split(';')
+    .map((cookie) => cookie.split('=')[0]?.trim())
+    .filter((name) => name);
 
-    // Actually, identifying the exact cookie name for HTTPOnly cookies from the server side
-    // without seeing the request cookies is hard, BUT:
-    // We can read 'req.cookies' to see what cookies are being sent!
+  const expiredCookies = cookieNames.map((name) => buildExpiredCookie(name));
 
-    const cookies = req.cookies;
-    const cookiesToClear = Object.keys(cookies).filter(name =>
-        name.includes('woocommerce') ||
-        name.includes('wp_woocommerce') ||
-        name.includes('wordpress_logged_in')
-    );
+  if (expiredCookies.length > 0) {
+    res.setHeader('Set-Cookie', expiredCookies);
+  }
 
-    const serializedCookies = cookiesToClear.map(name => {
-        return `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; HttpOnly; SameSite=Lax`;
-    });
-
-    if (serializedCookies.length > 0) {
-        res.setHeader('Set-Cookie', serializedCookies);
-    }
-
-    res.status(200).json({ message: 'Session reset', cleared: cookiesToClear });
+  res.status(200).json({ ok: true, cleared: cookieNames.length });
 }

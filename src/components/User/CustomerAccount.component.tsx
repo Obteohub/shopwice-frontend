@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
-import { GET_CUSTOMER_DASHBOARD_DATA } from '../../utils/gql/GQL_QUERIES';
+import { GET_CURRENT_USER, GET_CUSTOMER_DASHBOARD_DATA } from '../../utils/gql/GQL_QUERIES';
 import { UPDATE_CUSTOMER } from '../../utils/gql/GQL_MUTATIONS';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
 import dynamic from 'next/dynamic';
@@ -31,18 +31,53 @@ const CustomerAccount = () => {
       { shallow: true }
     );
   };
-  const { loading, error, data } = useQuery(GET_CUSTOMER_DASHBOARD_DATA, {
-    fetchPolicy: 'cache-and-network'
+  const {
+    loading: currentUserLoading,
+    data: currentUserData,
+  } = useQuery(GET_CURRENT_USER, {
+    fetchPolicy: 'cache-first',
+    nextFetchPolicy: 'cache-and-network',
+    returnPartialData: true,
   });
 
+  const needsDashboardData = activeTab !== 'profile';
+  const {
+    loading: dashboardLoading,
+    error: dashboardError,
+    data: dashboardData,
+    refetch,
+  } = useQuery(GET_CUSTOMER_DASHBOARD_DATA, {
+    fetchPolicy: 'cache-first',
+    nextFetchPolicy: 'cache-and-network',
+    returnPartialData: true,
+    skip: !needsDashboardData,
+  });
+
+  const customer = dashboardData?.customer || currentUserData?.customer;
+  const isGuest = !customer || !customer.username;
+
   // Handle Loading State
-  if (loading) return <div className="p-8 flex justify-center"><LoadingSpinner /></div>;
+  if ((needsDashboardData && dashboardLoading && !dashboardData) || (currentUserLoading && !currentUserData)) {
+    return <div className="p-8 flex justify-center"><LoadingSpinner /></div>;
+  }
+
+  if (dashboardError) {
+    return (
+      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Unable to load account</h2>
+        <p className="text-sm text-gray-600 mb-4">{dashboardError.message}</p>
+        <button
+          onClick={() => refetch()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-semibold"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   // Handle Auth State
-  // If error or no customer, we are in Guest Mode
-  const customer = data?.customer;
-  // Harden guest check: must have a username or databaseId to be considered logged in
-  const isGuest = !customer || !customer.username || !!error;
+  // If no customer, we are in Guest Mode
 
   const handleLogout = async () => {
     // Determine which logout to use based solely on the imported utility
@@ -182,12 +217,22 @@ const CustomerAccount = () => {
   }
 
   // ... Render other tabs (Orders, Addresses, etc) similar to before but with a "Back to Profile" button
+  const BackToProfile = () => (
+    <button
+      onClick={() => setActiveTab('profile')}
+      className="text-sm text-blue-600 hover:underline mb-4"
+    >
+      ← Back to Profile
+    </button>
+  );
+
   return (
-    <div className="max-w-4xl mx-auto bg-white min-h-[500px]">
+    <div className="max-w-4xl mx-auto bg-white min-h-[500px] p-4 md:p-6">
 
 
       {activeTab === 'dashboard' && (
         <div className="space-y-6">
+          <BackToProfile />
           <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
           <p className="text-gray-600">
             Hello <span className="font-semibold text-gray-900">{customer?.firstName || customer?.username || 'User'}</span>,
@@ -214,6 +259,7 @@ const CustomerAccount = () => {
 
       {activeTab === 'orders' && (
         <div className="space-y-6">
+          <BackToProfile />
           <h2 className="text-2xl font-bold text-gray-900">Order History</h2>
           {customer?.orders?.nodes && customer.orders.nodes.length > 0 ? (
             <div className="overflow-x-auto">
@@ -237,7 +283,7 @@ const CustomerAccount = () => {
                             order.status === 'PROCESSING' ? 'bg-blue-100 text-blue-800' :
                               order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
                           }`}>
-                          {order.status.toLowerCase().replace('-', ' ')}
+                          {(order.status || 'unknown').toLowerCase().replace('-', ' ')}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-sm font-semibold text-gray-900">{order.total}</td>
@@ -254,13 +300,41 @@ const CustomerAccount = () => {
 
       {activeTab === 'addresses' && (
         <div className="space-y-6">
+          <BackToProfile />
           <h2 className="text-2xl font-bold text-gray-900">Addresses</h2>
           <AddressManager customer={customer} />
         </div>
       )}
 
       {activeTab === 'account' && (
-        <AccountDetailsForm customer={customer} />
+        <div className="space-y-6">
+          <BackToProfile />
+          <AccountDetailsForm customer={customer} />
+        </div>
+      )}
+
+      {activeTab === 'reviews' && (
+        <div className="space-y-4">
+          <BackToProfile />
+          <h2 className="text-2xl font-bold text-gray-900">My Reviews</h2>
+          <p className="text-sm text-gray-600">Your reviews will appear here once available.</p>
+        </div>
+      )}
+
+      {activeTab === 'payment' && (
+        <div className="space-y-4">
+          <BackToProfile />
+          <h2 className="text-2xl font-bold text-gray-900">Payment Methods</h2>
+          <p className="text-sm text-gray-600">Payment methods management is coming soon.</p>
+        </div>
+      )}
+
+      {activeTab === 'notifications' && (
+        <div className="space-y-4">
+          <BackToProfile />
+          <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
+          <p className="text-sm text-gray-600">Notification preferences are coming soon.</p>
+        </div>
       )}
     </div>
   );

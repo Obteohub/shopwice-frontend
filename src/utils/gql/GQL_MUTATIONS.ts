@@ -54,65 +54,70 @@ export const REFRESH_AUTH_TOKEN = gql`
 `;
 
 export const ADD_TO_CART = gql`
-  mutation ($input: AddToCartInput!) {
+  mutation AddToCart($input: AddToCartInput!) {
     addToCart(input: $input) {
-      cartItem {
-        key
-        product {
-          node {
-            id
-            databaseId
-            name
-            description
-            type
-            onSale
-            slug
-            averageRating
-            reviewCount
-            image {
-              id
-              sourceUrl
-              altText
-            }
-            galleryImages {
-              nodes {
+      cart {
+        contents {
+          nodes {
+            key
+            product {
+              node {
                 id
-                sourceUrl
-                altText
-              }
-            }
-          }
-        }
-        variation {
-          node {
-            id
-            databaseId
-            name
-            description
-            type
-            onSale
-            price
-            regularPrice
-            salePrice
-            image {
-              id
-              sourceUrl
-              altText
-            }
-            attributes {
-              nodes {
-                id
-                attributeId
+                databaseId
                 name
-                value
+                description
+                type
+                onSale
+                slug
+                averageRating
+                reviewCount
+                image {
+                  id
+                  sourceUrl
+                  altText
+                }
+                galleryImages {
+                  nodes {
+                    id
+                    sourceUrl
+                    altText
+                  }
+                }
               }
             }
+            variation {
+              node {
+                id
+                databaseId
+                name
+                description
+                type
+                onSale
+                price
+                regularPrice
+                salePrice
+                image {
+                  id
+                  sourceUrl
+                  altText
+                }
+                attributes {
+                  nodes {
+                    id
+                    attributeId
+                    name
+                    value
+                  }
+                }
+              }
+            }
+            quantity
+            total
+            subtotal
           }
         }
-        quantity
-        total
         subtotal
-        subtotalTax
+        total
       }
     }
   }
@@ -127,97 +132,70 @@ export const CHECKOUT_MUTATION = gql`
   }
 `;
 export const UPDATE_CART = gql`
-  mutation ($input: UpdateItemQuantitiesInput!) {
+  mutation UpdateCart($input: UpdateItemQuantitiesInput!) {
     updateItemQuantities(input: $input) {
-      items {
-        key
-        product {
-          node {
-            id
-            databaseId
-            name
-            description
-            type
-            onSale
-            slug
-            averageRating
-            reviewCount
-            image {
-              id
-              sourceUrl
-              altText
-            }
-            galleryImages {
-              nodes {
+      cart {
+        contents {
+          nodes {
+            key
+            product {
+              node {
                 id
-                sourceUrl
-                altText
-              }
-            }
-          }
-        }
-
-        variation {
-          node {
-            id
-            databaseId
-            name
-            description
-            type
-            onSale
-            price
-            regularPrice
-            salePrice
-            image {
-              id
-              sourceUrl
-              altText
-            }
-            attributes {
-              nodes {
-                id
-                attributeId
+                databaseId
                 name
-                value
+                description
+                type
+                onSale
+                slug
+                averageRating
+                reviewCount
+                image {
+                  id
+                  sourceUrl
+                  altText
+                }
+                galleryImages {
+                  nodes {
+                    id
+                    sourceUrl
+                    altText
+                  }
+                }
               }
             }
+            variation {
+              node {
+                id
+                databaseId
+                name
+                description
+                type
+                onSale
+                price
+                regularPrice
+                salePrice
+                image {
+                  id
+                  sourceUrl
+                  altText
+                }
+                attributes {
+                  nodes {
+                    id
+                    attributeId
+                    name
+                    value
+                  }
+                }
+              }
+            }
+            quantity
+            total
+            subtotal
           }
         }
-        quantity
-        total
         subtotal
-        subtotalTax
-      }
-      removed {
-        key
-        product {
-          node {
-            id
-            databaseId
-          }
-        }
-        variation {
-          node {
-            id
-            databaseId
-          }
-        }
-      }
-      updated {
-        key
-        product {
-          node {
-            id
-            databaseId
-          }
-        }
-
-        variation {
-          node {
-            id
-            databaseId
-          }
-        }
+        total
       }
     }
   }

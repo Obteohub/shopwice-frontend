@@ -14,7 +14,6 @@ const CheckoutOrderReview = ({ cart }: ICheckoutOrderReviewProps) => {
     const cartSubtotal = cart.subtotal || cart.total;
     const cartTotal = cart.total;
     const shippingTotal = cart.shippingTotal;
-    const shippingTax = cart.shippingTax;
 
     return (
         <div className="bg-white rounded-md shadow-sm border border-gray-200 p-3 mb-2">

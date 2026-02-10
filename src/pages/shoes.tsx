@@ -37,7 +37,7 @@ const ShoesPage = ({ category, products, pageInfo, slug }: ShoesPageProps) => {
                     pageInfo={pageInfo}
                     slug={slug}
                     query={GET_CATEGORY_DATA_BY_SLUG}
-                    queryVariables={{ slug, id: slug }}
+                    queryVariables={{ slug: [slug], categoryId: category.databaseId }}
                     totalCount={category?.count}
                 />
             </div>
@@ -52,20 +52,37 @@ export const getStaticProps: GetStaticProps = async () => {
     const slug = 'shoes'; // Hardcoded slug
 
     try {
-        const { data } = await client.query({
+        // Step 1: Resolve slug to ID
+        const { data: catData } = await client.query({
             query: GET_CATEGORY_DATA_BY_SLUG,
-            variables: { slug, id: slug },
+            variables: { slug: [slug], categoryId: null, first: 0 },
         });
 
-        // Even if category is null (not distinct category), we might still show products if valid?
-        // But usually GET_CATEGORY_DATA_BY_SLUG relies on category existing.
-        // If user says "shoes are not categories", maybe we should just SEARCH for "shoes"?
-        // But let's try category first. If it fails, fallback to search?
-        // Given existing patterns, likely "shoes" *is* a category slug.
+        const category = catData?.productCategories?.nodes?.[0];
+
+        if (!category) {
+            return {
+                props: {
+                    category: { name: 'Shoes' },
+                    products: [],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    slug: 'shoes'
+                },
+                revalidate: 60,
+            };
+        }
+
+        const categoryId = category.databaseId;
+
+        // Step 2: Fetch products by categoryId
+        const { data } = await client.query({
+            query: GET_CATEGORY_DATA_BY_SLUG,
+            variables: { slug: [slug], categoryId, first: 24 },
+        });
 
         return {
             props: {
-                category: data?.productCategory || { name: 'Shoes', count: data?.products?.nodes?.length || 0 },
+                category,
                 products: data?.products?.nodes || [],
                 pageInfo: data?.products?.pageInfo || { hasNextPage: false, endCursor: null },
                 slug,

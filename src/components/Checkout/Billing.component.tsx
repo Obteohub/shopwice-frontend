@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import { InputField } from '@/components/Input/InputField.component';
 import AddressAutocomplete from '@/components/Input/AddressAutocomplete.component';
 import Button from '../UI/Button.component';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
 
 // Constants
 import { INPUT_FIELDS } from '@/utils/constants/INPUT_FIELDS';
@@ -50,7 +51,7 @@ const OrderButton = ({ isLoading, label }: { isLoading: boolean; label: string }
     <div className="w-full p-2">
       <div className="mt-4 flex justify-center">
         <Button buttonDisabled={isLoading}>
-          {isLoading ? 'Processing...' : label}
+          {isLoading ? <LoadingSpinner color="white" size="sm" /> : label}
         </Button>
       </div>
     </div>

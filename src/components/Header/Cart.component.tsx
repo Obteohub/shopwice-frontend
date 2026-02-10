@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 import { useCartStore } from '@/stores/cartStore';
@@ -12,17 +11,7 @@ interface ICartProps {
  * Displays amount of items in cart.
  */
 const Cart = ({ stickyNav }: ICartProps) => {
-  const cart = useCartStore((state) => state.cart);
-  const [productCount, setProductCount] = useState<number | null | undefined>();
-
-  useEffect(() => {
-    console.log("Cart Component: Store Cart Updated:", cart);
-    if (cart) {
-      setProductCount(cart.totalProductsCount);
-    } else {
-      setProductCount(null);
-    }
-  }, [cart]);
+  const productCount = useCartStore((state) => state.cart?.totalProductsCount || 0);
 
   return (
     <Link href="/cart" className="relative flex items-center p-1">

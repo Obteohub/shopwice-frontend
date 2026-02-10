@@ -1,85 +1,281 @@
-
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { GetServerSideProps } from 'next';
-import Layout from '@/components/Layout/Layout.component';
-import ProductList from '@/components/Product/ProductList.component';
+import { useRouter } from 'next/router';
+import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
+import { GET_CATEGORY_NODE_BY_SLUG, GET_CATEGORY_PRODUCTS_BY_ID, GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE, GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
+import { gql, useLazyQuery } from '@apollo/client';
+import { Product } from '@/types/product';
 
-interface CategoryPageProps {
-    category: any;
-    products: any[];
-    pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string | null;
-    };
-    slug: string;
+// ----- TypeScript Types -----
+interface CategoryNode {
+    databaseId: number;
+    name: string;
+    description?: string;
+    count: number;
 }
 
-import BackButton from '@/components/UI/BackButton.component';
+interface PageInfo {
+    hasNextPage: boolean;
+    endCursor: string | null;
+}
 
-const CategoryPage = ({ category, products, pageInfo, slug }: CategoryPageProps) => {
+interface CategoryPageProps {
+    category: CategoryNode | null;
+    products: Product[];
+    pageInfo: PageInfo;
+    slug: string;
+    attr?: string;
+    term?: string;
+    categoryId?: number;
+    isError?: boolean;
+}
+
+// ----- Component -----
+const CategoryPage = ({ category: initialCategory, products: initialProducts, pageInfo: initialPageInfo, slug, attr, term, categoryId: initialCategoryId, isError }: CategoryPageProps) => {
+    const [category, setCategory] = useState<CategoryNode | null>(initialCategory);
+    const [products, setProducts] = useState<Product[]>(initialProducts);
+    const [pageInfo, setPageInfo] = useState<PageInfo>(initialPageInfo);
+    const [categoryId, setCategoryId] = useState<number | undefined>(initialCategoryId);
+    const [loading, setLoading] = useState(!!isError);
+    const router = useRouter();
+
+    // Handle navigation loading state
+    useEffect(() => {
+        const handleStart = (url: string) => {
+            if (url !== router.asPath) {
+                setLoading(true);
+            }
+        };
+        const handleComplete = () => setLoading(false);
+
+        router.events.on('routeChangeStart', handleStart);
+        router.events.on('routeChangeComplete', handleComplete);
+        router.events.on('routeChangeError', handleComplete);
+
+        return () => {
+            router.events.off('routeChangeStart', handleStart);
+            router.events.off('routeChangeComplete', handleComplete);
+            router.events.off('routeChangeError', handleComplete);
+        };
+    }, [router]);
+
+    // Sync state with props when navigating between categories
+    useEffect(() => {
+        setCategory(initialCategory);
+        setProducts(initialProducts);
+        setPageInfo(initialPageInfo);
+        setCategoryId(initialCategoryId);
+        setLoading(!!isError);
+    }, [initialCategory, initialProducts, initialPageInfo, initialCategoryId, isError]);
+
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
+    const hasAttrFilter = Boolean(attrTax && term);
+
+    const [getCategory] = useLazyQuery(GET_CATEGORY_NODE_BY_SLUG, { fetchPolicy: 'network-only' });
+    const [getProducts] = useLazyQuery(hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID, { fetchPolicy: 'network-only' });
+
+    useEffect(() => {
+        if (isError && slug) {
+            const fetchData = async () => {
+                try {
+                    setLoading(true);
+                    console.log('CSR Fallback: Fetching category...');
+                    const { data: catData } = await getCategory({ variables: { slug: [slug] } });
+                    const catNode = catData?.productCategories?.nodes?.[0];
+
+                    if (catNode) {
+                        setCategory(catNode);
+                        setCategoryId(catNode.databaseId);
+                        
+                        console.log('CSR Fallback: Fetching products...');
+                        const variables = hasAttrFilter
+                            ? { categoryId: catNode.databaseId, attrTax, attrTerm: [term], first: 24 }
+                            : { categoryId: catNode.databaseId, first: 24 };
+                        
+                        const { data: prodData } = await getProducts({ variables });
+                        setProducts(prodData?.products?.nodes || []);
+                        setPageInfo(prodData?.products?.pageInfo || { hasNextPage: false, endCursor: null });
+                    }
+                } catch (err) {
+                    console.error('CSR Fallback Error:', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchData();
+        }
+    }, [isError, slug, attrTax, term, hasAttrFilter, getCategory, getProducts]);
+
+    const totalCount = category?.count || products.length;
+
+    if (loading && products.length === 0) {
+         return (
+            <TaxonomyListingPage
+                title={'Loading...'}
+                products={[]}
+                pageInfo={{ hasNextPage: false, endCursor: null }}
+                slug={slug}
+                query={hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID}
+                queryVariables={{}}
+                emptyMessage="Loading category data..."
+                totalCount={0}
+                loading={true}
+            />
+        );
+    }
+
     return (
-        <Layout title={category?.name || 'Category'} fullWidth={true}>
-            <div className="px-2 md:px-4 pt-1 pb-1">
-                <BackButton />
-                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
-                    {category?.name?.toLowerCase()}
-                </h1>
-                {category?.description && (
-                    <div
-                        className="mb-10 text-gray-500 max-w-3xl"
-                        dangerouslySetInnerHTML={{ __html: category.description }}
-                    />
-                )}
-                <ProductList
-                    products={products}
-                    title={category?.name}
-                    pageInfo={pageInfo}
-                    slug={slug}
-                    query={GET_CATEGORY_DATA_BY_SLUG}
-                    queryVariables={{ slug, id: slug }}
-                    totalCount={category?.count}
-                />
-            </div>
-        </Layout>
+        <TaxonomyListingPage
+            title={category?.name || 'Category'}
+            description={category?.description}
+            products={products}
+            pageInfo={pageInfo}
+            slug={slug}
+            query={hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID}
+            queryVariables={hasAttrFilter
+                ? { categoryId, attrTax, attrTerm: [term], first: 24 }
+                : { categoryId, first: 24 }}
+            emptyMessage="No products found in this category"
+            totalCount={totalCount}
+            fetchAllForSort={true}
+            loading={loading}
+        />
     );
 };
 
-
 export default CategoryPage;
 
-export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
+// ----- getServerSideProps -----
+export const getServerSideProps: GetServerSideProps = async ({ params, res, query }) => {
     const slug = params?.slug as string;
+    const attr = (query?.attr as string | undefined) || '';
+    const term = (query?.term as string | undefined) || '';
+
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+
+    const attrTax = attrTaxonomyMap[attr.toLowerCase()];
+    const hasAttrFilter = Boolean(attrTax && term);
+
+    if (!slug) return { notFound: true };
 
     try {
-        // Cache control
+        // Cache control: 1 minute, background refresh
         res.setHeader(
             'Cache-Control',
             'public, s-maxage=60, stale-while-revalidate=59'
         );
 
-        const { data } = await client.query({
-            query: GET_CATEGORY_DATA_BY_SLUG,
-            variables: { slug, id: slug },
+        const { data: categoryData } = await client.query({
+            query: GET_CATEGORY_NODE_BY_SLUG,
+            variables: { slug: [slug] },
+            fetchPolicy: 'network-only',
         });
 
-        if (!data?.productCategory) {
-            return { notFound: true };
+        let categoryNode = categoryData?.productCategories?.nodes?.[0];
+
+        if (!categoryNode) {
+            const SEARCH_CATEGORY = gql`
+                query SearchCategory($search: String!) {
+                    productCategories(first: 1, where: { search: $search }) {
+                        nodes {
+                            databaseId
+                            name
+                            description
+                            count
+                            slug
+                        }
+                    }
+                }
+            `;
+
+            try {
+                const searchResult = await client.query({
+                    query: SEARCH_CATEGORY,
+                    variables: { search: slug.replace(/-/g, ' ') },
+                    fetchPolicy: 'network-only',
+                });
+
+                const candidate = searchResult?.data?.productCategories?.nodes?.[0];
+                if (candidate?.slug) {
+                    const retry = await client.query({
+                        query: GET_CATEGORY_DATA_BY_SLUG,
+                        variables: { slug: [candidate.slug], first: 24 },
+                        fetchPolicy: 'network-only',
+                    });
+                    categoryNode = retry?.data?.productCategories?.nodes?.[0];
+                }
+            } catch (e) {
+                console.error('Category search fallback failed:', e);
+            }
         }
+
+        if (!categoryNode) {
+            return {
+                props: {
+                    category: {
+                        databaseId: 0,
+                        name: slug.replace(/-/g, ' '),
+                        description: null,
+                        count: 0,
+                    },
+                    products: [],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    slug,
+                    attr,
+                    term,
+                },
+            };
+        }
+
+        const categoryId = categoryNode.databaseId;
+
+        const { data: productsData } = await client.query({
+            query: hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID,
+            variables: hasAttrFilter
+                ? { categoryId, attrTax, attrTerm: [term], first: 24 }
+                : { categoryId, first: 24 },
+            fetchPolicy: 'network-only',
+        });
+
+        const products = productsData?.products?.nodes || [];
+        const pageInfo = productsData?.products?.pageInfo || { hasNextPage: false, endCursor: null };
 
         return {
             props: {
-                category: data.productCategory,
-                products: data.products.nodes,
-                pageInfo: data.products.pageInfo,
+                category: {
+                    databaseId: categoryNode.databaseId,
+                    name: categoryNode.name,
+                    description: categoryNode.description || null,
+                    count: categoryNode.count || 0,
+                },
+                products,
+                pageInfo,
                 slug,
+                attr,
+                term,
+                categoryId,
             },
         };
     } catch (error) {
-        console.error('Error fetching category data:', error);
+        console.error('Error fetching category SSR:', error);
+        // Fallback to CSR
         return {
-            notFound: true,
+            props: {
+                category: null,
+                products: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+                slug,
+                attr,
+                term,
+                isError: true,
+            },
         };
     }
 };

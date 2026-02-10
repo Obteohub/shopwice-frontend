@@ -39,8 +39,15 @@ export const middleware = new ApolloLink((operation, forward) => {
     if (Date.now() - createdTime > SEVEN_DAYS) {
       localStorage.removeItem('woo-session');
     } else {
-      headers['woocommerce-session'] = `Session ${token}`;
+      const cleanToken = token.replace(/^Session\s+/i, '');
+      headers['woocommerce-session'] = `Session ${cleanToken}`;
     }
+  }
+
+  // Add Nonce Header if available
+  const nonce = typeof window !== 'undefined' ? localStorage.getItem('wc_nonce') : null;
+  if (nonce) {
+    headers['X-WC-Store-API-Nonce'] = nonce;
   }
 
   // Add JWT Authorization if available (Skip for Registration)
@@ -63,18 +70,24 @@ export const middleware = new ApolloLink((operation, forward) => {
 export const afterware = new ApolloLink((operation, forward) =>
   forward(operation).map((response) => {
     /**
-     * Check for session header and update session in local storage accordingly.
-     */
-    const context = operation.getContext();
-    const responseHeaders = context?.response?.headers;
+   * Check for session header and update session in local storage accordingly.
+   */
+  const context = operation.getContext();
+  const responseHeaders = context?.response?.headers;
 
-    const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
+  const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
+  const nonce = responseHeaders ? (responseHeaders.get('x-wc-store-api-nonce') || responseHeaders.get('X-WC-Store-API-Nonce')) : null;
 
-    if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
-      console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session Header:`, session);
-    }
+  if (operation.operationName === 'AddToCart' || operation.operationName === 'GET_CART') {
+    console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session: ${session}, Nonce: ${nonce}`);
+  }
 
-    if (session && typeof window !== 'undefined') {
+  // Capture Nonce
+  if (nonce && typeof window !== 'undefined') {
+    localStorage.setItem('wc_nonce', nonce);
+  }
+
+  if (session && typeof window !== 'undefined') {
       if ('false' === session) {
         // Remove session data if session destroyed.
         localStorage.removeItem('woo-session');
@@ -106,21 +119,169 @@ export const afterware = new ApolloLink((operation, forward) =>
 
 const clientSide = typeof window === 'undefined';
 
+// Determine the base URL for SSR
+const getServerUrl = () => {
+  if (process.env.NODE_ENV !== 'production') {
+    return 'http://localhost:3000';
+  }
+  // In production (deployed), use the actual domain
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+  // In development, use localhost
+  return 'http://localhost:3000';
+};
+
 // Apollo GraphQL client.
+const serverGraphqlUrl = process.env.NEXT_PUBLIC_GRAPHQL_URL;
+const isServer = typeof window === 'undefined';
+const linkUri = isServer
+  ? (serverGraphqlUrl || `${getServerUrl()}/api/graphql`)
+  : '/api/graphql';
+const linkCredentials = isServer && serverGraphqlUrl ? 'omit' : 'include';
+
+/**
+ * Custom fetch wrapper to capture session headers directly from the response.
+ * This ensures session tokens are saved even if Apollo Link context doesn't propagate headers.
+ */
+const customFetch = async (uri, options) => {
+  const response = await fetch(uri, options);
+
+  if (typeof window !== 'undefined') {
+    const sessionHeader = response.headers.get('woocommerce-session') || 
+                          response.headers.get('x-woocommerce-session');
+    
+    const nonceHeader = response.headers.get('x-wc-store-api-nonce') || 
+                        response.headers.get('X-WC-Store-API-Nonce');
+
+    if (sessionHeader) {
+      console.log('[Apollo customFetch] Captured Session Header:', sessionHeader);
+      localStorage.setItem(
+        'woo-session',
+        JSON.stringify({ token: sessionHeader, createdTime: Date.now() }),
+      );
+    }
+
+    if (nonceHeader) {
+      console.log('[Apollo customFetch] Captured Nonce Header:', nonceHeader);
+      localStorage.setItem('wc_nonce', nonceHeader);
+    }
+  }
+
+  return response;
+};
+
 const client = new ApolloClient({
   ssrMode: clientSide,
   link: middleware.concat(
     afterware.concat(
       createHttpLink({
-        // Use proxy on client to avoid CORS, absolute URL on server
-        // Use proxy on client to avoid CORS, absolute URL on server
-        uri: typeof window === 'undefined' ? (process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql') : '/graphql',
-        fetch,
-        credentials: 'include',
+        // ALWAYS use /api/graphql proxy for session isolation
+        // This prevents cookies from being sent to api.shopwice.com
+        uri: linkUri,
+        fetch: customFetch,
+        credentials: linkCredentials, // Include credentials for OUR domain only
       }),
     ),
   ),
-  cache: new InMemoryCache(),
+  cache: new InMemoryCache({
+    possibleTypes: {
+      Product: ['SimpleProduct', 'VariableProduct', 'ExternalProduct', 'GroupProduct'],
+    },
+    typePolicies: {
+      Query: {
+        fields: {
+          products: {
+            keyArgs: ['where'],
+            merge(existing, incoming, { args }) {
+              if (!existing) return incoming;
+              const { after } = args || {};
+              if (after) {
+                return {
+                  ...incoming,
+                  nodes: [...(existing.nodes || []), ...(incoming.nodes || [])],
+                };
+              }
+              return incoming;
+            },
+          },
+        },
+      },
+      // Disable automatic normalization for Product types to avoid missing field errors
+      // Products will be cached by query instead of by ID
+      Product: {
+        keyFields: false,
+        fields: {
+          // Handle nullable fields gracefully
+          databaseId: { read(existing) { return existing || null; } },
+          date: { read(existing) { return existing || null; } },
+          averageRating: { read(existing) { return existing || null; } },
+          reviewCount: { read(existing) { return existing || null; } },
+          stockQuantity: { read(existing) { return existing || null; } },
+          image: { read(existing) { return existing || null; } },
+          productCategories: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          productBrand: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          productLocation: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          attributes: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+        },
+      },
+      ProductCategory: { keyFields: ['slug'] },
+      Cart: {
+        fields: {
+          contents: { merge(existing, incoming) { return incoming; } },
+          total: { merge(existing, incoming) { return incoming; } },
+          items: { merge(existing, incoming) { return incoming; } },
+          itemCount: { merge(existing, incoming) { return incoming; } },
+          totals: { merge(existing, incoming) { return incoming; } },
+        },
+      },
+      CartItem: {
+        keyFields: ['key'],
+        fields: {
+          quantity: { merge(existing, incoming) { return incoming; } },
+          total: { merge(existing, incoming) { return incoming; } },
+        },
+      },
+      VariableProduct: {
+        keyFields: false,
+        fields: {
+          variations: {
+            merge(existing, incoming) { return incoming; },
+          },
+        },
+      },
+      ProductVariation: { keyFields: false },
+      SimpleProduct: { keyFields: false },
+      ExternalProduct: { keyFields: false },
+      GroupProduct: { keyFields: false },
+      MediaItem: { keyFields: ['id'] },
+      TermNode: { keyFields: false },
+      Attribute: {
+        keyFields: false,
+        fields: {
+          nodes: {
+            read(existing) { return existing || []; },
+            merge(existing, incoming) { return incoming || []; },
+          },
+        },
+      },
+    },
+  }),
 });
 
 export default client;

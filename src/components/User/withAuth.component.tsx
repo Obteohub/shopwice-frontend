@@ -11,10 +11,17 @@ const withAuth = <P extends object>(WrappedComponent: ComponentType<P>) => {
 
     const { data, loading, error } = useQuery(GET_CURRENT_USER, {
       errorPolicy: 'all',
-      fetchPolicy: 'cache-and-network',
+      fetchPolicy: 'cache-first',
+      nextFetchPolicy: 'cache-and-network',
+      returnPartialData: true,
     });
 
     useEffect(() => {
+      if (data?.customer) {
+        setIsChecking(false);
+        return;
+      }
+
       if (!loading) {
         setIsChecking(false);
 

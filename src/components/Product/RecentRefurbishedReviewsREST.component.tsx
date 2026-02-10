@@ -1,10 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useReviewsStore } from '@/stores/reviewsStore';
+import { useQuery } from '@apollo/client';
+import { GET_RECENT_REVIEWS_QUERY } from '@/utils/gql/GQL_QUERIES';
 
 const RecentRefurbishedReviewsREST = () => {
-    const { reviews: allReviews, isLoading, error } = useReviewsStore();
+    const { data, loading, error } = useQuery(GET_RECENT_REVIEWS_QUERY, {
+        fetchPolicy: 'cache-first',
+    });
     const [mounted, setMounted] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -13,14 +16,28 @@ const RecentRefurbishedReviewsREST = () => {
     }, []);
 
     const reviews = useMemo(() => {
-        // Shuffle all reviews and take 10
-        const shuffled = [...allReviews];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-        }
-        return shuffled.slice(0, 10);
-    }, [allReviews]);
+        const products = data?.products?.nodes || [];
+        const flattened = products.flatMap((product: any) => {
+            const productName = product?.name || 'Product';
+            const productSlug = product?.slug || '';
+            const productImage = product?.image?.sourceUrl || '';
+            const productLink = productSlug ? `/product/${productSlug}` : '#';
+            const nodes = product?.reviews?.nodes || [];
+
+            return nodes.map((review: any) => ({
+                id: review.id,
+                reviewer: review?.author?.node?.name || 'Customer',
+                date_created: review?.date,
+                review: review?.content || '',
+                rating: review?.rating ?? 0,
+                product_name: productName,
+                product_image: productImage,
+                product_permalink: productLink,
+            }));
+        });
+
+        return flattened.slice(0, 10);
+    }, [data]);
 
     const nextSlide = () => {
         setCurrentIndex((prev) => (prev + 1) % reviews.length);
@@ -31,7 +48,7 @@ const RecentRefurbishedReviewsREST = () => {
     };
 
     if (!mounted) return null;
-    if (isLoading && reviews.length === 0) return (
+    if (loading && reviews.length === 0) return (
         <div className="mt-6 border-t border-gray-100 pt-4 relative group animate-pulse">
             <div className="h-4 bg-gray-200 rounded w-48 mb-3"></div>
             <div className="relative overflow-hidden min-h-[140px] bg-gray-50 rounded-lg border border-gray-100 p-4">
@@ -53,14 +70,13 @@ const RecentRefurbishedReviewsREST = () => {
         </div>
     );
     if (error && reviews.length === 0) return null;
-    if (reviews.length === 0 && !isLoading) return null;
+    if (reviews.length === 0 && !loading) return null;
 
     return (
         <div className="mt-6 border-t border-gray-100 pt-4 relative group">
             <h4 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-tight">Recent Customer Feedback</h4>
 
             <div className="relative overflow-hidden min-h-[140px] bg-gray-50 rounded-lg border border-gray-100">
-                {/* Navigation Arrows */}
                 {reviews.length > 1 && (
                     <>
                         <button
@@ -82,7 +98,7 @@ const RecentRefurbishedReviewsREST = () => {
                     className="flex transition-transform duration-300 ease-in-out h-full"
                     style={{ transform: `translateX(-${currentIndex * 100}%)` }}
                 >
-                    {reviews.map((review) => (
+                    {reviews.map((review: any) => (
                         <div key={review.id} className="min-w-full p-4 flex flex-col justify-between bg-white">
                             <div>
                                 <div className="flex gap-3 mb-3">
@@ -98,12 +114,12 @@ const RecentRefurbishedReviewsREST = () => {
                                     )}
                                     <div className="flex flex-col flex-grow min-w-0 pt-0.5">
                                         <div className="flex items-center justify-between gap-2">
-                                            <span className="font-bold text-gray-900 text-[11px] uppercase tracking-wider truncate">{review.reviewer || 'Customer'}</span>
+                                            <span className="font-bold text-gray-900 text-[11px] uppercase tracking-wider truncate">{review.reviewer}</span>
                                             <span className="text-gray-400 text-[9px] font-medium uppercase tracking-tighter">
-                                                {new Date(review.date_created).toLocaleDateString()}
+                                                {review.date_created ? new Date(review.date_created).toLocaleDateString() : ''}
                                             </span>
                                         </div>
-                                        {review.rating && (
+                                        {review.rating > 0 && (
                                             <div className="flex text-yellow-400 mt-0.5">
                                                 {[...Array(5)].map((_, i) => (
                                                     <svg
@@ -117,11 +133,6 @@ const RecentRefurbishedReviewsREST = () => {
                                                 ))}
                                             </div>
                                         )}
-                                        {review.verified && (
-                                            <span className="text-[8px] text-green-600 font-bold uppercase tracking-widest mt-0.5">
-                                                Verified Purchase
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
 
@@ -131,36 +142,25 @@ const RecentRefurbishedReviewsREST = () => {
                                 />
                             </div>
 
-                            <div className="mt-auto space-y-3">
-                                {review.images && review.images.length > 0 && (
-                                    <div className="flex gap-2 overflow-hidden pb-1">
-                                        {review.images.slice(0, 3).map((img) => (
-                                            <div key={img.id} className="relative w-12 h-12 rounded border border-gray-100 overflow-hidden flex-shrink-0 bg-gray-50">
-                                                <Image src={img.src} alt="Review" fill className="object-cover" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {review.product_permalink && review.product_name && (
+                            {review.product_permalink && review.product_name && (
+                                <div className="mt-auto space-y-3">
                                     <Link
-                                        href={review.product_permalink.replace('https://shopwice.com', '')}
+                                        href={review.product_permalink}
                                         className="text-[10px] text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 font-bold uppercase tracking-tight border-t border-gray-50 pt-2"
                                     >
                                         <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
                                         View Item
                                     </Link>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* Dots Indicator */}
             {reviews.length > 1 && (
                 <div className="flex justify-center gap-1.5 mt-2">
-                    {reviews.map((_, idx) => (
+                    {reviews.map((_: any, idx: number) => (
                         <button
                             key={idx}
                             onClick={() => setCurrentIndex(idx)}
