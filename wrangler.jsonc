@@ -10,9 +10,9 @@
 	"vars": {
 		"NEXT_PUBLIC_SITE_URL": "https://web.shopwice.com",
 		"NEXT_PUBLIC_GRAPHQL_URL": "https://api.shopwice.com/graphql",
-		"NEXT_PUBLIC_REST_API_URL": "https://api.shopwice.com",
-		"NEXT_PUBLIC_STORE_API_URL": "https://api.shopwice.com",
-		"WORDPRESS_API_URL": "https://api.shopwice.com"
+		"NEXT_PUBLIC_REST_API_URL": "https://api.shopwice.com/api",
+		"NEXT_PUBLIC_STORE_API_URL": "https://api.shopwice.com/api",
+		"WORDPRESS_API_URL": "https://api.shopwice.com/api"
 	},
 	"assets": {
 		"directory": ".open-next/assets",
