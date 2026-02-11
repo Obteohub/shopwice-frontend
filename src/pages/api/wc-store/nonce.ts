@@ -19,7 +19,7 @@ export default async function handler(
     try {
         const candidates = [
             process.env.NEXT_PUBLIC_STORE_API_URL,
-            'https://api.shopwice.com/api',
+            'https://api.shopwice.com',
             process.env.NEXT_PUBLIC_REST_API_URL,
         ].filter(Boolean) as string[];
 
@@ -28,11 +28,7 @@ export default async function handler(
 
         for (const baseUrl of candidates) {
             // Add cache buster to prevent getting cached responses (especially errors)
-            // If the URL ends in /api, we assume it's the custom endpoint root and just append /cart
-            // Otherwise, we append the standard WooCommerce Store API path
-            const path = baseUrl.endsWith('/api') ? '/cart' : '/wp-json/wc/store/v1/cart';
-            const nonceEndpoint = `${baseUrl}${path}?_t=${Date.now()}`;
-            
+            const nonceEndpoint = `${baseUrl}/wp-json/wc/store/v1/cart?_t=${Date.now()}`;
             console.log('[Nonce API] Fetching nonce from:', nonceEndpoint);
 
             // Make a simple GET request to the Store API to get a nonce

@@ -18,7 +18,7 @@ export default async function handler(
 ) {
     try {
         // Force the correct backend URL as the environment variable NEXT_PUBLIC_STORE_API_URL
-        const storeApiUrl = process.env.NEXT_PUBLIC_STORE_API_URL || 'https://api.shopwice.com/api';
+        const storeApiUrl = process.env.NEXT_PUBLIC_STORE_API_URL || 'https://api.shopwice.com';
 
         // Extract the path from the URL
         // e.g., /api/wc-store/cart/add-item -> cart/add-item
@@ -45,7 +45,7 @@ export default async function handler(
         const queryString = searchParams.toString();
 
         // Build the target URL
-        const targetUrl = `${storeApiUrl}/${apiPath}${queryString ? `?${queryString}` : ''}`;
+        const targetUrl = `${storeApiUrl}/wp-json/wc/store/v1/${apiPath}${queryString ? `?${queryString}` : ''}`;
 
         console.log('[Store API Proxy] Forwarding:', req.method, targetUrl);
         if (req.method !== 'GET') {

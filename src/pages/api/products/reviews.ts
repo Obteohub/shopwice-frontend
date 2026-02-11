@@ -11,8 +11,8 @@ export default async function handler(
     try {
         const { page, per_page, product } = req.query;
 
-        const baseUrl = process.env.WORDPRESS_API_URL || 'https://api.shopwice.com/api';
-        const restEndpoint = `${baseUrl}/products/reviews`;
+        const baseUrl = process.env.WORDPRESS_API_URL || 'https://api.shopwice.com';
+        const restEndpoint = `${baseUrl}/wp-json/wc/v3/products/reviews`;
 
         const queryParams = new URLSearchParams();
 
