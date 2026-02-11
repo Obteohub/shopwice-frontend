@@ -14556,287 +14556,6 @@ export const useProductFilters = (products: Product[]) => {
 };
 ```
 
-## File: src/pages/api/products/index.ts
-```typescript
-import type { NextApiRequest, NextApiResponse } from 'next';
-export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse
-) {
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-    try {
-        const { include, slug } = req.query;
-        const baseUrl = process.env.WORDPRESS_API_URL || 'https://api.shopwice.com';
-        const restEndpoint = `${baseUrl}/wp-json/wc/v3/products`;
-        const queryParams = new URLSearchParams();
-        if (process.env.WC_CONSUMER_KEY && process.env.WC_CONSUMER_SECRET) {
-            queryParams.append('consumer_key', process.env.WC_CONSUMER_KEY);
-            queryParams.append('consumer_secret', process.env.WC_CONSUMER_SECRET);
-        }
-        if (include) {
-            queryParams.append('include', include as string);
-        }
-        if (slug) {
-            queryParams.append('slug', slug as string);
-        }
-        const fetchUrl = `${restEndpoint}?${queryParams.toString()}`;
-        console.log('[API Proxy] Fetching products:', fetchUrl.replace(/consumer_secret=[^&]+/, 'consumer_secret=***'));
-        const response = await fetch(fetchUrl);
-        if (!response.ok) {
-            console.error('[API Proxy] Upstream error:', response.status, response.statusText);
-            return res.status(response.status).json({ error: 'Failed to fetch from upstream' });
-        }
-        const data = await response.json();
-        res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-        return res.status(200).json(data);
-    } catch (error) {
-        console.error('[API Proxy] Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error' });
-    }
-}
-```
-
-## File: src/pages/api/products/reviews.ts
-```typescript
-import type { NextApiRequest, NextApiResponse } from 'next';
-export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse
-) {
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-    try {
-        const { page, per_page, product } = req.query;
-        const baseUrl = process.env.WORDPRESS_API_URL || 'https://api.shopwice.com';
-        const restEndpoint = `${baseUrl}/wp-json/wc/v3/products/reviews`;
-        const queryParams = new URLSearchParams();
-        if (process.env.WC_CONSUMER_KEY && process.env.WC_CONSUMER_SECRET) {
-            queryParams.append('consumer_key', process.env.WC_CONSUMER_KEY);
-            queryParams.append('consumer_secret', process.env.WC_CONSUMER_SECRET);
-        }
-        if (page) queryParams.append('page', page as string);
-        if (per_page) queryParams.append('per_page', per_page as string);
-        if (product) queryParams.append('product', product as string);
-        const fetchUrl = `${restEndpoint}?${queryParams.toString()}`;
-        console.log('[API Proxy] Fetching reviews:', fetchUrl.replace(/consumer_secret=[^&]+/, 'consumer_secret=***'));
-        const response = await fetch(fetchUrl);
-        // Handle 404 cleanly (no reviews)
-        if (response.status === 404) {
-            return res.status(200).json([]);
-        }
-        if (!response.ok) {
-            console.error('[API Proxy] Upstream reviews error:', response.status, response.statusText);
-            return res.status(response.status).json({ error: 'Failed to fetch reviews' });
-        }
-        const data = await response.json();
-        // Cache reviews for a short time
-        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-        return res.status(200).json(data);
-    } catch (error) {
-        console.error('[API Proxy] Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error' });
-    }
-}
-```
-
-## File: src/pages/api/wc-store/[...path].ts
-```typescript
-import type { NextApiRequest, NextApiResponse } from 'next';
-/**
- * WooCommerce Store API Generic Proxy
- * 
- * This endpoint proxies all requests to the WooCommerce Store API.
- * It handles nonce-based authentication and ensures session isolation.
- * 
- * Usage:
- * - GET /api/wc-store/cart -> /wp-json/wc/store/v1/cart
- * - POST /api/wc-store/checkout -> /wp-json/wc/store/v1/checkout
- * - etc.
- */
-export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse
-) {
-    try {
-        // Force the correct backend URL as the environment variable NEXT_PUBLIC_STORE_API_URL
-        // seems to point to a broken domain (web.shopwice.com returns "Hello world").
-        const storeApiUrl = 'https://shopwice.com';
-        // Extract the path from the URL
-        // e.g., /api/wc-store/cart/add-item -> cart/add-item
-        const { path, ...queryParams } = req.query;
-        const apiPath = Array.isArray(path) ? path.join('/') : path;
-        if (!apiPath) {
-            return res.status(400).json({ error: 'Missing path parameter' });
-        }
-        // Build query string
-        const searchParams = new URLSearchParams();
-        Object.entries(queryParams).forEach(([key, value]) => {
-            if (Array.isArray(value)) {
-                value.forEach(v => searchParams.append(key, v));
-            } else if (value !== undefined) {
-                searchParams.append(key, value);
-            }
-        });
-        // Add cache buster to prevent Cloudflare caching of API responses
-        searchParams.append('_t', Date.now().toString());
-        const queryString = searchParams.toString();
-        // Build the target URL
-        const targetUrl = `${storeApiUrl}/wp-json/wc/store/v1/${apiPath}${queryString ? `?${queryString}` : ''}`;
-        console.log('[Store API Proxy] Forwarding:', req.method, targetUrl);
-        if (req.method !== 'GET') {
-            console.log('[Store API Proxy] Body:', JSON.stringify(req.body, null, 2));
-        }
-        // Prepare headers
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
-        // Forward Authorization header if present
-        if (req.headers['authorization']) {
-            headers['Authorization'] = req.headers['authorization'] as string;
-        }
-        // Forward nonce if present (our internal 'Nonce' header)
-        if (req.headers['nonce']) {
-            headers['X-WC-Store-API-Nonce'] = req.headers['nonce'] as string;
-        }
-        // Forward woocommerce-session header if present
-        if (req.headers['woocommerce-session']) {
-            headers['woocommerce-session'] = req.headers['woocommerce-session'] as string;
-        }
-        // Make the request to WooCommerce Store API
-        const response = await fetch(targetUrl, {
-            method: req.method,
-            credentials: 'omit',
-            headers,
-            body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
-        });
-        // Get the response data
-        let data;
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            data = await response.json();
-        } else {
-            data = { message: await response.text() };
-        }
-        // Forward the nonce header back if present
-        const nonceHeader = response.headers.get('nonce') ||
-            response.headers.get('x-wc-store-api-nonce');
-        if (nonceHeader) {
-            res.setHeader('Nonce', nonceHeader);
-        }
-        // Forward woocommerce-session header back if present
-        const sessionHeader = response.headers.get('woocommerce-session') || 
-                              response.headers.get('x-woocommerce-session');
-        if (sessionHeader) {
-            console.log('[Store API Proxy] Forwarding Session to client:', sessionHeader.substring(0, 20) + '...');
-            res.setHeader('woocommerce-session', sessionHeader);
-            // Also set x-woocommerce-session for compatibility
-            res.setHeader('x-woocommerce-session', sessionHeader);
-        }
-        // Return the response
-        return res.status(response.status).json(data);
-    } catch (error) {
-        console.error('[Store API Proxy] Error:', error);
-        return res.status(500).json({
-            error: 'Failed to proxy Store API request',
-            details: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
-}
-```
-
-## File: src/pages/api/wc-store/nonce.ts
-```typescript
-import type { NextApiRequest, NextApiResponse } from 'next';
-/**
- * WooCommerce Store API Nonce Endpoint
- * 
- * This endpoint fetches a fresh nonce from the WooCommerce Store API.
- * Nonces are required for cart operations when using the Store API.
- * 
- * @see https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/src/StoreApi/docs/authentication.md
- */
-export default async function handler(
-    req: NextApiRequest,
-    res: NextApiResponse
-) {
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-    try {
-        const candidates = [
-            process.env.NEXT_PUBLIC_STORE_API_URL,
-            process.env.NEXT_PUBLIC_SITE_URL,
-            'https://shopwice.com',
-            process.env.NEXT_PUBLIC_REST_API_URL,
-            'https://api.shopwice.com',
-        ].filter(Boolean) as string[];
-        let nonce: string | null = null;
-        let lastStatus: number | null = null;
-        for (const baseUrl of candidates) {
-            // Add cache buster to prevent getting cached responses (especially errors)
-            const nonceEndpoint = `${baseUrl}/wp-json/wc/store/v1/cart?_t=${Date.now()}`;
-            console.log('[Nonce API] Fetching nonce from:', nonceEndpoint);
-            // Make a simple GET request to the Store API to get a nonce
-            const response = await fetch(nonceEndpoint, {
-                method: 'GET',
-                credentials: 'omit', // Don't send cookies to prevent session conflicts
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            lastStatus = response.status;
-            console.log('[Nonce API] Response status:', response.status);
-            // The nonce is returned in the response headers
-            nonce = response.headers.get('nonce') ||
-                response.headers.get('x-wc-store-api-nonce') ||
-                response.headers.get('Nonce');
-            if (nonce) {
-                break;
-            }
-            const contentType = response.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-                try {
-                    const data = await response.json();
-                    console.log('[Nonce API] Response data:', data);
-                } catch (e) {
-                    console.error('[Nonce API] Failed to parse response:', e);
-                }
-            } else {
-                console.warn('[Nonce API] Non-JSON response, skipping body parse');
-            }
-        }
-        if (!nonce) {
-            console.warn('[Nonce API] No nonce found in headers. Using fallback.');
-            nonce = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        }
-        if (!nonce) {
-            console.error('[Nonce API] No nonce could be obtained');
-            return res.status(500).json({
-                error: 'Failed to obtain nonce',
-                details: 'WooCommerce Store API may not be properly configured. Check if the Store API is enabled on your backend.',
-                suggestion: 'You may need to enable the WooCommerce Store API or use GraphQL instead.'
-            });
-        }
-        console.log('[Nonce API] Nonce obtained:', nonce.substring(0, 20) + '...');
-        // Return the nonce to the client
-        return res.status(200).json({
-            nonce,
-            expiresIn: 12 * 60 * 60, // 12 hours in seconds
-            isTemporary: nonce.startsWith('temp_')
-        });
-    } catch (error) {
-        console.error('[Nonce API] Error:', error);
-        return res.status(500).json({
-            error: 'Failed to fetch nonce',
-            details: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
-}
-```
-
 ## File: src/pages/api/graphql.ts
 ```typescript
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -21592,6 +21311,284 @@ const GlobalInitializer = () => {
 export default GlobalInitializer;
 ```
 
+## File: src/pages/api/products/index.ts
+```typescript
+import type { NextApiRequest, NextApiResponse } from 'next';
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse
+) {
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+    try {
+        const { include, slug } = req.query;
+        const baseUrl = process.env.WORDPRESS_API_URL || 'https://api.shopwice.com';
+        const restEndpoint = `${baseUrl}/wp-json/wc/v3/products`;
+        const queryParams = new URLSearchParams();
+        if (process.env.WC_CONSUMER_KEY && process.env.WC_CONSUMER_SECRET) {
+            queryParams.append('consumer_key', process.env.WC_CONSUMER_KEY);
+            queryParams.append('consumer_secret', process.env.WC_CONSUMER_SECRET);
+        }
+        if (include) {
+            queryParams.append('include', include as string);
+        }
+        if (slug) {
+            queryParams.append('slug', slug as string);
+        }
+        const fetchUrl = `${restEndpoint}?${queryParams.toString()}`;
+        console.log('[API Proxy] Fetching products:', fetchUrl.replace(/consumer_secret=[^&]+/, 'consumer_secret=***'));
+        const response = await fetch(fetchUrl);
+        if (!response.ok) {
+            console.error('[API Proxy] Upstream error:', response.status, response.statusText);
+            return res.status(response.status).json({ error: 'Failed to fetch from upstream' });
+        }
+        const data = await response.json();
+        res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+        return res.status(200).json(data);
+    } catch (error) {
+        console.error('[API Proxy] Error:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+}
+```
+
+## File: src/pages/api/products/reviews.ts
+```typescript
+import type { NextApiRequest, NextApiResponse } from 'next';
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse
+) {
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+    try {
+        const { page, per_page, product } = req.query;
+        const baseUrl = process.env.WORDPRESS_API_URL || 'https://api.shopwice.com';
+        const restEndpoint = `${baseUrl}/wp-json/wc/v3/products/reviews`;
+        const queryParams = new URLSearchParams();
+        if (process.env.WC_CONSUMER_KEY && process.env.WC_CONSUMER_SECRET) {
+            queryParams.append('consumer_key', process.env.WC_CONSUMER_KEY);
+            queryParams.append('consumer_secret', process.env.WC_CONSUMER_SECRET);
+        }
+        if (page) queryParams.append('page', page as string);
+        if (per_page) queryParams.append('per_page', per_page as string);
+        if (product) queryParams.append('product', product as string);
+        const fetchUrl = `${restEndpoint}?${queryParams.toString()}`;
+        console.log('[API Proxy] Fetching reviews:', fetchUrl.replace(/consumer_secret=[^&]+/, 'consumer_secret=***'));
+        const response = await fetch(fetchUrl);
+        // Handle 404 cleanly (no reviews)
+        if (response.status === 404) {
+            return res.status(200).json([]);
+        }
+        if (!response.ok) {
+            console.error('[API Proxy] Upstream reviews error:', response.status, response.statusText);
+            return res.status(response.status).json({ error: 'Failed to fetch reviews' });
+        }
+        const data = await response.json();
+        // Cache reviews for a short time
+        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+        return res.status(200).json(data);
+    } catch (error) {
+        console.error('[API Proxy] Error:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+}
+```
+
+## File: src/pages/api/wc-store/[...path].ts
+```typescript
+import type { NextApiRequest, NextApiResponse } from 'next';
+/**
+ * WooCommerce Store API Generic Proxy
+ * 
+ * This endpoint proxies all requests to the WooCommerce Store API.
+ * It handles nonce-based authentication and ensures session isolation.
+ * 
+ * Usage:
+ * - GET /api/wc-store/cart -> /wp-json/wc/store/v1/cart
+ * - POST /api/wc-store/checkout -> /wp-json/wc/store/v1/checkout
+ * - etc.
+ */
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse
+) {
+    try {
+        // Force the correct backend URL as the environment variable NEXT_PUBLIC_STORE_API_URL
+        const storeApiUrl = process.env.NEXT_PUBLIC_STORE_API_URL || 'https://api.shopwice.com';
+        // Extract the path from the URL
+        // e.g., /api/wc-store/cart/add-item -> cart/add-item
+        const { path, ...queryParams } = req.query;
+        const apiPath = Array.isArray(path) ? path.join('/') : path;
+        if (!apiPath) {
+            return res.status(400).json({ error: 'Missing path parameter' });
+        }
+        // Build query string
+        const searchParams = new URLSearchParams();
+        Object.entries(queryParams).forEach(([key, value]) => {
+            if (Array.isArray(value)) {
+                value.forEach(v => searchParams.append(key, v));
+            } else if (value !== undefined) {
+                searchParams.append(key, value);
+            }
+        });
+        // Add cache buster to prevent Cloudflare caching of API responses
+        searchParams.append('_t', Date.now().toString());
+        const queryString = searchParams.toString();
+        // Build the target URL
+        const targetUrl = `${storeApiUrl}/wp-json/wc/store/v1/${apiPath}${queryString ? `?${queryString}` : ''}`;
+        console.log('[Store API Proxy] Forwarding:', req.method, targetUrl);
+        if (req.method !== 'GET') {
+            console.log('[Store API Proxy] Body:', JSON.stringify(req.body, null, 2));
+        }
+        // Prepare headers
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        // Forward Authorization header if present
+        if (req.headers['authorization']) {
+            headers['Authorization'] = req.headers['authorization'] as string;
+        }
+        // Forward nonce if present (our internal 'Nonce' header)
+        if (req.headers['nonce']) {
+            headers['X-WC-Store-API-Nonce'] = req.headers['nonce'] as string;
+        }
+        // Forward woocommerce-session header if present
+        if (req.headers['woocommerce-session']) {
+            headers['woocommerce-session'] = req.headers['woocommerce-session'] as string;
+        }
+        // Make the request to WooCommerce Store API
+        const response = await fetch(targetUrl, {
+            method: req.method,
+            credentials: 'omit',
+            headers,
+            body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined,
+        });
+        // Get the response data
+        let data;
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            data = await response.json();
+        } else {
+            data = { message: await response.text() };
+        }
+        // Forward the nonce header back if present
+        const nonceHeader = response.headers.get('nonce') ||
+            response.headers.get('x-wc-store-api-nonce');
+        if (nonceHeader) {
+            res.setHeader('Nonce', nonceHeader);
+        }
+        // Forward woocommerce-session header back if present
+        const sessionHeader = response.headers.get('woocommerce-session') || 
+                              response.headers.get('x-woocommerce-session');
+        if (sessionHeader) {
+            console.log('[Store API Proxy] Forwarding Session to client:', sessionHeader.substring(0, 20) + '...');
+            res.setHeader('woocommerce-session', sessionHeader);
+            // Also set x-woocommerce-session for compatibility
+            res.setHeader('x-woocommerce-session', sessionHeader);
+        }
+        // Return the response
+        return res.status(response.status).json(data);
+    } catch (error) {
+        console.error('[Store API Proxy] Error:', error);
+        return res.status(500).json({
+            error: 'Failed to proxy Store API request',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}
+```
+
+## File: src/pages/api/wc-store/nonce.ts
+```typescript
+import type { NextApiRequest, NextApiResponse } from 'next';
+/**
+ * WooCommerce Store API Nonce Endpoint
+ * 
+ * This endpoint fetches a fresh nonce from the WooCommerce Store API.
+ * Nonces are required for cart operations when using the Store API.
+ * 
+ * @see https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/src/StoreApi/docs/authentication.md
+ */
+export default async function handler(
+    req: NextApiRequest,
+    res: NextApiResponse
+) {
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+    try {
+        const candidates = [
+            process.env.NEXT_PUBLIC_STORE_API_URL,
+            'https://api.shopwice.com',
+            process.env.NEXT_PUBLIC_REST_API_URL,
+        ].filter(Boolean) as string[];
+        let nonce: string | null = null;
+        let lastStatus: number | null = null;
+        for (const baseUrl of candidates) {
+            // Add cache buster to prevent getting cached responses (especially errors)
+            const nonceEndpoint = `${baseUrl}/wp-json/wc/store/v1/cart?_t=${Date.now()}`;
+            console.log('[Nonce API] Fetching nonce from:', nonceEndpoint);
+            // Make a simple GET request to the Store API to get a nonce
+            const response = await fetch(nonceEndpoint, {
+                method: 'GET',
+                credentials: 'omit', // Don't send cookies to prevent session conflicts
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            lastStatus = response.status;
+            console.log('[Nonce API] Response status:', response.status);
+            // The nonce is returned in the response headers
+            nonce = response.headers.get('nonce') ||
+                response.headers.get('x-wc-store-api-nonce') ||
+                response.headers.get('Nonce');
+            if (nonce) {
+                break;
+            }
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                try {
+                    const data = await response.json();
+                    console.log('[Nonce API] Response data:', data);
+                } catch (e) {
+                    console.error('[Nonce API] Failed to parse response:', e);
+                }
+            } else {
+                console.warn('[Nonce API] Non-JSON response, skipping body parse');
+            }
+        }
+        if (!nonce) {
+            console.warn('[Nonce API] No nonce found in headers. Using fallback.');
+            nonce = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+        if (!nonce) {
+            console.error('[Nonce API] No nonce could be obtained');
+            return res.status(500).json({
+                error: 'Failed to obtain nonce',
+                details: 'WooCommerce Store API may not be properly configured. Check if the Store API is enabled on your backend.',
+                suggestion: 'You may need to enable the WooCommerce Store API or use GraphQL instead.'
+            });
+        }
+        console.log('[Nonce API] Nonce obtained:', nonce.substring(0, 20) + '...');
+        // Return the nonce to the client
+        return res.status(200).json({
+            nonce,
+            expiresIn: 12 * 60 * 60, // 12 hours in seconds
+            isTemporary: nonce.startsWith('temp_')
+        });
+    } catch (error) {
+        console.error('[Nonce API] Error:', error);
+        return res.status(500).json({
+            error: 'Failed to fetch nonce',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}
+```
+
 ## File: src/pages/location/[slug].tsx
 ```typescript
 import { useState, useEffect } from 'react';
@@ -23785,57 +23782,6 @@ export const getStaticProps: GetStaticProps = async () => {
 };
 ```
 
-## File: wrangler.jsonc
-```json
-{
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"main": ".open-next/worker.js",
-	"name": "shopwice",
-	"compatibility_date": "2026-02-05",
-	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
-	],
-	"vars": {
-		"NEXT_PUBLIC_SITE_URL": "https://web.shopwice.com",
-		"NEXT_PUBLIC_GRAPHQL_URL": "https://api.shopwice.com/graphql",
-		"NEXT_PUBLIC_REST_API_URL": "https://api.shopwice.com/api",
-		"NEXT_PUBLIC_STORE_API_URL": "https://api.shopwice.com/api",
-		"WORDPRESS_API_URL": "https://api.shopwice.com/api"
-	},
-	"assets": {
-		"directory": ".open-next/assets",
-		"binding": "ASSETS"
-	},
-	"services": [
-		{
-			// Self-reference service binding, the service name must match the worker name
-			// see https://opennext.js.org/cloudflare/caching
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "shopwice"
-		}
-	],
-	"r2_buckets": [
-		// Use R2 incremental cache
-		// See https://opennext.js.org/cloudflare/caching
-		{
-			"binding": "NEXT_INC_CACHE_R2_BUCKET",
-			// Create the bucket before deploying
-			// You can change the bucket name if you want
-			// See https://developers.cloudflare.com/workers/wrangler/commands/#r2-bucket-create
-			"bucket_name": "shopwice-media"
-		}
-	],
-	/*
-	"images": {
-		// Enable image optimization
-		// see https://opennext.js.org/cloudflare/howtos/image
-		"binding": "IMAGES"
-	}
-	*/
-}
-```
-
 ## File: src/components/Product/RecentRefurbishedReviewsREST.component.tsx
 ```typescript
 import React, { useMemo, useState, useEffect } from 'react';
@@ -24001,6 +23947,57 @@ const RecentRefurbishedReviewsREST = () => {
     );
 };
 export default RecentRefurbishedReviewsREST;
+```
+
+## File: wrangler.jsonc
+```json
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "shopwice",
+	"compatibility_date": "2026-02-05",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"vars": {
+		"NEXT_PUBLIC_SITE_URL": "https://shopwice.com",
+		"NEXT_PUBLIC_GRAPHQL_URL": "https://api.shopwice.com/graphql",
+		"NEXT_PUBLIC_REST_API_URL": "https://api.shopwice.com",
+		"NEXT_PUBLIC_STORE_API_URL": "https://api.shopwice.com",
+		"WORDPRESS_API_URL": "https://api.shopwice.com"
+	},
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			// Self-reference service binding, the service name must match the worker name
+			// see https://opennext.js.org/cloudflare/caching
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "shopwice"
+		}
+	],
+	"r2_buckets": [
+		// Use R2 incremental cache
+		// See https://opennext.js.org/cloudflare/caching
+		{
+			"binding": "NEXT_INC_CACHE_R2_BUCKET",
+			// Create the bucket before deploying
+			// You can change the bucket name if you want
+			// See https://developers.cloudflare.com/workers/wrangler/commands/#r2-bucket-create
+			"bucket_name": "shopwice-media"
+		}
+	],
+	/*
+	"images": {
+		// Enable image optimization
+		// see https://opennext.js.org/cloudflare/howtos/image
+		"binding": "IMAGES"
+	}
+	*/
+}
 ```
 
 ## File: src/utils/gql/GQL_QUERIES.ts
