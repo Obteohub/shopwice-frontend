@@ -22247,12 +22247,7 @@ const nextConfig = {
   },
   // Trigger restart 1
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'swewoocommerce.dfweb.no',
-        pathname: '**',
-      },
+    remotePatterns: {
       {
         protocol: 'https',
         hostname: 'shopwice.com',
