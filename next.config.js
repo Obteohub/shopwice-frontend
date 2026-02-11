@@ -13,11 +13,6 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'swewoocommerce.dfweb.no',
-        pathname: '**',
-      },
-      {
-        protocol: 'https',
         hostname: 'shopwice.com',
         pathname: '**',
       },
