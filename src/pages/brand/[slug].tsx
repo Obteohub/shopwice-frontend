@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-export const runtime = 'edge';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 
@@ -9,6 +8,8 @@ import { GET_BRAND_DATA_BY_SLUG, GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
 
 import Link from 'next/link';
+
+export const runtime = 'edge';
 
 /**
  * Display brand page with filtering, sorting, and infinite scroll

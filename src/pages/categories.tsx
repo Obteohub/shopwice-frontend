@@ -1,12 +1,12 @@
 import { NextPage, InferGetStaticPropsType, GetStaticProps } from 'next';
-export const runtime = 'edge';
-
 import Categories from '@/components/Category/Categories.component';
 import Layout from '@/components/Layout/Layout.component';
 
 import client from '@/utils/apollo/ApolloClient';
 
 import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
+
+export const runtime = 'edge';
 
 /**
  * Category page displays all of the categories

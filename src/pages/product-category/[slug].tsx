@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-export const runtime = 'edge';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
@@ -7,6 +6,8 @@ import client from '@/utils/apollo/ApolloClient';
 import { GET_CATEGORY_NODE_BY_SLUG, GET_CATEGORY_PRODUCTS_BY_ID, GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE } from '@/utils/gql/GQL_QUERIES';
 import { useLazyQuery } from '@apollo/client';
 import { Product } from '@/types/product';
+
+export const runtime = 'edge';
 
 // ----- TypeScript Types -----
 interface CategoryNode {

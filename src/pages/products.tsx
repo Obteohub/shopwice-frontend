@@ -1,11 +1,12 @@
 import Head from 'next/head';
-export const runtime = 'edge';
 import Layout from '@/components/Layout/Layout.component';
 import ProductList from '@/components/Product/ProductList.component';
 import client from '@/utils/apollo/ApolloClient';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
 import { FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
 import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
+
+export const runtime = 'edge';
 
 const Products: NextPage = ({
   products,

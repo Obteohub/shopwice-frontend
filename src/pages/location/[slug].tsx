@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-export const runtime = 'edge';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 
@@ -7,6 +6,8 @@ import client from '@/utils/apollo/ApolloClient';
 
 import { GET_LOCATION_DATA_BY_SLUG, GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/LOCATION_QUERIES';
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
+
+export const runtime = 'edge';
 
 /**
  * Display location page with filtering, sorting, and infinite scroll

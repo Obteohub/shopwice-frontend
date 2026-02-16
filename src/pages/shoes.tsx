@@ -1,12 +1,13 @@
 
 import React from 'react';
 import { GetStaticProps } from 'next';
-export const runtime = 'edge';
 import Layout from '@/components/Layout/Layout.component';
 import ProductList from '@/components/Product/ProductList.component';
 import client from '@/utils/apollo/ApolloClient';
 import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
 import BackButton from '@/components/UI/BackButton.component';
+
+export const runtime = 'edge';
 
 interface ShoesPageProps {
     category: any;

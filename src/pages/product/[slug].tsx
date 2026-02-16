@@ -1,6 +1,4 @@
 // Imports - Updated Layout
-export const runtime = 'edge';
-
 // Components
 import SingleProduct from '@/components/Product/SingleProductFinal.component';
 import Layout from '@/components/Layout/Layout.component';
@@ -18,6 +16,8 @@ import type {
 // GraphQL
 import { GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
 import { NextSeo, ProductJsonLd } from 'next-seo';
+
+export const runtime = 'edge';
 
 /**
  * Display a single product with dynamic pretty urls

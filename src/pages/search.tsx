@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-export const runtime = 'edge';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Layout from '@/components/Layout/Layout.component';
@@ -8,6 +7,8 @@ import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component
 import { SEARCH_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
 import { GetServerSideProps } from 'next';
 import client from '@/utils/apollo/ApolloClient';
+
+export const runtime = 'edge';
 
 interface SearchPageProps {
     products: any[];

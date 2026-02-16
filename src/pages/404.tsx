@@ -1,10 +1,11 @@
 import Link from 'next/link';
-export const runtime = 'edge';
 import Layout from '@/components/Layout/Layout.component';
 import client from '@/utils/apollo/ApolloClient';
 import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
 import ProductCard from '@/components/Product/ProductCard.component';
 import { Product } from '@/types/product';
+
+export const runtime = 'edge';
 
 interface Custom404Props {
     bestSellers: Product[];
