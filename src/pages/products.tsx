@@ -38,7 +38,6 @@ const Products: NextPage = ({
       <div className="pt-1 pb-1">
         <ProductList
           products={products}
-          title="All Products"
           pageInfo={pageInfo}
           query={FETCH_ALL_PRODUCTS_QUERY}
         />

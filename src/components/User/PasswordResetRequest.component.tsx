@@ -52,7 +52,7 @@ const PasswordResetRequest = () => {
         <div className="w-full max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-100">
             <div className="text-center mb-8">
                 <h1 className="text-2xl font-bold text-gray-900">Forgot Password?</h1>
-                <p className="text-gray-500 mt-2 text-sm">Enter your email and we'll send you instructions to reset your password.</p>
+                <p className="text-gray-500 mt-2 text-sm">Enter your email and we&apos;ll send you instructions to reset your password.</p>
             </div>
 
             <FormProvider {...methods}>

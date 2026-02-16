@@ -11,7 +11,6 @@ interface RootObject {
 }
 
 import { ChangeEvent } from 'react';
-import { IVariationNodes } from '@/components/Product/AddToCart.component';
 
 /* Interface for products*/
 

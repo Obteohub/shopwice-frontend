@@ -4,7 +4,6 @@ import {
   TERM_FIELDS,
   PRICING_FIELDS,
   VARIATION_FIELDS,
-  ATTRIBUTE_FIELDS,
 } from './FRAGMENTS';
 
 /**
@@ -43,18 +42,6 @@ export const PRODUCT_CARD_FIELDS_FRAGMENT = gql`
         options
         variation
         visible
-      }
-    }
-
-    productBrand: terms(where: { taxonomies: PRODUCTBRAND }) {
-      nodes {
-        ...TermFields
-      }
-    }
-
-    productLocation: terms(where: { taxonomies: PRODUCTLOCATION }) {
-      nodes {
-        ...TermFields
       }
     }
   }
@@ -104,110 +91,71 @@ export const HOME_PRODUCT_CARD_FIELDS_FRAGMENT = gql`
 `;
 
 export const GET_SINGLE_PRODUCT = gql`
-  query Product($slug: ID!) {
-  product(id: $slug, idType: SLUG) {
-      ...ProductCardFields
-    description
-    shortDescription
-    stockStatus
-    metaData {
-      id
-      key
-      value
-    }
+  query Product($slug: String!) {
+    products(first: 1, where: { search: $slug }) {
+      nodes {
+        ...ProductCardFields
+        description
+        shortDescription
+        stockStatus
 
-      galleryImages {
-        nodes {
-          ...ImageFields
-      }
-    }
-      productCategories(first: 50) {
-        nodes {
-          id
-          name
-          slug
-          ancestors(first: 20) {
+        galleryImages {
+          nodes {
+            ...ImageFields
+          }
+        }
+        productCategories {
+          nodes {
+            id
+            name
+            slug
+          }
+        }
+        reviews {
+          nodes {
+            id
+            content
+            date
+            rating
+            author {
+              node {
+                name
+              }
+            }
+          }
+        }
+        seo {
+          title
+          description
+          fullHead
+        }
+
+        ... on SimpleProduct {
+          sku
+          totalSales
+        }
+        ... on VariableProduct {
+          sku
+          totalSales
+          allPaColor {
             nodes {
-              id
               name
-              slug
+            }
+          }
+          allPaSize {
+            nodes {
+              name
+            }
+          }
+          variations(first: 50) {
+            nodes {
+              ...VariationFields
             }
           }
         }
       }
-      reviews {
-        nodes {
-        id
-        content
-        date
-        rating
-          author {
-            node {
-            name
-          }
-        }
-      }
-    }
-      seo {
-      title
-      description
-      fullHead
-    }
-    related(first: 12) {
-        nodes {
-          ...ProductCardFields
-      }
-    }
-    crossSell(first: 12) {
-        nodes {
-          ...ProductCardFields
-        }
-    }
-    upsell(first: 12) {
-        nodes {
-          ...ProductCardFields
-        }
-    }
-
-      ... on SimpleProduct {
-      sku
-      totalSales
-    }
-      ... on VariableProduct {
-      sku
-      totalSales
-        allPaColor {
-          nodes {
-          name
-        }
-      }
-        allPaSize {
-          nodes {
-          name
-        }
-      }
-        variations(first: 50) {
-          nodes {
-            ...VariationFields
-        }
-      }
-    }
-      ... on ExternalProduct {
-      externalUrl
-    }
-      ... on GroupProduct {
-        products {
-          nodes {
-            ...ProductCardFields
-        }
-      }
-    }
-    metaData {
-      key
-      value
     }
   }
-}
 
   ${PRODUCT_CARD_FIELDS_FRAGMENT}
   ${VARIATION_FIELDS}
@@ -219,7 +167,7 @@ export const GET_SINGLE_PRODUCT = gql`
 
 export const FETCH_FIRST_PRODUCTS_FROM_HOODIES_QUERY = `
  query MyQuery {
-  products(first: 4, where: { category: "Hoodies" }) {
+  products(first: 4, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["hoodies"] }] } }) {
     nodes {
       databaseId
       name
@@ -266,39 +214,17 @@ export const FETCH_ALL_PRODUCTS_QUERY = gql`
  */
 export const FETCH_ALL_CATEGORIES_QUERY = gql`
   query Categories {
-  productCategories(first: 50, where: { parent: 0 }) {
+  productCategories {
       nodes {
       id
+      databaseId
       name
       slug
+      parent
       image {
         id
         sourceUrl
         altText
-      }
-      children(first: 20) {
-          nodes {
-          id
-          name
-          slug
-          image {
-            id
-            sourceUrl
-            altText
-          }
-          children(first: 20) {
-              nodes {
-              id
-              name
-              slug
-              image {
-                id
-                sourceUrl
-                altText
-              }
-            }
-          }
-        }
       }
     }
   }
@@ -307,12 +233,14 @@ export const FETCH_ALL_CATEGORIES_QUERY = gql`
 
 export const GET_CATEGORY_DATA_BY_SLUG = gql`
   query CategoryData($slug: [String]!, $first: Int = 24, $after: String) {
-    productCategories(where: { slug: $slug }) {
+    productCategories {
       nodes {
         databaseId
         name
         description
         count
+        slug
+        parent
       }
     }
     products(
@@ -337,13 +265,15 @@ export const GET_CATEGORY_DATA_BY_SLUG = gql`
 `;
 
 export const GET_CATEGORY_NODE_BY_SLUG = gql`
-  query CategoryNodeBySlug($slug: [String]!) {
-    productCategories(where: { slug: $slug }) {
+  query CategoryNodeBySlug {
+    productCategories {
       nodes {
         databaseId
         name
         description
         count
+        slug
+        parent
       }
     }
   }
@@ -443,12 +373,14 @@ export const GET_CATEGORY_DATA_BY_SLUG_WITH_ATTRIBUTE = gql`
     $first: Int = 24
     $after: String
   ) {
-    productCategories(where: { slug: $slug }) {
+    productCategories {
       nodes {
         databaseId
         name
         description
         count
+        slug
+        parent
       }
     }
     products(
@@ -692,17 +624,17 @@ export const SEARCH_PRODUCTS_QUERY = gql`
 
 export const GET_404_PAGE_PRODUCTS = gql`
   query Get404PageProducts {
-  bestSellers: products(first: 5, where: { orderby: { field: TOTAL_SALES, order: DESC } }) {
+  bestSellers: products(first: 5) {
       nodes {
         ...ProductCardFields
     }
   }
-  newest: products(first: 5, where: { orderby: { field: DATE, order: DESC } }) {
+  newest: products(first: 5) {
       nodes {
         ...ProductCardFields
     }
   }
-  topRated: products(first: 5, where: { orderby: { field: RATING, order: DESC } }) {
+  topRated: products(first: 5) {
       nodes {
         ...ProductCardFields
     }
@@ -713,7 +645,7 @@ export const GET_404_PAGE_PRODUCTS = gql`
 
 export const FETCH_TOP_RATED_PRODUCTS_QUERY = gql`
   query FetchTopRatedProducts {
-  products(first: 12, where: { orderby: { field: RATING, order: DESC } }) {
+  products(first: 12) {
       nodes {
         ...ProductCardFields
     }
@@ -724,7 +656,7 @@ export const FETCH_TOP_RATED_PRODUCTS_QUERY = gql`
 
 export const FETCH_BEST_SELLING_PRODUCTS_QUERY = gql`
   query FetchBestSellingProducts {
-  products(first: 12, where: { orderby: { field: TOTAL_SALES, order: DESC } }) {
+  products(first: 12) {
       nodes {
         ...ProductCardFields
     }
@@ -736,7 +668,7 @@ export const FETCH_BEST_SELLING_PRODUCTS_QUERY = gql`
 
 export const FETCH_AIR_CONDITIONER_PRODUCTS_QUERY = gql`
   query FetchAirConditionerProducts {
-  products(first: 12, where: { category: "air-conditioners" }) {
+  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["air-conditioners"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -747,7 +679,7 @@ export const FETCH_AIR_CONDITIONER_PRODUCTS_QUERY = gql`
 
 export const FETCH_MOBILE_PHONES_ON_SALE_QUERY = gql`
   query FetchMobilePhonesOnSale {
-  products(first: 12, where: { category: "mobile-phones", onSale: true }) {
+  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["mobile-phones"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -758,7 +690,7 @@ export const FETCH_MOBILE_PHONES_ON_SALE_QUERY = gql`
 
 export const FETCH_LAPTOPS_QUERY = gql`
   query FetchLaptops {
-  products(first: 12, where: { category: "laptops" }) {
+  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["laptops"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -769,7 +701,7 @@ export const FETCH_LAPTOPS_QUERY = gql`
 
 export const FETCH_SPEAKERS_QUERY = gql`
   query FetchSpeakers {
-  products(first: 12, where: { category: "speakers" }) {
+  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["speakers"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -780,7 +712,7 @@ export const FETCH_SPEAKERS_QUERY = gql`
 
 export const FETCH_TELEVISIONS_QUERY = gql`
   query FetchTelevisions {
-  products(first: 12, where: { category: "televisions" }) {
+  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["televisions"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -791,7 +723,7 @@ export const FETCH_TELEVISIONS_QUERY = gql`
 
 export const FETCH_PROMO_PRODUCT_QUERY = gql`
   query FetchPromoProduct($slug: ID!) {
-  product(id: $slug, idType: SLUG) {
+  product(id: $slug) {
       ...ProductCardFields
   }
 }
@@ -801,42 +733,42 @@ export const FETCH_PROMO_PRODUCT_QUERY = gql`
 
 export const FETCH_HOME_PAGE_DATA = gql`
   query FetchHomePageData($promoProductSlug: ID!) {
-  topRatedProducts: products(first: 12, where: { orderby: { field: RATING, order: DESC } }) {
+  topRatedProducts: products(first: 12) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  bestSellingProducts: products(first: 12, where: { orderby: { field: TOTAL_SALES, order: DESC } }) {
+  bestSellingProducts: products(first: 12) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  airConditionerProducts: products(first: 12, where: { category: "air-conditioners" }) {
+  airConditionerProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["air-conditioners"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  mobilePhonesOnSale: products(first: 12, where: { category: "mobile-phones", onSale: true }) {
+  mobilePhonesOnSale: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["mobile-phones"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  laptopsProducts: products(first: 12, where: { category: "laptops" }) {
+  laptopsProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["laptops"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  speakersProducts: products(first: 12, where: { category: "speakers" }) {
+  speakersProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["speakers"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  televisionsProducts: products(first: 12, where: { category: "televisions" }) {
+  televisionsProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["televisions"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  promoProduct: product(id: $promoProductSlug, idType: SLUG) {
+  promoProduct: product(id: $promoProductSlug) {
       ...HomeProductCardFields
   }
 }
@@ -845,12 +777,12 @@ export const FETCH_HOME_PAGE_DATA = gql`
 
 export const FETCH_HOME_PAGE_SSG = gql`
   query FetchHomePageSsg($promoProductSlug: ID!) {
-    topRatedProducts: products(first: 12, where: { orderby: { field: RATING, order: DESC } }) {
+    topRatedProducts: products(first: 12) {
       nodes {
         ...HomeProductCardFields
       }
     }
-    promoProduct: product(id: $promoProductSlug, idType: SLUG) {
+    promoProduct: product(id: $promoProductSlug) {
       ...HomeProductCardFields
     }
   }

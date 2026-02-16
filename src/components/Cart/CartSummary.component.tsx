@@ -2,7 +2,6 @@
 import React from 'react';
 import Link from 'next/link';
 import Button from '@/components/UI/Button.component';
-import { useCartStore } from '@/stores/cartStore';
 
 interface CartSummaryProps {
     subtotal: string;

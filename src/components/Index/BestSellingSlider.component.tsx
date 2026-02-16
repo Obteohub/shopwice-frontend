@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ProductCard from '../Product/ProductCard.component';
 import { Product } from '@/types/product';
@@ -9,7 +9,7 @@ interface BestSellingSliderProps {
 
 const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [slidesPerView, setSlidesPerView] = useState(1);
+    const [slidesPerView, setSlidesPerView] = useState(2);
 
     // ---------- Responsive Slides ----------
     useEffect(() => {
@@ -29,17 +29,15 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
         updateSlides();
         window.addEventListener('resize', handleResize);
 
-        return () => window.removeEventListener('resize', handleResize);
+        return () => {
+            clearTimeout(resizeTimeout);
+            window.removeEventListener('resize', handleResize);
+        };
     }, []);
-
-    // ---------- Prevent invalid index ----------
-    useEffect(() => {
-        const maxIndex = Math.max(0, products.length - slidesPerView);
-        if (currentIndex > maxIndex) setCurrentIndex(0);
-    }, [slidesPerView, products.length]);
 
     const safeProducts = products || [];
     const maxIndex = Math.max(0, safeProducts.length - slidesPerView);
+    const effectiveIndex = Math.min(currentIndex, maxIndex);
 
     const nextSlide = () =>
         setCurrentIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
@@ -72,7 +70,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
 
                 {/* ---------- MOBILE SCROLL ---------- */}
                 <div className="md:hidden flex overflow-x-auto snap-x snap-mandatory gap-2 pb-4 no-scrollbar">
-                    {products.map((product, index) => (
+                    {safeProducts.map((product, index) => (
                         <div
                             key={product.databaseId ?? index}
                             className="snap-start shrink-0 w-[42vw]"
@@ -88,10 +86,10 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
                     <div
                         className="flex w-full transition-transform duration-500 ease-out [transform:var(--slide-transform)]"
                         style={{
-                            '--slide-transform': `translateX(-${(currentIndex * 100) / slidesPerView}%)`,
+                            '--slide-transform': `translateX(-${(effectiveIndex * 100) / slidesPerView}%)`,
                         } as React.CSSProperties}
                     >
-                        {products.map((product, index) => (
+                        {safeProducts.map((product, index) => (
                             <div
                                 key={product.databaseId ?? index}
                                 className="px-2 shrink-0 w-1/2 md:w-1/5 lg:w-[12.5%]"
@@ -102,7 +100,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
                     </div>
 
                     {/* ---------- ARROWS ---------- */}
-                    {products.length > slidesPerView && (
+                    {safeProducts.length > slidesPerView && (
                         <>
                             <button
                                 onClick={prevSlide}

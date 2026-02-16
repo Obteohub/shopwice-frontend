@@ -13,8 +13,7 @@ import { useCartStore } from '@/stores/cartStore';
 
 // Utils
 import { getFormattedCart } from '@/utils/functions/functions';
-import { ADD_TO_CART } from '@/utils/gql/GQL_MUTATIONS';
-import { clearCart } from '@/utils/wc-store-api/cartService'; // Keep clearCart for Buy Now logic if needed, or remove if we want full GraphQL
+import { ADD_TO_CART, UPDATE_CART } from '@/utils/gql/GQL_MUTATIONS';
 
 
 interface IImage {
@@ -168,6 +167,18 @@ const AddToCart = ({
     }
   });
 
+  const [updateCart] = useMutation(UPDATE_CART, {
+    onCompleted: (data) => {
+      if (data?.updateItemQuantities?.cart) {
+        const formattedCart = getFormattedCart({ cart: data.updateItemQuantities.cart });
+        syncWithWooCommerce(formattedCart);
+      }
+    },
+    onError: (error) => {
+      console.error('Update cart error:', error);
+    }
+  });
+
   useEffect(() => {
     if (isSuccess) {
       const timer = setTimeout(() => setIsSuccess(false), 2000);
@@ -189,10 +200,20 @@ const AddToCart = ({
     // Use global store state to check if cart has items
     if (buyNow && cart?.products && cart.products.length > 0) {
       try {
-        await clearCart();
-        console.log("AddToCart: Cart cleared for Buy Now");
+        const itemsToClear = cart.products.map((item) => ({
+          key: item.cartKey,
+          quantity: 0
+        }));
+        await updateCart({
+          variables: {
+            input: {
+              clientMutationId: uuidv4(),
+              items: itemsToClear
+            }
+          }
+        });
       } catch (e) {
-        console.error("AddToCart: Failed to clear cart before Buy Now", e);
+        console.error('AddToCart: Failed to clear cart before Buy Now', e);
       }
     }
 

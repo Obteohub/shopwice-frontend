@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 import FadeLeftToRight from '@/components/Animations/FadeLeftToRight.component';
@@ -27,42 +27,26 @@ const Hamburger = () => {
     null,
   );
 
-  useEffect(() => {
-    if (isExpanded) {
-      setHidden('');
-      setIsAnimating(true);
-
-      // Clear any existing timeout
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current);
-      }
-
-      // Set a timeout for the animation duration
-      animationTimeoutRef.current = setTimeout(() => {
-        setIsAnimating(false);
-      }, 1000); // Match this with the animation duration
-    } else {
-      setIsAnimating(true);
-
-      // Clear any existing timeout
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current);
-      }
-
-      // Set a timeout for the animation duration and hiding
-      animationTimeoutRef.current = setTimeout(() => {
-        setHidden('invisible');
-        setIsAnimating(false);
-      }, 1000); // Match this with the animation duration
+  const startAnimation = useCallback((nextExpanded: boolean) => {
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current);
     }
 
-    // Cleanup function to clear timeout when component unmounts
-    return () => {
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current);
-      }
-    };
-  }, [isExpanded]);
+    setIsAnimating(true);
+
+    if (nextExpanded) {
+      setHidden('');
+      animationTimeoutRef.current = setTimeout(() => {
+        setIsAnimating(false);
+      }, 1000);
+      return;
+    }
+
+    animationTimeoutRef.current = setTimeout(() => {
+      setHidden('invisible');
+      setIsAnimating(false);
+    }, 1000);
+  }, []);
 
   const handleMobileMenuClick = useCallback(() => {
     // Prevent clicks during animation
@@ -75,8 +59,18 @@ const Hamburger = () => {
      * Even if your state updates are batched and multiple updates to the enabled/disabled state are made together
      * each update will rely on the correct previous state so that you always end up with the result you expect.
      */
-    setisExpanded((prevExpanded) => !prevExpanded);
-  }, [setisExpanded, isAnimating]);
+    setisExpanded((prevExpanded) => {
+      const nextExpanded = !prevExpanded;
+      startAnimation(nextExpanded);
+      return nextExpanded;
+    });
+  }, [isAnimating, startAnimation]);
+
+  const handleCloseMenu = useCallback(() => {
+    if (isAnimating) return;
+    startAnimation(false);
+    setisExpanded(false);
+  }, [isAnimating, startAnimation]);
 
   return (
     <div className="z-50 md:hidden lg:hidden xl:hidden bg-blue-800">
@@ -131,18 +125,14 @@ const Hamburger = () => {
                   <Link href={href} passHref>
                     <span
                       className="text-xl inline-block px-4 py-2 no-underline hover:text-black hover:underline"
-                      onClick={() => {
-                        if (!isAnimating) {
-                          setisExpanded((prevExpanded) => !prevExpanded);
-                        }
-                      }}
+                      onClick={handleCloseMenu}
                       onKeyDown={(event) => {
                         // 'Enter' key or 'Space' key
                         if (
                           (event.key === 'Enter' || event.key === ' ') &&
                           !isAnimating
                         ) {
-                          setisExpanded((prevExpanded) => !prevExpanded);
+                          handleCloseMenu();
                         }
                       }}
                       tabIndex={0} // Make the span focusable

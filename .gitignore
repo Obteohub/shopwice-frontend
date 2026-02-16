@@ -58,3 +58,6 @@ next-env.d.ts
 /playwright-report/
 /playwright/.cache/
 src/pages/registrer.tsx
+
+# Cloudflare
+.wrangler

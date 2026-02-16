@@ -16,7 +16,7 @@ import { FETCH_HOME_PAGE_SSG } from '@/utils/gql/GQL_QUERIES';
 import { useGlobalStore } from '@/stores/globalStore';
 import { useEffect } from 'react';
 
-const SectionSkeleton = ({ title }: { title: string }) => (
+const SectionSkeleton = () => (
   <div className="px-4 md:px-6 py-6">
     <div className="h-5 w-48 bg-gray-200 rounded animate-pulse mb-4" aria-hidden="true" />
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -28,42 +28,42 @@ const SectionSkeleton = ({ title }: { title: string }) => (
 );
 
 const TopRatedProducts = dynamic(() => import('@/components/Index/TopRatedProducts.component'), {
-  loading: () => <SectionSkeleton title="Top Rated" />,
+  loading: () => <SectionSkeleton />,
 });
 const AirConditionerProducts = dynamic(() => import('@/components/Index/AirConditionerProducts.component'), {
-  loading: () => <SectionSkeleton title="Air Conditioners" />,
+  loading: () => <SectionSkeleton />,
 });
 const MobilePhonesOnSale = dynamic(() => import('@/components/Index/MobilePhonesOnSale.component'), {
-  loading: () => <SectionSkeleton title="Mobile Phones" />,
+  loading: () => <SectionSkeleton />,
 });
 const LaptopsProducts = dynamic(() => import('@/components/Index/LaptopsProducts.component'), {
-  loading: () => <SectionSkeleton title="Laptops" />,
+  loading: () => <SectionSkeleton />,
 });
 const SpeakersProducts = dynamic(() => import('@/components/Index/SpeakersProducts.component'), {
-  loading: () => <SectionSkeleton title="Speakers" />,
+  loading: () => <SectionSkeleton />,
 });
 const TelevisionsProducts = dynamic(() => import('@/components/Index/TelevisionsProducts.component'), {
-  loading: () => <SectionSkeleton title="Televisions" />,
+  loading: () => <SectionSkeleton />,
 });
 const BestSellingSlider = dynamic(() => import('@/components/Index/BestSellingSlider.component'), {
-  loading: () => <SectionSkeleton title="Best Selling" />,
+  loading: () => <SectionSkeleton />,
 });
 const WhyChooseUs = dynamic(() => import('@/components/Index/WhyChooseUs.component'), {
-  loading: () => <SectionSkeleton title="Why Choose Us" />,
+  loading: () => <SectionSkeleton />,
 });
 const PromoBoxes = dynamic(() => import('@/components/Index/PromoBoxes.component'), {
-  loading: () => <SectionSkeleton title="Promotions" />,
+  loading: () => <SectionSkeleton />,
 });
 const InfoBanner = dynamic(() => import('@/components/Index/InfoBanner.component'), {
-  loading: () => <SectionSkeleton title="Info" />,
+  loading: () => <SectionSkeleton />,
 });
 const Newsletter = dynamic(() => import('@/components/Index/Newsletter.component'), {
-  loading: () => <SectionSkeleton title="Newsletter" />,
+  loading: () => <SectionSkeleton />,
 });
-const RecentRefurbishedReviewsREST = dynamic(
-  () => import('@/components/Product/RecentRefurbishedReviewsREST.component'),
+const RecentRefurbishedReviews = dynamic(
+  () => import('@/components/Product/RecentRefurbishedReviews.component'),
   {
-    loading: () => <SectionSkeleton title="Reviews" />,
+    loading: () => <SectionSkeleton />,
   }
 );
 
@@ -86,16 +86,17 @@ const Index: NextPage = ({
 }: InferGetStaticPropsType<typeof getStaticProps>) => {
   const setHomeData = useGlobalStore((state) => state.setHomeData);
   const homeData = useGlobalStore((state) => state.homeData);
+  const hasHydrated = useGlobalStore((state) => state.hasHydrated);
 
   // If props are empty (build error), fallback to cached data from store
-  const topRatedProducts = initialTopRated?.length > 0 ? initialTopRated : (homeData.topRatedProducts || []);
-  const bestSellingProducts = initialBestSelling?.length > 0 ? initialBestSelling : (homeData.bestSellingProducts || []);
-  const airConditionerProducts = initialAir?.length > 0 ? initialAir : (homeData.airConditionerProducts || []);
-  const mobilePhonesOnSale = initialMobile?.length > 0 ? initialMobile : (homeData.mobilePhonesOnSale || []);
-  const laptopsProducts = initialLaptops?.length > 0 ? initialLaptops : (homeData.laptopsProducts || []);
-  const speakersProducts = initialSpeakers?.length > 0 ? initialSpeakers : (homeData.speakersProducts || []);
-  const televisionsProducts = initialTelevisions?.length > 0 ? initialTelevisions : (homeData.televisionsProducts || []);
-  const promoProduct = initialPromo || homeData.promoProduct;
+  const topRatedProducts = initialTopRated?.length > 0 ? initialTopRated : (hasHydrated ? (homeData.topRatedProducts || []) : []);
+  const bestSellingProducts = initialBestSelling?.length > 0 ? initialBestSelling : (hasHydrated ? (homeData.bestSellingProducts || []) : []);
+  const airConditionerProducts = initialAir?.length > 0 ? initialAir : (hasHydrated ? (homeData.airConditionerProducts || []) : []);
+  const mobilePhonesOnSale = initialMobile?.length > 0 ? initialMobile : (hasHydrated ? (homeData.mobilePhonesOnSale || []) : []);
+  const laptopsProducts = initialLaptops?.length > 0 ? initialLaptops : (hasHydrated ? (homeData.laptopsProducts || []) : []);
+  const speakersProducts = initialSpeakers?.length > 0 ? initialSpeakers : (hasHydrated ? (homeData.speakersProducts || []) : []);
+  const televisionsProducts = initialTelevisions?.length > 0 ? initialTelevisions : (hasHydrated ? (homeData.televisionsProducts || []) : []);
+  const promoProduct = initialPromo || (hasHydrated ? homeData.promoProduct : null);
 
   useEffect(() => {
     if (initialTopRated?.length > 0) {
@@ -129,7 +130,7 @@ const Index: NextPage = ({
         <BestSellingSlider products={bestSellingProducts} />
 
         <div className="container mx-auto px-4 mb-8">
-          <RecentRefurbishedReviewsREST />
+          <RecentRefurbishedReviews />
         </div>
 
         <InfoBanner />

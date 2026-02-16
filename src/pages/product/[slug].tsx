@@ -1,11 +1,8 @@
 // Imports - Updated Layout
-import { withRouter } from 'next/router';
-import { useRouter } from 'next/router';
 
 // Components
 import SingleProduct from '@/components/Product/SingleProductFinal.component';
 import Layout from '@/components/Layout/Layout.component';
-import { gql } from '@apollo/client';
 
 // Utilities
 import client from '@/utils/apollo/ApolloClient';
@@ -18,8 +15,7 @@ import type {
 } from 'next';
 
 // GraphQL
-import { GET_SINGLE_PRODUCT, PRODUCT_CARD_FIELDS_FRAGMENT } from '@/utils/gql/GQL_QUERIES';
-import { VARIATION_FIELDS } from '@/utils/gql/FRAGMENTS';
+import { GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
 import { NextSeo, ProductJsonLd } from 'next-seo';
 
 /**
@@ -28,13 +24,12 @@ import { NextSeo, ProductJsonLd } from 'next-seo';
  * @param {InferGetServerSidePropsType<typeof getServerSideProps>} products
  * @returns {JSX.Element} - Rendered component
  */
-const product: NextPage = ({
+const ProductPage: NextPage = ({
   product,
   loading,
   networkStatus,
   isRefurbished
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-  const router = useRouter();
   const hasError = networkStatus === 8;
   // --- SEO Preparation ---
   // Safely extract data
@@ -131,7 +126,7 @@ const product: NextPage = ({
 };
 
 
-export default withRouter(product);
+export default ProductPage;
 
 export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
   try {
@@ -149,24 +144,36 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res }) =>
     let loading = true;
     let networkStatus;
 
-    // 1. Try Direct Lookup
+    // Search for product and filter by exact slug match
     try {
       const result = await client.query({
         query: GET_SINGLE_PRODUCT,
         variables: { slug },
         fetchPolicy: 'no-cache'
       });
-      product = result.data.product;
+
+      // Get nodes from search results
+      const nodes = result.data?.products?.nodes || [];
+
+      // Find exact slug match (case-insensitive for better compatibility)
+      product = nodes.find((node: any) =>
+        node?.slug?.toLowerCase() === slug.toLowerCase()
+      ) || null;
+
+      // If no exact match but we have results, log for debugging
+      if (!product && nodes.length > 0) {
+        console.log(`[SSR] Search returned ${nodes.length} products but none matched slug exactly`);
+        console.log(`[SSR] Looking for: "${slug}", found: ${nodes.map((n: any) => n.slug).join(', ')}`);
+      }
+
       loading = result.loading;
       networkStatus = result.networkStatus;
+
+      console.log(`[SSR] Search result for ${slug}:`, product ? 'Found' : 'Not Found');
     } catch (e) {
-      console.error(`[SSR] Direct lookup failed for ${slug}`, e);
+      console.error(`[SSR] Product lookup failed for ${slug}`, e);
     }
 
-    // 2. Fallback: Search by Slug if direct lookup returned null
-    // REMOVED: Fallback search was causing timeouts and returning incorrect results.
-    // If direct lookup fails, the product likely does not exist or the slug is incorrect.
-    
     console.log(`[SSR] Final product result for ${slug}:`, product ? 'Found' : 'Not Found');
 
     if (!product) {
@@ -191,9 +198,9 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res }) =>
     console.log(`[SSR] Product: ${product.name}`);
     console.log(`[SSR] Type: ${product.__typename}`);
     if (product.variations) {
-        console.log(`[SSR] Variations found: ${product.variations.nodes?.length || 0}`);
+      console.log(`[SSR] Variations found: ${product.variations.nodes?.length || 0}`);
     } else {
-        console.log(`[SSR] No variations field on product object`);
+      console.log(`[SSR] No variations field on product object`);
     }
     console.log(`[SSR] isRefurbished: ${isRefurbished}`);
 

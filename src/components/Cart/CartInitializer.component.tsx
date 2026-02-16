@@ -3,9 +3,9 @@ import { useEffect } from 'react';
 // State
 import { useCartStore } from '@/stores/cartStore';
 
-// Store API
-import { getCart } from '@/utils/wc-store-api/cartService';
-import { formatStoreApiCartForStore } from '@/utils/functions/storeApiCartUtils';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_CART } from '@/utils/gql/GQL_QUERIES';
+import { getFormattedCart } from '@/utils/functions/functions';
 
 /**
  * Non-rendering component responsible for initializing the cart state
@@ -20,11 +20,16 @@ const CartInitializer = () => {
   useEffect(() => {
     const loadCart = async () => {
       try {
-        const cart = await getCart();
-        const formatted = formatStoreApiCartForStore(cart);
-        syncWithWooCommerce(formatted);
+        const { data } = await client.query({
+          query: GET_CART,
+          fetchPolicy: 'network-only'
+        });
+        if (data?.cart) {
+          const formatted = getFormattedCart({ cart: data.cart });
+          syncWithWooCommerce(formatted);
+        }
       } catch (error) {
-        console.error('[CartInitializer] Failed to load Store API cart:', error);
+        console.error('[CartInitializer] Failed to load cart:', error);
       }
     };
 

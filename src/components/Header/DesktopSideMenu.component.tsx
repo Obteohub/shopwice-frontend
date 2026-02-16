@@ -1,68 +1,44 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from '@apollo/client';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
+import { useQuery } from '@apollo/client';
 
 interface Category {
     id: string;
+    databaseId: number;
     name: string;
     slug: string;
+    parent?: number | null;
     children?: {
         nodes: Category[];
     };
 }
 
 const DesktopSideMenu = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-    const [loading, setLoading] = useState(false);
-    const [data, setData] = useState<any>(null);
+    const [cachedData] = useState<any>(() => {
+        if (typeof window === 'undefined') return null;
+        const cached = localStorage.getItem('shopwice_menu_cache');
+        if (!cached) return null;
+        try {
+            return JSON.parse(cached);
+        } catch (e) {
+            console.error('Error parsing menu cache', e);
+            localStorage.removeItem('shopwice_menu_cache');
+            return null;
+        }
+    });
     const [viewStack, setViewStack] = useState<Category[]>([]);
 
-    useEffect(() => {
-        if (isOpen && !data) {
-            setLoading(true);
-            const CACHE_KEY = 'shopwice_menu_cache';
-            const cachedData = localStorage.getItem(CACHE_KEY);
-
-            if (cachedData) {
-                try {
-                    const parsedData = JSON.parse(cachedData);
-                    setData(parsedData);
-                    setLoading(false);
-                } catch (e) {
-                    console.error("Error parsing menu cache", e);
-                    localStorage.removeItem(CACHE_KEY);
-                }
-            }
-
-            // Only fetch if no cache found (or cache invalid)
-            if (!cachedData) {
-                fetch(process.env.NEXT_PUBLIC_GRAPHQL_URL as string, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'omit',
-                    cache: 'force-cache',
-                    body: JSON.stringify({
-                        query: require('graphql').print(FETCH_ALL_CATEGORIES_QUERY)
-                    }),
-                })
-                    .then(res => res.json())
-                    .then(json => {
-                        if (json.errors) throw new Error(json.errors[0].message);
-                        setData(json.data);
-                        localStorage.setItem(CACHE_KEY, JSON.stringify(json.data));
-                        setLoading(false);
-                    })
-                    .catch(err => {
-                        console.error('DesktopSideMenu Fetch Error:', err);
-                        setLoading(false);
-                    });
-            } else {
-                // cache hit, ensure loading is off
-                setLoading(false);
+    const { data: queryData, loading: queryLoading } = useQuery(FETCH_ALL_CATEGORIES_QUERY, {
+        fetchPolicy: 'network-only',
+        skip: !isOpen || !!cachedData,
+        onCompleted: (result) => {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('shopwice_menu_cache', JSON.stringify(result));
             }
         }
-    }, [isOpen, data]);
+    });
 
     // Reset view stack when menu closes
     useEffect(() => {
@@ -82,14 +58,31 @@ const DesktopSideMenu = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
         return () => { document.body.style.overflow = 'unset'; };
     }, [isOpen]);
 
-    if (!isOpen && viewStack.length === 0) return null;
+    const data = cachedData || queryData;
+    const loading = queryLoading && !cachedData;
+    const categoryTree = useMemo(() => {
+        const nodes: Category[] = data?.productCategories?.nodes || [];
+        const byId = new Map<number, Category>();
+        nodes.forEach((node) => {
+            byId.set(node.databaseId, { ...node, children: { nodes: [] } });
+        });
+        byId.forEach((node) => {
+            const parentId = typeof node.parent === 'number' ? node.parent : Number(node.parent || 0);
+            if (parentId && byId.has(parentId)) {
+                byId.get(parentId)?.children?.nodes.push(node);
+            }
+        });
+        return Array.from(byId.values()).filter((node) => !node.parent || Number(node.parent) === 0);
+    }, [data]);
 
     const currentCategory = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
     const categoriesToShow = currentCategory
         ? currentCategory.children?.nodes
-        : data?.productCategories?.nodes?.filter((cat: any) =>
+        : categoryTree?.filter((cat: any) =>
             cat.name.toLowerCase() !== 'uncategorized' && cat.slug !== 'uncategorized'
         );
+
+    if (!isOpen && viewStack.length === 0) return null;
 
     const handleCategoryClick = (category: Category) => {
         if (category.children && category.children.nodes.length > 0) {

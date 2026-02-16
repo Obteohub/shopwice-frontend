@@ -27,9 +27,12 @@ export const getStaticProps: GetStaticProps = async () => {
       query: FETCH_ALL_CATEGORIES_QUERY,
     });
 
+    const nodes = result.data?.productCategories?.nodes || [];
+    const rootCategories = nodes.filter((node: any) => !node.parent || Number(node.parent) === 0);
+
     return {
       props: {
-        categories: result.data?.productCategories?.nodes || [],
+        categories: rootCategories,
       },
       revalidate: 60,
     };

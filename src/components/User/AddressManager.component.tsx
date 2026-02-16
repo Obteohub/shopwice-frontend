@@ -7,7 +7,7 @@ import { InputField } from '../Input/InputField.component';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
 import Button from '../UI/Button.component';
 import { useLoadScript } from '@react-google-maps/api';
-import usePlacesAutocomplete, { getGeocode, getZipCode, getLatLng } from 'use-places-autocomplete';
+import usePlacesAutocomplete, { getGeocode } from 'use-places-autocomplete';
 
 interface IAddressData {
     shipping: {
@@ -117,9 +117,7 @@ const AddressManager = ({ customer }: { customer: any }) => {
     const shipping = customer?.shipping || {};
     const billing = customer?.billing || {};
 
-    const { data: countriesData } = useQuery(GET_ALLOWED_COUNTRIES);
-    const allowedCountries = countriesData?.wooCommerce?.countries || [];
-    const defaultCountry = 'GH'; // Force Ghana
+    useQuery(GET_ALLOWED_COUNTRIES);
 
     const methods = useForm<IAddressData>({
         defaultValues: {

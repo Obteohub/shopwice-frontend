@@ -1,5 +1,5 @@
 // Imports - Layout Refined
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
@@ -7,8 +7,7 @@ import dynamic from 'next/dynamic';
 import { filteredVariantPrice, paddedPrice } from '@/utils/functions/functions';
 
 // Components
-import AddToCart, { IProductRootObject } from './AddToCart.component';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
+import AddToCart from './AddToCart.component';
 import Breadcrumbs from '@/components/UI/Breadcrumbs.component';
 import StarRating from '@/components/UI/StarRating.component';
 import ProductGallery from './ProductGalleryVertical.component';
@@ -29,7 +28,6 @@ import QuantityControl from '@/components/Cart/QuantityControl.component';
 
 const SingleProductFinal = ({
     product,
-    loading = false,
     isRefurbished = false
 }: {
     product: any;
@@ -45,13 +43,6 @@ const SingleProductFinal = ({
     const reviewsRef = useRef<HTMLDivElement>(null);
 
     const placeholderFallBack = 'https://via.placeholder.com/600';
-
-    useEffect(() => {
-        if (product?.variations?.nodes?.length > 0) {
-            const firstVariant = product.variations.nodes[0].databaseId;
-            setSelectedVariation(firstVariant);
-        }
-    }, [product?.variations]);
 
     let { description, shortDescription, image, name, onSale, price, regularPrice, salePrice, productCategories, productBrand, averageRating, reviewCount, galleryImages, reviews, attributes, sku, stockStatus, stockQuantity, totalSales, metaData, productLocation } =
         product;
@@ -92,17 +83,16 @@ const SingleProductFinal = ({
         reviewsRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    const getStockStatusColor = (status: string | undefined, quantity: number) => {
-        if (status === 'OUT_OF_STOCK') return 'text-red-600 bg-red-50 border-red-100';
-        if (status === 'ON_BACKORDER') return 'text-orange-600 bg-orange-50 border-orange-100';
-        return 'text-green-700 bg-green-50 border-green-100';
-    };
-
     const isVariableProduct = (product?.variations?.nodes?.length || 0) > 0;
-    const isSelectionMissing = isVariableProduct && !selectedVariation;
+    const selectedVariationMatch = product?.variations?.nodes?.some(
+        (node: any) => node.databaseId === selectedVariation,
+    );
+    const firstVariationId = product?.variations?.nodes?.[0]?.databaseId;
+    const selectedVariationId = selectedVariationMatch ? selectedVariation : firstVariationId;
+    const isSelectionMissing = isVariableProduct && !selectedVariationId;
 
     const selectedVariationNode = product.variations?.nodes?.find(
-        (node: any) => node.databaseId === selectedVariation,
+        (node: any) => node.databaseId === selectedVariationId,
     );
 
     const currentStockQuantity = selectedVariationNode
@@ -310,7 +300,7 @@ const SingleProductFinal = ({
                                                 <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m-8-4v10l8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                                                 </svg>
-                                                <span className="text-md font-medium text-gray-600 tracking-wide">What's in the box?</span>
+                                                <span className="text-md font-medium text-gray-600 tracking-wide">What&apos;s in the box?</span>
                                             </div>
                                             <p className="text-xs md:text-sm text-gray-600 pl-6 leading-relaxed font-xs" suppressHydrationWarning>
                                                 {boxContentText}
@@ -424,7 +414,7 @@ const SingleProductFinal = ({
                                                 {product.variations.nodes.map(
                                                     ({ id, name, databaseId, stockQuantity, stockStatus }: any) => {
                                                         const isOutOfStock = stockStatus === 'OUT_OF_STOCK' || (stockQuantity !== null && stockQuantity === 0);
-                                                        const isSelected = selectedVariation === databaseId;
+                                                        const isSelected = selectedVariationId === databaseId;
                                                         const variantName = name.split('- ').pop();
 
                                                         return (
@@ -493,7 +483,7 @@ const SingleProductFinal = ({
                                                 <div className="w-full md:flex-1">
                                                     <AddToCart
                                                         product={product}
-                                                        variationId={selectedVariation}
+                                                        variationId={selectedVariationId}
                                                         fullWidth={true}
                                                         disabled={isSelectionMissing}
                                                         quantity={quantity}
@@ -502,7 +492,7 @@ const SingleProductFinal = ({
                                                 <div className="w-full md:flex-1">
                                                     <AddToCart
                                                         product={product}
-                                                        variationId={selectedVariation}
+                                                        variationId={selectedVariationId}
                                                         fullWidth={true}
                                                         buyNow={true}
                                                         disabled={isSelectionMissing}

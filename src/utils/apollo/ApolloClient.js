@@ -9,6 +9,62 @@ import {
 
 const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
 
+const getLocalStorageJson = (key) => {
+  if (typeof window === 'undefined') return null;
+  return JSON.parse(localStorage.getItem(key));
+};
+
+const shouldLogSession = (operationName) =>
+  operationName === 'addToCart' || operationName === 'GET_CART';
+
+const getSessionHeader = (sessionData, operationName) => {
+  if (!sessionData?.token || !sessionData?.createdTime || operationName === 'CreateUser') {
+    return null;
+  }
+
+  const { token, createdTime } = sessionData;
+  if (Date.now() - createdTime > SEVEN_DAYS) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('woo-session');
+    }
+    return null;
+  }
+
+  const cleanToken = token.replace(/^Session\s+/i, '');
+  return `Session ${cleanToken}`;
+};
+
+const getAuthHeader = (authData, operationName) => {
+  if (!authData?.authToken || operationName === 'CreateUser') return null;
+  return `Bearer ${authData.authToken}`;
+};
+
+const getSessionFromHeaders = (headers) => {
+  if (!headers) return null;
+  return headers.get('woocommerce-session') || headers.get('x-woocommerce-session') || null;
+};
+
+const persistSession = (session) => {
+  if (!session || typeof window === 'undefined') return;
+  if (session === 'false') {
+    localStorage.removeItem('woo-session');
+    return;
+  }
+  localStorage.setItem(
+    'woo-session',
+    JSON.stringify({ token: session, createdTime: Date.now() }),
+  );
+};
+
+const handleInvalidSession = (errors) => {
+  if (!errors || typeof window === 'undefined') return;
+  const invalid = errors.some((err) => err.message === "The 'woocommerce-session' header is invalid");
+  if (invalid) {
+    localStorage.removeItem('woo-session');
+    window.location.reload();
+  }
+};
+
 /**
  * Middleware operation
  * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
@@ -17,42 +73,24 @@ export const middleware = new ApolloLink((operation, forward) => {
   /**
    * If session data exist in local storage, set value as session header.
    */
-  const sessionData = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('woo-session'))
-    : null;
-
-  const authData = typeof window !== 'undefined'
-    ? JSON.parse(localStorage.getItem('auth-data'))
-    : null;
+  const sessionData = getLocalStorageJson('woo-session');
+  const authData = getLocalStorageJson('auth-data');
 
   const headers = {};
 
   // Middleware Log
-  if (operation.operationName === 'addToCart' || operation.operationName === 'GET_CART') {
+  if (shouldLogSession(operation.operationName)) {
     console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
   }
 
-  // Add Session Header (Skip for Registration to prevent Nonce/Session conflicts)
-  if (sessionData && sessionData.token && sessionData.createdTime && operation.operationName !== 'CreateUser') {
-    const { token, createdTime } = sessionData;
-    // Check if the token is older than 7 days
-    if (Date.now() - createdTime > SEVEN_DAYS) {
-      localStorage.removeItem('woo-session');
-    } else {
-      const cleanToken = token.replace(/^Session\s+/i, '');
-      headers['woocommerce-session'] = `Session ${cleanToken}`;
-    }
+  const sessionHeader = getSessionHeader(sessionData, operation.operationName);
+  if (sessionHeader) {
+    headers['woocommerce-session'] = sessionHeader;
   }
 
-  // Add Nonce Header if available
-  const nonce = typeof window !== 'undefined' ? localStorage.getItem('wc_nonce') : null;
-  if (nonce) {
-    headers['X-WC-Store-API-Nonce'] = nonce;
-  }
-
-  // Add JWT Authorization if available (Skip for Registration)
-  if (authData && authData.authToken && operation.operationName !== 'CreateUser') {
-    headers['Authorization'] = `Bearer ${authData.authToken}`;
+  const authHeader = getAuthHeader(authData, operation.operationName);
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
   }
 
   operation.setContext({
@@ -74,44 +112,14 @@ export const afterware = new ApolloLink((operation, forward) =>
    */
   const context = operation.getContext();
   const responseHeaders = context?.response?.headers;
-
-  const session = responseHeaders ? (responseHeaders.get('woocommerce-session') || responseHeaders.get('x-woocommerce-session')) : null;
-  const nonce = responseHeaders ? (responseHeaders.get('x-wc-store-api-nonce') || responseHeaders.get('X-WC-Store-API-Nonce')) : null;
+  const session = getSessionFromHeaders(responseHeaders);
 
   if (operation.operationName === 'AddToCart' || operation.operationName === 'GET_CART') {
-    console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session: ${session}, Nonce: ${nonce}`);
+    console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session: ${session}`);
   }
 
-  // Capture Nonce
-  if (nonce && typeof window !== 'undefined') {
-    localStorage.setItem('wc_nonce', nonce);
-  }
-
-  if (session && typeof window !== 'undefined') {
-      if ('false' === session) {
-        // Remove session data if session destroyed.
-        localStorage.removeItem('woo-session');
-        // Update session new data if changed.
-      } else {
-        // Always update session data if header is present
-        localStorage.setItem(
-          'woo-session',
-          JSON.stringify({ token: session, createdTime: Date.now() }),
-        );
-      }
-    }
-
-    // Check for errors in response
-    if (response.errors) {
-      response.errors.forEach(err => {
-        if (err.message === "The 'woocommerce-session' header is invalid") {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('woo-session');
-            window.location.reload();
-          }
-        }
-      })
-    }
+  persistSession(session);
+  handleInvalidSession(response.errors);
 
     return response;
   }),
@@ -119,29 +127,9 @@ export const afterware = new ApolloLink((operation, forward) =>
 
 const clientSide = typeof window === 'undefined';
 
-// Determine the base URL for SSR
-const getServerUrl = () => {
-  if (process.env.NODE_ENV !== 'production') {
-    return 'http://localhost:3000';
-  }
-  // In production (deployed), use the actual domain
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL;
-  }
-  // In development, use localhost
-  return 'http://localhost:3000';
-};
-
 // Apollo GraphQL client.
-const serverGraphqlUrl = process.env.NEXT_PUBLIC_GRAPHQL_URL;
-const isServer = typeof window === 'undefined';
-const linkUri = isServer
-  ? (serverGraphqlUrl || `${getServerUrl()}/api/graphql`)
-  : '/api/graphql';
-const linkCredentials = isServer && serverGraphqlUrl ? 'omit' : 'include';
+const linkUri = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql';
+const linkCredentials = 'omit';
 
 /**
  * Custom fetch wrapper to capture session headers directly from the response.
@@ -153,9 +141,6 @@ const customFetch = async (uri, options) => {
   if (typeof window !== 'undefined') {
     const sessionHeader = response.headers.get('woocommerce-session') || 
                           response.headers.get('x-woocommerce-session');
-    
-    const nonceHeader = response.headers.get('x-wc-store-api-nonce') || 
-                        response.headers.get('X-WC-Store-API-Nonce');
 
     if (sessionHeader) {
       console.log('[Apollo customFetch] Captured Session Header:', sessionHeader);
@@ -165,10 +150,6 @@ const customFetch = async (uri, options) => {
       );
     }
 
-    if (nonceHeader) {
-      console.log('[Apollo customFetch] Captured Nonce Header:', nonceHeader);
-      localStorage.setItem('wc_nonce', nonceHeader);
-    }
   }
 
   return response;
@@ -179,8 +160,6 @@ const client = new ApolloClient({
   link: middleware.concat(
     afterware.concat(
       createHttpLink({
-        // ALWAYS use /api/graphql proxy for session isolation
-        // This prevents cookies from being sent to api.shopwice.com
         uri: linkUri,
         fetch: customFetch,
         credentials: linkCredentials, // Include credentials for OUR domain only

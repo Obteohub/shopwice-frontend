@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useMutation } from '@apollo/client';
 import { useForm, FormProvider } from 'react-hook-form';
 import { RESET_USER_PASSWORD } from '../../utils/gql/GQL_MUTATIONS';

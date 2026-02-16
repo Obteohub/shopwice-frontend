@@ -9,7 +9,6 @@ import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
 
 interface ProductListProps {
   products: Product[];
-  title: string;
   pageInfo?: {
     hasNextPage: boolean;
     endCursor: string | null;
@@ -24,7 +23,6 @@ interface ProductListProps {
 
 const ProductList = ({
   products: initialProducts,
-  title,
   pageInfo,
   slug,
   query,
@@ -171,8 +169,6 @@ const ProductList = ({
     setMinRating,
     showOnSaleOnly,
     setShowOnSaleOnly,
-    productTypes,
-    toggleProductType,
     resetFilters,
     filteredProducts
   } = useProductFilters(allProducts);
@@ -228,8 +224,6 @@ const ProductList = ({
             setMinRating={setMinRating}
             showOnSaleOnly={showOnSaleOnly}
             setShowOnSaleOnly={setShowOnSaleOnly}
-            productTypes={productTypes}
-            toggleProductType={toggleProductType}
             products={allProducts}
             resetFilters={resetFilters}
           />
@@ -363,8 +357,6 @@ const ProductList = ({
                   setMinRating={setMinRating}
                   showOnSaleOnly={showOnSaleOnly}
                   setShowOnSaleOnly={setShowOnSaleOnly}
-                  productTypes={productTypes}
-                  toggleProductType={toggleProductType}
                   products={allProducts}
                   resetFilters={resetFilters}
                 />

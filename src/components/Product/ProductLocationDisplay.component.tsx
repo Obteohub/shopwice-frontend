@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useLocationStore } from '@/stores/locationStore';
 import { useQuery } from '@apollo/client';
 import { FETCH_ALL_LOCATIONS_QUERY } from '@/utils/gql/GQL_QUERIES';
@@ -7,12 +7,8 @@ const ProductLocationDisplay = () => {
     const { selectedLocation, setSelectedLocation } = useLocationStore();
     const [isDetecting, setIsDetecting] = useState(false);
     const [geoError, setGeoError] = useState<string | null>(null);
-    const [hasMounted, setHasMounted] = useState(false);
+    const isClient = typeof window !== 'undefined';
     const { data } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
-
-    useEffect(() => {
-        setHasMounted(true);
-    }, []);
 
     // ... (rest of logic) ...
 
@@ -54,13 +50,13 @@ const ProductLocationDisplay = () => {
                     } else {
                         setGeoError('Could not determine city.');
                     }
-                } catch (error) {
+                } catch {
                     setGeoError('Failed to fetch address.');
                 } finally {
                     setIsDetecting(false);
                 }
             },
-            (error) => {
+            () => {
                 setGeoError('Location access denied.');
                 setIsDetecting(false);
             },
@@ -76,10 +72,10 @@ const ProductLocationDisplay = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
                 </svg>
                 <span className="text-xs text-gray-600">
-                    Deliver to: <span className="text-gray-600">{hasMounted && selectedLocation ? selectedLocation.name : 'Select Location'}</span>
+                    Deliver to: <span className="text-gray-600">{isClient && selectedLocation ? selectedLocation.name : 'Select Location'}</span>
                 </span>
 
-                {(!hasMounted || !selectedLocation) && !isDetecting && (
+                {(!isClient || !selectedLocation) && !isDetecting && (
                     <button
                         onClick={handleDetectLocation}
                         className="text-xs text-gray-600 hover:underline ml-2 font-medium"
@@ -87,7 +83,7 @@ const ProductLocationDisplay = () => {
                         Auto-detect
                     </button>
                 )}
-                {hasMounted && selectedLocation && !isDetecting && (
+                {isClient && selectedLocation && !isDetecting && (
                     <button
                         onClick={() => window.dispatchEvent(new Event('open-location-picker'))}
                         className="text-xs text-gray-600 underline ml-2 font-medium"

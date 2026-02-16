@@ -71,7 +71,6 @@ const Billing = ({ handleFormSubmit, isLoading = false, buttonLabel = 'PLACE ORD
       // remounts or we want the store to drive it.
       // Let's check current value first.
       const currentCity = methods.getValues('city');
-      const currentState = methods.getValues('address1'); // Using address1 for State/Region as per previous conversation? No, previous conv said "Region" field... wait.
       // INPUT_FIELDS says 'city' is city.
       // INPUT_FIELDS says 'state' is Region?
       // Let's check INPUT_FIELDS content if possible. I recall viewing it.

@@ -5,11 +5,9 @@ import SocialIcons from './SocialIcons.component';
 
 const Footer = () => {
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
-    setMounted(true);
-
     const handleScroll = () => {
       if (window.scrollY > 300) {
         setShowBackToTop(true);
@@ -143,7 +141,7 @@ const Footer = () => {
           </div>
 
           <div className="text-sm text-white opacity-90">
-            &copy; 2017 - {mounted ? new Date().getFullYear() : '2026'} Shopwice / Developed by <span className="text-yellow-400 font-bold">Theo</span>
+            &copy; 2017 - {currentYear} Shopwice / Developed by <span className="text-yellow-400 font-bold">Theo</span>
           </div>
         </div>
       </div>

@@ -21,7 +21,7 @@ const CartContents = () => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   // GraphQL Query
-  const { data, loading, error, refetch } = useQuery(GET_CART, {
+  const { data, loading, error } = useQuery(GET_CART, {
     fetchPolicy: 'cache-and-network',
     notifyOnNetworkStatusChange: true,
     onCompleted: (data) => {

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@apollo/client';
 import { FETCH_ALL_LOCATIONS_QUERY } from '@/utils/gql/GQL_QUERIES';
@@ -6,15 +6,14 @@ import { useLocationStore } from '@/stores/locationStore';
 
 const LocationPicker = ({ variant = 'default' }: { variant?: 'default' | 'headless' }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => setMounted(true), []);
+    const [mounted] = useState(() => typeof window !== 'undefined');
     const [isDetecting, setIsDetecting] = useState(false);
     const [geoError, setGeoError] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const { selectedLocation, setSelectedLocation } = useLocationStore();
     const { data, loading } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
 
-    const locations = data?.productLocations?.nodes || [];
+    const locations = useMemo(() => data?.productLocations?.nodes || [], [data]);
 
     // Set default location if none selected and data is loaded
     useEffect(() => {
@@ -88,7 +87,7 @@ const LocationPicker = ({ variant = 'default' }: { variant?: 'default' | 'headle
                     } else {
                         setGeoError('Could not determine your city.');
                     }
-                } catch (error) {
+                } catch {
                     setGeoError('Failed to fetch address details.');
                 } finally {
                     setIsDetecting(false);

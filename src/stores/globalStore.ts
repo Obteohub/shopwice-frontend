@@ -13,9 +13,11 @@ interface GlobalState {
         televisionsProducts: any[];
         promoProduct: any | null;
     };
+    hasHydrated: boolean;
     homeDataLoaded: boolean;
     setHomeData: (data: any) => void;
     setCategories: (categories: any[]) => void;
+    setHasHydrated: (value: boolean) => void;
 }
 
 export const useGlobalStore = create<GlobalState>()(
@@ -32,6 +34,7 @@ export const useGlobalStore = create<GlobalState>()(
                 televisionsProducts: [],
                 promoProduct: null,
             },
+            hasHydrated: false,
             homeDataLoaded: false,
             setHomeData: (data) => set({
                 homeData: {
@@ -47,9 +50,13 @@ export const useGlobalStore = create<GlobalState>()(
                 homeDataLoaded: true
             }),
             setCategories: (categories) => set({ featuredCategories: categories }),
+            setHasHydrated: (value) => set({ hasHydrated: value }),
         }),
         {
             name: 'shopwice-global-store',
+            onRehydrateStorage: () => (state) => {
+                state?.setHasHydrated(true);
+            },
         }
     )
 );

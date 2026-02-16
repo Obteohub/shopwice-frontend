@@ -1,0 +1,19 @@
+name = "shopwice"
+compatibility_date = "2026-02-05"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+pages_build_output_dir = ".vercel/output/static"
+
+[vars]
+NEXT_PUBLIC_SITE_URL = "https://shopwice.com"
+NEXT_PUBLIC_GRAPHQL_URL = "https://api.shopwice.com/graphql"
+NEXT_PUBLIC_REST_API_URL = "https://api.shopwice.com/api"
+NEXT_PUBLIC_STORE_API_URL = "https://api.shopwice.com/api"
+WORDPRESS_API_URL = "https://api.shopwice.com/api"
+
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "shopwice"
+
+[[r2_buckets]]
+binding = "NEXT_INC_CACHE_R2_BUCKET"
+bucket_name = "shopwice-media"

@@ -97,32 +97,7 @@ const nextConfig = {
       },
     ];
   },
-  async rewrites() {
-    return {
-      beforeFiles: [
-        // Ensure local Store API proxy routes are not rewritten
-        {
-          source: '/api/wc-store/:path*',
-          destination: '/api/wc-store/:path*',
-        },
-        {
-          source: '/api/wc-store',
-          destination: '/api/wc-store',
-        },
-      ],
-      afterFiles: [
-        {
-          source: '/graphql',
-          destination: 'https://api.shopwice.com/graphql',
-        },
-        // Proxy all other /api calls to backend
-        {
-          source: '/api/:path*',
-          destination: 'https://api.shopwice.com/api/:path*',
-        },
-      ],
-    };
-  },
+  
 };
 
 module.exports = nextConfig;

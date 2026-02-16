@@ -1,5 +1,3 @@
-import { Fragment } from 'react';
-
 interface ComparePriceModalProps {
     isOpen: boolean;
     onClose: () => void;

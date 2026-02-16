@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface AccordionProps {
     title: string;
@@ -15,43 +15,20 @@ const Accordion: React.FC<AccordionProps> = ({
 }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     const [hasBeenOpened, setHasBeenOpened] = useState(defaultOpen);
-    const [contentHeight, setContentHeight] = useState<string>('0px');
-    const contentRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (isOpen) {
-            setHasBeenOpened(true);
-        }
-    }, [isOpen]);
-
-    useEffect(() => {
-        if (!isOpen) {
-            setContentHeight('0px');
-            return;
-        }
-
-        const updateHeight = () => {
-            if (contentRef.current) {
-                setContentHeight(`${contentRef.current.scrollHeight}px`);
-            }
-        };
-
-        // Initial height when opening
-        updateHeight();
-
-        const resizeObserver = new ResizeObserver(updateHeight);
-        if (contentRef.current) {
-            resizeObserver.observe(contentRef.current);
-        }
-
-        return () => resizeObserver.disconnect();
-    }, [isOpen]);
 
     return (
         <div className={`border-b border-gray-200 ${className}`}>
             <button
                 className="w-full flex justify-between items-center py-2.5 text-left focus:outline-none focus:text-blue-600 group"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    setIsOpen((prev) => {
+                        const next = !prev;
+                        if (next) {
+                            setHasBeenOpened(true);
+                        }
+                        return next;
+                    });
+                }}
                 aria-expanded={isOpen}
             >
                 <span className="text-[15px] font-semibold text-gray-900 group-hover:text-gray-700 transition-colors tracking-tight">
@@ -68,11 +45,8 @@ const Accordion: React.FC<AccordionProps> = ({
                     </svg>
                 </span>
             </button>
-            <div
-                style={{ height: contentHeight, overflow: 'hidden' }}
-                className="transition-all duration-300 ease-in-out"
-            >
-                <div ref={contentRef} className="pb-2 text-gray-600 text-sm leading-relaxed prose prose-sm max-w-none">
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[1000px]' : 'max-h-0'}`}>
+                <div className="pb-2 text-gray-600 text-sm leading-relaxed prose prose-sm max-w-none">
                     {hasBeenOpened ? children : null}
                 </div>
             </div>

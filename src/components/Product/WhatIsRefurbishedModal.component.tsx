@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import Link from 'next/link';
 
 interface WhatIsRefurbishedModalProps {
@@ -86,7 +85,7 @@ const WhatIsRefurbishedModal = ({ isOpen, onClose }: WhatIsRefurbishedModalProps
                     <div className="relative z-10">
                         <h3 className="text-2xl font-bold mb-2">Renewed & Refurbished Devices</h3>
                         <p className="text-gray-300 text-sm leading-relaxed">
-                            A Refurbished or Renewed device is a premium product that has been professionally restored to its original factory condition to ensure 100% performance and a "Fresh in Box" experience.
+                            A Refurbished or Renewed device is a premium product that has been professionally restored to its original factory condition to ensure 100% performance and a &quot;Fresh in Box&quot; experience.
                         </p>
                     </div>
                     {/* Decorative element */}
@@ -128,7 +127,7 @@ const WhatIsRefurbishedModal = ({ isOpen, onClose }: WhatIsRefurbishedModalProps
                         ))}
                         <div className="mt-10 p-4 bg-blue-50 rounded-xl border border-blue-100 text-left">
                             <p className="text-blue-800 text-xs font-medium leading-relaxed mb-3">
-                                <span className="font-bold">Our Promise:</span> Choosing refurbished doesn't mean compromising on quality. It means getting a premium device at a fraction of the cost, backed by our commitment to excellence.
+                                <span className="font-bold">Our Promise:</span> Choosing refurbished doesn&apos;t mean compromising on quality. It means getting a premium device at a fraction of the cost, backed by our commitment to excellence.
                             </p>
                             <Link href="/refurbished-policy" className="text-blue-700 text-xs font-bold underline hover:text-blue-900 transition-colors">
                                 Read our full Refurbished & Renewed Policy

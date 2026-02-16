@@ -1,7 +1,7 @@
 
 import React from 'react';
 import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_NODE_BY_SLUG, GET_CATEGORY_PRODUCTS_BY_ID, GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
+import { GET_CATEGORY_NODE_BY_SLUG, GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
 
 const DebugCategory = ({ logs }: { logs: string[] }) => {
   return (
@@ -18,8 +18,6 @@ export const getServerSideProps = async () => {
   const logs: string[] = [];
   const addLog = (msg: string) => logs.push(msg);
   const categorySlug = 'hoodies'; 
-  const productSlug = 'test-product'; // We need a real product slug, maybe 'hoodie-with-logo' or similar
-
   try {
     addLog(`--- TEST 1: CATEGORY ---`);
     addLog(`Fetching category node...`);

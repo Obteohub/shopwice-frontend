@@ -8,12 +8,15 @@ interface LaptopsProductsProps {
 }
 
 const LaptopsProducts = ({ products }: LaptopsProductsProps) => {
-    const [mounted, setMounted] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [slidesPerView, setSlidesPerView] = useState(1);
+    const [slidesPerView, setSlidesPerView] = useState(() => {
+        if (typeof window === 'undefined') return 2.5;
+        if (window.innerWidth >= 1024) return 8;
+        if (window.innerWidth >= 768) return 5;
+        return 2.5;
+    });
 
     useEffect(() => {
-        setMounted(true);
         const handleResize = () => {
             if (window.innerWidth >= 1024) {
                 setSlidesPerView(8);
@@ -25,7 +28,6 @@ const LaptopsProducts = ({ products }: LaptopsProductsProps) => {
         };
 
         window.addEventListener('resize', handleResize);
-        handleResize();
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
@@ -79,8 +81,8 @@ const LaptopsProducts = ({ products }: LaptopsProductsProps) => {
                     <div
                         className="flex transition-transform duration-500 ease-out [transform:var(--slide-transform)] [width:var(--slide-width)]"
                         style={{
-                            '--slide-transform': mounted ? `translateX(-${currentIndex * (100 / slidesPerView)}%)` : 'translateX(0%)',
-                            '--slide-width': mounted ? `${(products.length / slidesPerView) * 100}%` : '100%'
+                            '--slide-transform': `translateX(-${currentIndex * (100 / slidesPerView)}%)`,
+                            '--slide-width': `${(products.length / slidesPerView) * 100}%`
                         } as React.CSSProperties}
                     >
                         {products.map((product, index) => (
@@ -88,7 +90,7 @@ const LaptopsProducts = ({ products }: LaptopsProductsProps) => {
                                 key={`desk-laptops-${product.databaseId || index}`}
                                 className="px-2 [width:var(--item-width)]"
                                 style={{
-                                    '--item-width': mounted ? `${100 / products.length}%` : '100%',
+                                    '--item-width': `${100 / products.length}%`,
                                 } as React.CSSProperties}
                             >
                                 <ProductCard

@@ -3,9 +3,8 @@ import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 import client from '@/utils/apollo/ApolloClient';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-import { GET_CATEGORY_NODE_BY_SLUG, GET_CATEGORY_PRODUCTS_BY_ID, GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE, GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
-import { gql, useLazyQuery } from '@apollo/client';
+import { GET_CATEGORY_NODE_BY_SLUG, GET_CATEGORY_PRODUCTS_BY_ID, GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE } from '@/utils/gql/GQL_QUERIES';
+import { useLazyQuery } from '@apollo/client';
 import { Product } from '@/types/product';
 
 // ----- TypeScript Types -----
@@ -85,8 +84,11 @@ const CategoryPage = ({ category: initialCategory, products: initialProducts, pa
                 try {
                     setLoading(true);
                     console.log('CSR Fallback: Fetching category...');
-                    const { data: catData } = await getCategory({ variables: { slug: [slug] } });
-                    const catNode = catData?.productCategories?.nodes?.[0];
+                    const { data: catData } = await getCategory();
+                    const allCategories = catData?.productCategories?.nodes || [];
+                    const normalizedSlug = slug.toLowerCase();
+                    const catNode = allCategories.find((node: any) => node.slug?.toLowerCase() === normalizedSlug)
+                        || allCategories.find((node: any) => node.name?.toLowerCase() === normalizedSlug.replace(/-/g, ' '));
 
                     if (catNode) {
                         setCategory(catNode);
@@ -174,47 +176,13 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res, quer
 
         const { data: categoryData } = await client.query({
             query: GET_CATEGORY_NODE_BY_SLUG,
-            variables: { slug: [slug] },
             fetchPolicy: 'network-only',
         });
 
-        let categoryNode = categoryData?.productCategories?.nodes?.[0];
-
-        if (!categoryNode) {
-            const SEARCH_CATEGORY = gql`
-                query SearchCategory($search: String!) {
-                    productCategories(first: 1, where: { search: $search }) {
-                        nodes {
-                            databaseId
-                            name
-                            description
-                            count
-                            slug
-                        }
-                    }
-                }
-            `;
-
-            try {
-                const searchResult = await client.query({
-                    query: SEARCH_CATEGORY,
-                    variables: { search: slug.replace(/-/g, ' ') },
-                    fetchPolicy: 'network-only',
-                });
-
-                const candidate = searchResult?.data?.productCategories?.nodes?.[0];
-                if (candidate?.slug) {
-                    const retry = await client.query({
-                        query: GET_CATEGORY_DATA_BY_SLUG,
-                        variables: { slug: [candidate.slug], first: 24 },
-                        fetchPolicy: 'network-only',
-                    });
-                    categoryNode = retry?.data?.productCategories?.nodes?.[0];
-                }
-            } catch (e) {
-                console.error('Category search fallback failed:', e);
-            }
-        }
+        const allCategories = categoryData?.productCategories?.nodes || [];
+        const normalizedSlug = slug.toLowerCase();
+        let categoryNode = allCategories.find((node: any) => node.slug?.toLowerCase() === normalizedSlug)
+            || allCategories.find((node: any) => node.name?.toLowerCase() === normalizedSlug.replace(/-/g, ' '));
 
         if (!categoryNode) {
             return {

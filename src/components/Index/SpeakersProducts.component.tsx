@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
 import ProductCard from '../Product/ProductCard.component';
 import { Product } from '@/types/product';
@@ -8,37 +8,20 @@ interface SpeakersProductsProps {
 }
 
 const SpeakersProducts = ({ products }: SpeakersProductsProps) => {
-    const [mounted, setMounted] = useState(false);
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [slidesPerView, setSlidesPerView] = useState(1);
-
-    useEffect(() => {
-        setMounted(true);
-        const handleResize = () => {
-            if (window.innerWidth >= 1024) {
-                setSlidesPerView(8);
-            } else if (window.innerWidth >= 768) {
-                setSlidesPerView(5);
-            } else {
-                setSlidesPerView(2.5);
-            }
-        };
-
-        window.addEventListener('resize', handleResize);
-        handleResize();
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    const sliderRef = useRef<HTMLDivElement | null>(null);
 
     if (!products || products.length === 0) return null;
 
     const nextSlide = () => {
-        const maxIndex = Math.max(0, products.length - slidesPerView);
-        setCurrentIndex((prev) => (prev + 1 > maxIndex ? 0 : prev + 1));
+        const el = sliderRef.current;
+        if (!el) return;
+        el.scrollBy({ left: el.clientWidth, behavior: 'smooth' });
     };
 
     const prevSlide = () => {
-        const maxIndex = Math.max(0, products.length - slidesPerView);
-        setCurrentIndex((prev) => (prev - 1 < 0 ? maxIndex : prev - 1));
+        const el = sliderRef.current;
+        if (!el) return;
+        el.scrollBy({ left: -el.clientWidth, behavior: 'smooth' });
     };
 
     return (
@@ -75,21 +58,15 @@ const SpeakersProducts = ({ products }: SpeakersProductsProps) => {
                 </div>
 
                 {/* Desktop View: Carousel */}
-                <div className="hidden md:block overflow-hidden relative min-h-[400px]">
+                <div className="hidden md:block relative min-h-[400px]">
                     <div
-                        className="flex transition-transform duration-500 ease-out [transform:var(--slide-transform)] [width:var(--slide-width)]"
-                        style={{
-                            '--slide-transform': mounted ? `translateX(-${currentIndex * (100 / slidesPerView)}%)` : 'translateX(0%)',
-                            '--slide-width': mounted ? `${(products.length / slidesPerView) * 100}%` : '100%'
-                        } as React.CSSProperties}
+                        ref={sliderRef}
+                        className="flex gap-2 overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar"
                     >
                         {products.map((product, index) => (
                             <div
                                 key={`desk-speakers-${product.databaseId || index}`}
-                                className="px-2 [width:var(--item-width)]"
-                                style={{
-                                    '--item-width': mounted ? `${100 / products.length}%` : '100%',
-                                } as React.CSSProperties}
+                                className="snap-start shrink-0 w-[42%] sm:w-[28%] md:w-[22%] lg:w-[12.5%] px-2"
                             >
                                 <ProductCard
                                     databaseId={product.databaseId}
@@ -110,7 +87,7 @@ const SpeakersProducts = ({ products }: SpeakersProductsProps) => {
                         ))}
                     </div>
                     {/* Arrows */}
-                    {products.length > slidesPerView && (
+                    {products.length > 8 && (
                         <>
                             <button
                                 onClick={prevSlide}

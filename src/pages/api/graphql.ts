@@ -48,7 +48,7 @@ export default async function handler(
         if (contentType && contentType.includes('application/json')) {
             try {
                 data = await response.json();
-            } catch (err) {
+            } catch {
                 const text = await response.text();
                 console.error('[GraphQL Proxy] Invalid JSON response:', text.substring(0, 500));
                 return res.status(502).json({ error: 'Invalid JSON from upstream', details: text.substring(0, 200) });

@@ -1,5 +1,5 @@
 import { Dispatch, SetStateAction } from 'react';
-import { Product, ProductType } from '@/types/product';
+import { Product } from '@/types/product';
 
 import Button from '@/components/UI/Button.component';
 import Checkbox from '@/components/UI/Checkbox.component';
@@ -21,8 +21,6 @@ interface ProductFiltersProps {
   setMinRating: Dispatch<SetStateAction<number>>;
   showOnSaleOnly: boolean;
   setShowOnSaleOnly: Dispatch<SetStateAction<boolean>>;
-  productTypes: ProductType[];
-  toggleProductType: (id: string) => void;
   products: Product[];
   resetFilters: () => void;
 }
@@ -42,8 +40,6 @@ const ProductFilters = ({
   setMinRating,
   showOnSaleOnly,
   setShowOnSaleOnly,
-  productTypes,
-  toggleProductType,
   products,
   resetFilters,
 }: ProductFiltersProps) => {

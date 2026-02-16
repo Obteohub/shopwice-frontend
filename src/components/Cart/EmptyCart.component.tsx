@@ -23,7 +23,7 @@ const EmptyCart: React.FC = () => {
 
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Cart is Empty</h2>
             <p className="text-gray-500 mb-8 max-w-sm text-center">
-                It looks like you haven't added any items to your cart yet.
+                It looks like you haven&apos;t added any items to your cart yet.
             </p>
 
             <Link

@@ -51,8 +51,8 @@ const RefurbishedPolicy = () => {
             title: "Definition of Refurbished Products",
             content: (
                 <div className="space-y-4">
-                    <p>A Refurbished or Renewed phone is a smartphone that has been professionally restored to its original factory condition. Unlike 'used' products, refurbished phones undergo a rigorous 90-point inspection by the manufacturer or manufacturer certified refurbished partners to ensure 100% performance, 100% battery health, and a "Fresh in Box" experience.</p>
-                    <p>It is the smartest way to own the world's best premium smartphones at a significant value, without compromising on quality or peace of mind. These products are confirmed to be fully functional and work as a brand new one at the time of sale, ensuring you receive the premium experience you expect from your favorite brands.</p>
+                    <p>A Refurbished or Renewed phone is a smartphone that has been professionally restored to its original factory condition. Unlike &apos;used&apos; products, refurbished phones undergo a rigorous 90-point inspection by the manufacturer or manufacturer certified refurbished partners to ensure 100% performance, 100% battery health, and a &quot;Fresh in Box&quot; experience.</p>
+                    <p>It is the smartest way to own the world&apos;s best premium smartphones at a significant value, without compromising on quality or peace of mind. These products are confirmed to be fully functional and work as a brand new one at the time of sale, ensuring you receive the premium experience you expect from your favorite brands.</p>
                 </div>
             )
         },
@@ -206,7 +206,7 @@ const RefurbishedPolicy = () => {
             id: 12,
             title: "Delivery & Return Costs",
             content: (
-                <p>Original delivery fees are non-refundable. Customers may be responsible for return shipping unless the error is ours or the vendor's.</p>
+                <p>Original delivery fees are non-refundable. Customers may be responsible for return shipping unless the error is ours or the vendor&apos;s.</p>
             )
         },
         {
@@ -295,8 +295,8 @@ const RefurbishedPolicy = () => {
                                     ))}
                                     <div className="pt-4 mt-4 border-t">
                                         <p className="text-xs text-gray-400 font-medium uppercase tracking-widest mb-2">Help & Support</p>
-                                        <p className="text-sm text-gray-600">📧 support@shopwice.com</p>
-                                        <p className="text-sm text-gray-600">📞 Phone/WhatsApp: [Insert Number]</p>
+                                        <p className="text-sm text-gray-600">info@shopwice.com</p>
+                                        <p className="text-sm text-gray-600"> Phone/WhatsApp: [Insert Number]</p>
                                     </div>
                                 </nav>
                             </div>

@@ -38,7 +38,8 @@ export const useProductFilters = (products: Product[]) => {
         : [...current, value];
 
       if (!updated.length) {
-        const { [attributeName]: _, ...rest } = prev;
+        const { [attributeName]: removed, ...rest } = prev;
+        void removed;
         return rest;
       }
 

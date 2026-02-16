@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { paddedPrice } from '@/utils/functions/functions';
 import StarRating from '../UI/StarRating.component';
@@ -43,6 +43,23 @@ const hasRefurbishKeyword = (value?: any) => {
     strVal.toLowerCase().includes('renewed');
 };
 
+const ProductImage = ({ image, name }: { image?: { sourceUrl?: string | null } | null; name?: string }) => {
+  const imgSrc = image?.sourceUrl;
+  return imgSrc ? (
+    <img
+      src={imgSrc}
+      alt={name || 'Product image'}
+      loading="lazy"
+      decoding="async"
+      className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-110"
+    />
+  ) : (
+    <div className="flex items-center justify-center h-full text-gray-400 text-xs italic">
+      No image
+    </div>
+  );
+};
+
 /* ---------- Component ---------- */
 
 const ProductCard = (props: ProductCardProps) => {
@@ -55,7 +72,6 @@ const ProductCard = (props: ProductCardProps) => {
     slug,
     image,
     averageRating = 0,
-    productCategories,
     attributes,
     stockQuantity,
     reviewCount,
@@ -133,25 +149,6 @@ const ProductCard = (props: ProductCardProps) => {
     </>
   );
 
-  /* ---------- Image Component ---------- */
-
-  const ProductImage = () => {
-    const imgSrc = image?.sourceUrl;
-    return imgSrc ? (
-      <img
-        src={imgSrc}
-        alt={name || 'Product image'}
-        loading="lazy"
-        decoding="async"
-        className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-110"
-      />
-    ) : (
-      <div className="flex items-center justify-center h-full text-gray-400 text-xs italic">
-        No image
-      </div>
-    );
-  };
-
   /* ---------- Render ---------- */
 
   return (
@@ -166,10 +163,10 @@ const ProductCard = (props: ProductCardProps) => {
             aria-label={`View product ${name}`}
             className="block w-full h-full"
           >
-            <ProductImage />
+            <ProductImage image={image} name={name} />
           </Link>
         ) : (
-          <ProductImage />
+          <ProductImage image={image} name={name} />
         )}
 
         {/* BADGES */}

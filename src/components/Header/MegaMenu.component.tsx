@@ -1,63 +1,44 @@
 import Link from 'next/link';
 import { useQuery } from '@apollo/client';
 import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 /**
  * MegaMenu component for desktop navigation
  * Displays top-level categories with hover dropdowns for subcategories
  */
-import { print } from 'graphql/language/printer';
 import DesktopSideMenu from './DesktopSideMenu.component';
 
+const CACHE_KEY = 'shopwice_menu_cache';
+
 const MegaMenu = () => {
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<any>(null);
-    const [data, setData] = useState<any>(null);
+    const [cachedData] = useState<any>(() => {
+        if (typeof window === 'undefined') return null;
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (!cached) return null;
+        try {
+            return JSON.parse(cached);
+        } catch (e) {
+            console.error('Error parsing menu cache', e);
+            localStorage.removeItem(CACHE_KEY);
+            return null;
+        }
+    });
     const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
 
-    useEffect(() => {
-        const CACHE_KEY = 'shopwice_menu_cache';
-        const cachedData = localStorage.getItem(CACHE_KEY);
-
-        if (cachedData) {
-            try {
-                const parsedData = JSON.parse(cachedData);
-                setData(parsedData);
-                setLoading(false);
-                // Optional: Re-fetch in background to update cache if needed, but per user request "store it", we'll trust the cache for now or simple "stale-while-revalidate" if complex.
-                // For this task, we prioritize the cache.
-            } catch (e) {
-                console.error("Error parsing menu cache", e);
-                localStorage.removeItem(CACHE_KEY);
+    const { data: queryData, loading: queryLoading, error: queryError } = useQuery(FETCH_ALL_CATEGORIES_QUERY, {
+        fetchPolicy: 'network-only',
+        skip: !!cachedData,
+        onCompleted: (result) => {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(result));
             }
         }
+    });
 
-        // Always fetch if no cache, or maybe fetch to update cache? for now strict cache check as requested
-        if (!cachedData) {
-            fetch(process.env.NEXT_PUBLIC_GRAPHQL_URL as string, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'omit',
-                cache: 'force-cache',
-                body: JSON.stringify({
-                    query: print(FETCH_ALL_CATEGORIES_QUERY)
-                }),
-            })
-                .then(res => res.json())
-                .then(json => {
-                    if (json.errors) throw new Error(json.errors[0].message);
-                    setData(json.data);
-                    setLoading(false);
-                    localStorage.setItem(CACHE_KEY, JSON.stringify(json.data));
-                })
-                .catch(err => {
-                    console.error('MegaMenu Fetch Error:', err);
-                    setError(err);
-                    setLoading(false);
-                });
-        }
-    }, []);
+    const data = cachedData || queryData;
+    const loading = queryLoading && !cachedData;
+    const error = queryError;
 
     if (loading) return <div className="h-12 bg-[#0C6DC9]"></div>;
     if (error) return null;

@@ -1,7 +1,6 @@
 
 import React from 'react';
 import ProductCard from '@/components/Product/ProductCard.component';
-import { Product } from '@/types/product';
 
 interface UpsellCarouselProps {
     title: string;

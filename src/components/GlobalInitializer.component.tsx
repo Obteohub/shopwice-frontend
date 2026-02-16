@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@apollo/client';
 import { useGlobalStore } from '@/stores/globalStore';
 import {
@@ -17,7 +17,7 @@ import {
  * - Avoids redundant store updates
  */
 const GlobalInitializer = () => {
-    const [isMounted, setIsMounted] = useState(false);
+    const isClient = typeof window !== 'undefined';
 
     // Prevent duplicate store writes
     const categoriesHydrated = useRef(false);
@@ -29,10 +29,6 @@ const GlobalInitializer = () => {
     /**
      * Ensure this only runs on the client
      */
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
     /**
      * Fetch navigation categories
      */
@@ -41,7 +37,7 @@ const GlobalInitializer = () => {
         error: categoryError,
     } = useQuery(FETCH_ALL_CATEGORIES_QUERY, {
         fetchPolicy: 'cache-first',
-        skip: !isMounted,
+        skip: !isClient,
     });
 
     /**
@@ -55,7 +51,7 @@ const GlobalInitializer = () => {
             promoProductSlug: 'microsoft-xbox-x-wireless-controller',
         },
         fetchPolicy: 'cache-and-network',
-        skip: !isMounted,
+        skip: !isClient,
     });
 
     /**

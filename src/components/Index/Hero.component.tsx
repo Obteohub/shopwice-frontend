@@ -63,32 +63,26 @@ const Hero = () => {
     },
   ];
 
-  const [mounted, setMounted] = useState(false);
-
   // Carousel State (Desktop/Tablet)
   const allSlides = slides;
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [slidesPerView, setSlidesPerView] = useState(1);
+  const [slidesPerView, setSlidesPerView] = useState(2.5);
 
   useEffect(() => {
-    setMounted(true);
-
-    // Add listener for resize to switch modes dynamicallly
-    const handleResize = () => {
-      // Update Slides Per View for Desktop Carousel Mode
+    const updateSlidesPerView = () => {
       if (window.innerWidth >= 1024) {
         setSlidesPerView(3.7);
       } else if (window.innerWidth >= 768) {
         setSlidesPerView(2.5);
+      } else {
+        setSlidesPerView(1);
       }
     };
 
-    window.addEventListener('resize', handleResize);
+    updateSlidesPerView();
+    window.addEventListener('resize', updateSlidesPerView);
 
-    // Initial call to set slide count
-    handleResize();
-
-    return () => window.removeEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', updateSlidesPerView);
   }, []);
 
   const prevSlide = () => {
@@ -145,9 +139,8 @@ const Hero = () => {
           className="relative h-[500px] transition-transform duration-500 ease-out"
           style={{
             display: 'flex',
-            // Avoid hydration mismatch by waiting for mount or using suppression
-            transform: mounted ? `translateX(-${(currentIndex * (100 / allSlides.length)).toFixed(4)}%)` : 'translateX(0%)',
-            width: mounted ? `${(allSlides.length / slidesPerView) * 100}%` : '100%'
+            transform: `translateX(-${(currentIndex * (100 / allSlides.length)).toFixed(4)}%)`,
+            width: `${(allSlides.length / slidesPerView) * 100}%`
           }}
         >
           {allSlides.map((slide, index) => (
@@ -155,7 +148,7 @@ const Hero = () => {
               key={`desk-${slide.id}-${index}`}
               className="relative h-full flex-shrink-0 px-2"
               style={{
-                width: mounted ? `${100 / allSlides.length}%` : '100%',
+                width: `${100 / allSlides.length}%`,
               }}
             >
               <Link href={slide.link || '#'} className={`block w-full h-full relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow`}>

@@ -77,7 +77,7 @@ const PaymentInfo = () => {
 
                             <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
                                 <p className="text-xs text-blue-900 leading-relaxed">
-                                    <strong>Please Be Ready:</strong> Ensure you are available and your payment is prepared before the rider arrives. Keeping the dispatch rider waiting causes delays for other customers' orders. Help us serve everyone efficiently by being ready to receive your package immediately.
+                                    <strong>Please Be Ready:</strong> Ensure you are available and your payment is prepared before the rider arrives. Keeping the dispatch rider waiting causes delays for other customers&apos; orders. Help us serve everyone efficiently by being ready to receive your package immediately.
                                 </p>
                             </div>
                         </div>

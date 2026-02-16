@@ -50,13 +50,13 @@ const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: Sear
     return (
         <Layout title={`Search: ${searchTerm}`} fullWidth={true}>
             <Head>
-                <title>Search Results for "{searchTerm}" | Shopwice</title>
+                <title>{`Search Results for "${searchTerm}" | Shopwice`}</title>
             </Head>
 
             <div className="pt-1 pb-1">
                 <div className="container mx-auto px-4 py-4">
                     <h1 className="text-xl font-bold mb-4">
-                        Search Results for <span className="text-orange-600">"{searchTerm}"</span>
+                        Search Results for <span className="text-orange-600">{`"${searchTerm}"`}</span>
                     </h1>
                 </div>
 
@@ -75,7 +75,7 @@ const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: Sear
 
                         {!serverError && products.length === 0 && searchTerm && (
                             <div className="text-center py-10">
-                                <p className="text-gray-600 text-lg">No products found matching "{searchTerm}"</p>
+                                <p className="text-gray-600 text-lg">{`No products found matching "${searchTerm}"`}</p>
                                 <p className="text-gray-500 mt-2">Try checking your spelling or using different keywords.</p>
                             </div>
                         )}
@@ -84,7 +84,6 @@ const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: Sear
                             <div className="pt-1 pb-1">
                                 <ProductList
                                     products={products}
-                                    title=""
                                     pageInfo={pageInfo}
                                     query={SEARCH_PRODUCTS_QUERY}
                                     queryVariables={{ search: searchTerm }}

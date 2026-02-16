@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import usePlacesAutocomplete, {
     getGeocode,
-    getLatLng,
 } from 'use-places-autocomplete';
 import { useFormContext } from 'react-hook-form';
 import { useJsApiLoader } from '@react-google-maps/api';

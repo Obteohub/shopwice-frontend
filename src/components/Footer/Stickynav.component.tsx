@@ -2,7 +2,6 @@ import Link from 'next/link';
 
 import Cart from '@/components/Header/Cart.component';
 import MobileNativeSearch from '@/components/Search/MobileNativeSearch.component';
-import SVGMobileSearchIcon from '@/components/SVG/SVGMobileSearchIcon.component';
 
 import Hamburger from './Hamburger.component';
 

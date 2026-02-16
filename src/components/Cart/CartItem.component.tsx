@@ -13,7 +13,7 @@ interface CartItemProps {
 }
 
 const CartItem: React.FC<CartItemProps> = ({ item, onUpdateQuantity, onRemove, loading }) => {
-    const { product, quantity, subtotal, key } = item;
+    const { product, quantity, subtotal } = item;
     const { node } = product;
 
     // Guard clause for missing product node

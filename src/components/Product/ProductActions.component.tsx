@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface ProductActionsProps {
     productName: string;
@@ -8,21 +8,18 @@ interface ProductActionsProps {
 }
 
 const ProductActions = ({ productName, productUrl, productId, orientation = 'col' }: ProductActionsProps) => {
-    const [isWishlisted, setIsWishlisted] = useState(false);
-    const [shareFeedback, setShareFeedback] = useState<string | null>(null);
-    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-
-    useEffect(() => {
-        // Check local storage for wishlist status
+    const [isWishlisted, setIsWishlisted] = useState(() => {
+        if (typeof window === 'undefined') return false;
         try {
             const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
-            if (wishlist.includes(productId)) {
-                setIsWishlisted(true);
-            }
+            return wishlist.includes(productId);
         } catch (e) {
-            console.error("Error reading wishlist", e);
+            console.error('Error reading wishlist', e);
+            return false;
         }
-    }, [productId]);
+    });
+    const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     const handleWishlistToggle = () => {
         try {
@@ -72,7 +69,7 @@ const ProductActions = ({ productName, productUrl, productId, orientation = 'col
             await navigator.clipboard.writeText(fullUrl);
             setShareFeedback('Copied!');
             setTimeout(() => setShareFeedback(null), 2000);
-        } catch (err) {
+        } catch {
             // Fallback for older browsers
             const textArea = document.createElement("textarea");
             textArea.value = fullUrl;
@@ -82,7 +79,7 @@ const ProductActions = ({ productName, productUrl, productId, orientation = 'col
                 document.execCommand('copy');
                 setShareFeedback('Copied!');
                 setTimeout(() => setShareFeedback(null), 2000);
-            } catch (err) {
+            } catch {
                 setShareFeedback('Failed');
                 setTimeout(() => setShareFeedback(null), 2000);
             }
@@ -97,7 +94,7 @@ const ProductActions = ({ productName, productUrl, productId, orientation = 'col
         },
         {
             name: 'Facebook',
-            getUrl: (url: string, text: string) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
+            getUrl: (url: string) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
         },
         {
             name: 'Twitter',

@@ -1,5 +1,4 @@
 
-import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import { GET_CURRENT_USER, GET_CUSTOMER_DASHBOARD_DATA } from '../../utils/gql/GQL_QUERIES';
 import { UPDATE_CUSTOMER } from '../../utils/gql/GQL_MUTATIONS';
@@ -349,18 +348,18 @@ interface IAccountDetails {
 }
 
 const AccountDetailsForm = ({ customer }: { customer: any }) => {
-  if (!customer) return <div className="p-4 text-center">Please log in to edit account details.</div>;
-
   const methods = useForm<IAccountDetails>({
     defaultValues: {
-      firstName: customer.firstName || '',
-      lastName: customer.lastName || '',
-      email: customer.email || '',
+      firstName: customer?.firstName || '',
+      lastName: customer?.lastName || '',
+      email: customer?.email || '',
       password: '',
       confirmPassword: ''
     }
   });
   const [updateCustomer, { loading }] = useMutation(UPDATE_CUSTOMER);
+
+  if (!customer) return <div className="p-4 text-center">Please log in to edit account details.</div>;
 
   const onSubmit = async (data: any) => {
     if (data.password && data.password !== data.confirmPassword) {
