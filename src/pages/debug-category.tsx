@@ -1,5 +1,6 @@
 
 import React from 'react';
+export const runtime = 'edge';
 import client from '@/utils/apollo/ApolloClient';
 import { GET_CATEGORY_NODE_BY_SLUG, GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
 
@@ -17,14 +18,14 @@ const DebugCategory = ({ logs }: { logs: string[] }) => {
 export const getServerSideProps = async () => {
   const logs: string[] = [];
   const addLog = (msg: string) => logs.push(msg);
-  const categorySlug = 'hoodies'; 
+  const categorySlug = 'hoodies';
   try {
     addLog(`--- TEST 1: CATEGORY ---`);
     addLog(`Fetching category node...`);
     const { data: categoryData } = await client.query({
-        query: GET_CATEGORY_NODE_BY_SLUG,
-        variables: { slug: [categorySlug] },
-        fetchPolicy: 'no-cache',
+      query: GET_CATEGORY_NODE_BY_SLUG,
+      variables: { slug: [categorySlug] },
+      fetchPolicy: 'no-cache',
     });
     addLog(`Category Result: ${JSON.stringify(categoryData)}`);
 
@@ -38,9 +39,9 @@ export const getServerSideProps = async () => {
     // We don't know a valid slug, but we can try a search or just use the same slug
     addLog(`Fetching product (using 'hoodie' as slug)...`);
     const { data: productData } = await client.query({
-        query: GET_SINGLE_PRODUCT,
-        variables: { slug: 'hoodie' }, // Common slug
-        fetchPolicy: 'no-cache',
+      query: GET_SINGLE_PRODUCT,
+      variables: { slug: 'hoodie' }, // Common slug
+      fetchPolicy: 'no-cache',
     });
     addLog(`Product Result: Success (found: ${!!productData?.product})`);
   } catch (error: any) {

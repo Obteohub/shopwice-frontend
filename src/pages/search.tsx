@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+export const runtime = 'edge';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Layout from '@/components/Layout/Layout.component';
@@ -40,13 +41,13 @@ const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: Sear
     }, [router]);
 
     // Keep router for navigation, but use props for data
-    
+
     // We can still use state if we want to support client-side updates without reload, 
     // but ProductList handles pagination/filtering internally now.
     // However, if the user changes the search term in the URL, the page will reload (SSR).
-    
+
     // If there's an error from SSR, show it.
-    
+
     return (
         <Layout title={`Search: ${searchTerm}`} fullWidth={true}>
             <Head>
@@ -88,7 +89,7 @@ const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: Sear
                                     query={SEARCH_PRODUCTS_QUERY}
                                     queryVariables={{ search: searchTerm }}
                                     // Removed useDirectFetch to use Apollo Client
-                                    context={{}} 
+                                    context={{}}
                                 />
                             </div>
                         )}

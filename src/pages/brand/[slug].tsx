@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+export const runtime = 'edge';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 

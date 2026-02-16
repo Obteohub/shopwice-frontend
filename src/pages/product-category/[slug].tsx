@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+export const runtime = 'edge';
 import { GetServerSideProps } from 'next';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
@@ -93,12 +94,12 @@ const CategoryPage = ({ category: initialCategory, products: initialProducts, pa
                     if (catNode) {
                         setCategory(catNode);
                         setCategoryId(catNode.databaseId);
-                        
+
                         console.log('CSR Fallback: Fetching products...');
                         const variables = hasAttrFilter
                             ? { categoryId: catNode.databaseId, attrTax, attrTerm: [term], first: 24 }
                             : { categoryId: catNode.databaseId, first: 24 };
-                        
+
                         const { data: prodData } = await getProducts({ variables });
                         setProducts(prodData?.products?.nodes || []);
                         setPageInfo(prodData?.products?.pageInfo || { hasNextPage: false, endCursor: null });
@@ -116,7 +117,7 @@ const CategoryPage = ({ category: initialCategory, products: initialProducts, pa
     const totalCount = category?.count || products.length;
 
     if (loading && products.length === 0) {
-         return (
+        return (
             <TaxonomyListingPage
                 title={'Loading...'}
                 products={[]}

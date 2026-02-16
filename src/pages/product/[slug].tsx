@@ -1,4 +1,5 @@
 // Imports - Updated Layout
+export const runtime = 'edge';
 
 // Components
 import SingleProduct from '@/components/Product/SingleProductFinal.component';

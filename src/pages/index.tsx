@@ -1,5 +1,7 @@
 import dynamic from 'next/dynamic';
 
+export const runtime = 'edge';
+
 import Hero from '@/components/Index/Hero.component';
 import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
 import SEOContent from '@/components/Index/SEOContent.component';

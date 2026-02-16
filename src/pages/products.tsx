@@ -1,4 +1,5 @@
 import Head from 'next/head';
+export const runtime = 'edge';
 import Layout from '@/components/Layout/Layout.component';
 import ProductList from '@/components/Product/ProductList.component';
 import client from '@/utils/apollo/ApolloClient';

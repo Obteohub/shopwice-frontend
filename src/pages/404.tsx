@@ -1,4 +1,5 @@
 import Link from 'next/link';
+export const runtime = 'edge';
 import Layout from '@/components/Layout/Layout.component';
 import client from '@/utils/apollo/ApolloClient';
 import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
