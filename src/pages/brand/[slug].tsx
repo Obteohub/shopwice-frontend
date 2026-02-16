@@ -9,7 +9,6 @@ import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
 
 import Link from 'next/link';
 
-// export const runtime = 'experimental-edge';
 export const config = {
     runtime: 'experimental-edge',
 };
