@@ -167,7 +167,7 @@ export const GET_SINGLE_PRODUCT = gql`
 
 export const FETCH_FIRST_PRODUCTS_FROM_HOODIES_QUERY = `
  query MyQuery {
-  products(first: 4, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["hoodies"] }] } }) {
+  products(first: 4, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["hoodies"] }] } }) {
     nodes {
       databaseId
       name
@@ -247,8 +247,14 @@ export const GET_CATEGORY_DATA_BY_SLUG = gql`
       first: $first,
       after: $after,
       where: {
-        taxonomyFilter: {
-          filters: [{ taxonomy: PRODUCTCATEGORY, terms: $slug }]
+        taxQuery: {
+          taxArray: [
+            {
+              taxonomy: PRODUCTCAT
+              field: SLUG
+              terms: $slug
+            }
+          ]
         }
       }
     ) {
@@ -668,7 +674,7 @@ export const FETCH_BEST_SELLING_PRODUCTS_QUERY = gql`
 
 export const FETCH_AIR_CONDITIONER_PRODUCTS_QUERY = gql`
   query FetchAirConditionerProducts {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["air-conditioners"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["air-conditioners"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -679,7 +685,7 @@ export const FETCH_AIR_CONDITIONER_PRODUCTS_QUERY = gql`
 
 export const FETCH_MOBILE_PHONES_ON_SALE_QUERY = gql`
   query FetchMobilePhonesOnSale {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["mobile-phones"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["mobile-phones"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -690,7 +696,7 @@ export const FETCH_MOBILE_PHONES_ON_SALE_QUERY = gql`
 
 export const FETCH_LAPTOPS_QUERY = gql`
   query FetchLaptops {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["laptops"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["laptops"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -701,7 +707,7 @@ export const FETCH_LAPTOPS_QUERY = gql`
 
 export const FETCH_SPEAKERS_QUERY = gql`
   query FetchSpeakers {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["speakers"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["speakers"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -712,7 +718,7 @@ export const FETCH_SPEAKERS_QUERY = gql`
 
 export const FETCH_TELEVISIONS_QUERY = gql`
   query FetchTelevisions {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["televisions"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["televisions"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -743,27 +749,27 @@ export const FETCH_HOME_PAGE_DATA = gql`
         ...HomeProductCardFields
     }
   }
-  airConditionerProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["air-conditioners"] }] } }) {
+  airConditionerProducts: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["air-conditioners"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  mobilePhonesOnSale: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["mobile-phones"] }] } }) {
+  mobilePhonesOnSale: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["mobile-phones"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  laptopsProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["laptops"] }] } }) {
+  laptopsProducts: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["laptops"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  speakersProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["speakers"] }] } }) {
+  speakersProducts: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["speakers"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  televisionsProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["televisions"] }] } }) {
+  televisionsProducts: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["televisions"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }

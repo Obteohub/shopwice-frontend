@@ -27,9 +27,7 @@ export const GET_LOCATION_DATA_BY_SLUG = gql`
       first: 50
       after: $after
       where: { 
-        taxonomyFilter: { 
-          filters: [{ taxonomy: PRODUCTLOCATION, terms: [$slug] }] 
-        } 
+        taxQuery: { taxArray: [{ taxonomy: PRODUCTLOCATION, field: SLUG, terms: [$slug] }] } 
       }
     ) {
       pageInfo {

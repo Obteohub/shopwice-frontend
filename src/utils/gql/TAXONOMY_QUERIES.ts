@@ -34,8 +34,14 @@ export const GET_BRAND_DATA_BY_SLUG = gql`
       first: 24
       after: $after
       where: { 
-        taxonomyFilter: { 
-          filters: [{ taxonomy: PRODUCT_BRAND, terms: $slug }] 
+        taxQuery: {
+          taxArray: [
+            {
+              taxonomy: PRODUCTBRAND
+              field: SLUG
+              terms: $slug
+            }
+          ]
         } 
       }
     ) {
