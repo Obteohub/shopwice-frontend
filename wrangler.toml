@@ -6,9 +6,6 @@ pages_build_output_dir = ".vercel/output/static"
 [vars]
 NEXT_PUBLIC_SITE_URL = "https://shopwice.com"
 NEXT_PUBLIC_GRAPHQL_URL = "https://api.shopwice.com/graphql"
-NEXT_PUBLIC_REST_API_URL = "https://api.shopwice.com/api"
-NEXT_PUBLIC_STORE_API_URL = "https://api.shopwice.com/api"
-WORDPRESS_API_URL = "https://api.shopwice.com/api"
 
 [[services]]
 binding = "WORKER_SELF_REFERENCE"
