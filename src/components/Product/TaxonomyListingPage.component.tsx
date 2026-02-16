@@ -45,9 +45,9 @@ const TaxonomyListingPage = ({
         <header className="mb-6">
           <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
             {loading ? (
-               title === 'Loading...' ? 'Loading...' : <span className="animate-pulse bg-gray-200 text-transparent rounded select-none">Loading Category</span>
+              title === 'Loading...' ? 'Loading...' : <span className="animate-pulse bg-gray-200 text-transparent rounded select-none">Loading Category</span>
             ) : (
-               (title || 'Products').toLowerCase()
+              (title || 'Products').toLowerCase()
             )}
           </h1>
           {description && (
@@ -61,26 +61,25 @@ const TaxonomyListingPage = ({
         {topSlot}
 
         {loading ? (
-             <div className="flex justify-center items-center min-h-[400px]">
-                <LoadingSpinner color="orange" size="lg" />
-             </div>
+          <div className="flex justify-center items-center min-h-[400px]">
+            <LoadingSpinner color="orange" size="lg" />
+          </div>
         ) : (
-            products && products.length > 0 ? (
-              <ProductList
-                products={products}
-                title={title || 'Products'}
-                pageInfo={pageInfo}
-                slug={slug}
-                query={query}
-                queryVariables={queryVariables}
-                totalCount={totalCount}
-                fetchAllForSort={fetchAllForSort}
-              />
-            ) : (
-              <div className="flex justify-center items-center min-h-[400px]">
-                <p className="text-xl text-gray-500">{emptyMessage}</p>
-              </div>
-            )
+          products && products.length > 0 ? (
+            <ProductList
+              products={products}
+              pageInfo={pageInfo}
+              slug={slug}
+              query={query}
+              queryVariables={queryVariables}
+              totalCount={totalCount}
+              fetchAllForSort={fetchAllForSort}
+            />
+          ) : (
+            <div className="flex justify-center items-center min-h-[400px]">
+              <p className="text-xl text-gray-500">{emptyMessage}</p>
+            </div>
+          )
         )}
       </div>
     </Layout>
