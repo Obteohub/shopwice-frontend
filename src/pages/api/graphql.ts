@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'experimental-edge';
+export const runtime = 'edge';
 
 /**
  * GraphQL Proxy Endpoint
