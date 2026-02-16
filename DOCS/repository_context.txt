@@ -13262,104 +13262,6 @@ export const parsePrice = (price?: string | number | null): number => {
 };
 ```
 
-## File: src/utils/gql/FRAGMENTS.ts
-```typescript
-import { gql } from '@apollo/client';
-/**
- * ============================================
- * REUSABLE BASE FRAGMENTS
- * ============================================
- * These fragments are used across multiple queries to:
- * - Reduce query size by ~25-35%
- * - Improve Apollo cache normalization
- * - Eliminate DRY violations
- * - Enable better fragment reuse
- */
-/**
- * Image Fields Fragment
- * Used for: product images, gallery images, variation images
- */
-export const IMAGE_FIELDS = gql`
-  fragment ImageFields on Image {
-    id
-    sourceUrl
-    srcSet
-    altText
-    title
-  }
-`;
-/**
- * Term Fields Fragment
- * Used for: categories, brands, locations, and other taxonomy terms
- * Eliminates ~40+ duplicate field definitions
- */
-export const TERM_FIELDS = gql`
-  fragment TermFields on TermNode {
-    id
-    databaseId
-    name
-    slug
-  }
-`;
-/**
- * Pricing Fields Fragment
- * Shared pricing structure across all product types
- * Used in: SimpleProduct, VariableProduct, ExternalProduct, Variations
- */
-export const PRICING_FIELDS = gql`
-  fragment PricingFields on Product {
-    price
-    regularPrice
-    salePrice
-  }
-`;
-/**
- * Variation Fields Fragment
- * Complete variation data structure for variable products
- * Enables reuse in: PDP, cart, quick view modals
- */
-export const VARIATION_FIELDS = gql`
-  fragment VariationFields on ProductVariation {
-    id
-    databaseId
-    name
-    sku
-    stockStatus
-    stockQuantity
-    purchasable
-    onSale
-    salePrice
-    regularPrice
-    price
-    image {
-      ...ImageFields
-    }
-    attributes {
-      nodes {
-        id
-        name
-        value
-      }
-    }
-  }
-`;
-/**
- * Attribute Fields Fragment
- * Shared attribute structure
- * Used in: Product, ProductVariation
- */
-export const ATTRIBUTE_FIELDS = gql`
-  fragment AttributeFields on ProductAttribute {
-    id
-    name
-    options
-    variation
-    visible
-    label
-  }
-`;
-```
-
 ## File: categories.txt
 ```
 - Accessories (accessories) [5]
@@ -16305,6 +16207,104 @@ export const useCartStore = create<CartState>()(
     },
   ),
 );
+```
+
+## File: src/utils/gql/FRAGMENTS.ts
+```typescript
+import { gql } from '@apollo/client';
+/**
+ * ============================================
+ * REUSABLE BASE FRAGMENTS
+ * ============================================
+ * These fragments are used across multiple queries to:
+ * - Reduce query size by ~25-35%
+ * - Improve Apollo cache normalization
+ * - Eliminate DRY violations
+ * - Enable better fragment reuse
+ */
+/**
+ * Image Fields Fragment
+ * Used for: product images, gallery images, variation images
+ */
+export const IMAGE_FIELDS = gql`
+  fragment ImageFields on Image {
+    id
+    sourceUrl
+    srcSet
+    altText
+    title
+  }
+`;
+/**
+ * Term Fields Fragment
+ * Used for: categories, brands, locations, and other taxonomy terms
+ * Eliminates ~40+ duplicate field definitions
+ */
+export const TERM_FIELDS = gql`
+  fragment TermFields on ProductCategory {
+    id
+    databaseId
+    name
+    slug
+  }
+`;
+/**
+ * Pricing Fields Fragment
+ * Shared pricing structure across all product types
+ * Used in: SimpleProduct, VariableProduct, ExternalProduct, Variations
+ */
+export const PRICING_FIELDS = gql`
+  fragment PricingFields on Product {
+    price
+    regularPrice
+    salePrice
+  }
+`;
+/**
+ * Variation Fields Fragment
+ * Complete variation data structure for variable products
+ * Enables reuse in: PDP, cart, quick view modals
+ */
+export const VARIATION_FIELDS = gql`
+  fragment VariationFields on ProductVariation {
+    id
+    databaseId
+    name
+    sku
+    stockStatus
+    stockQuantity
+    purchasable
+    onSale
+    salePrice
+    regularPrice
+    price
+    image {
+      ...ImageFields
+    }
+    attributes {
+      nodes {
+        id
+        name
+        # value removed as it does not exist on Attribute
+      }
+    }
+  }
+`;
+/**
+ * Attribute Fields Fragment
+ * Shared attribute structure
+ * Used in: Product, ProductVariation
+ */
+export const ATTRIBUTE_FIELDS = gql`
+  fragment AttributeFields on ProductAttribute {
+    id
+    name
+    options
+    variation
+    visible
+    label
+  }
+`;
 ```
 
 ## File: src/utils/gql/GQL_MUTATIONS.ts
@@ -21044,6 +21044,281 @@ export default async function handler(req: NextRequest) {
 }
 ```
 
+## File: package.json
+```json
+{
+  "name": "shopwice",
+  "version": "1.2.4",
+  "private": true,
+  "scripts": {
+    "lhci": "lhci autorun",
+    "lhci:perf": "lhci autorun --collect.settings.preset=perf",
+    "lhci:desktop": "lhci autorun --collect.settings.preset=desktop",
+    "dev": "next dev --turbopack",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
+    "format": "prettier --write \"**/*.{js,ts,tsx,json}\"",
+    "playwright": "npx playwright test",
+    "playwright:ui": "npx playwright test --ui",
+    "playwright:debug": "npx playwright test --debug",
+    "playwright:codegen": "playwright codegen",
+    "refresh": "rm -rf node_modules && rm package-lock.json && npm i && npm run format",
+    "generate-reviews": "node scripts/generate-reviews.js",
+    "postbuild": "next-sitemap"
+  },
+  "keywords": [
+    "next.js",
+    "next",
+    "javascript",
+    "framer"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@apollo/client": "^3.12.0",
+    "@react-google-maps/api": "^2.20.8",
+    "@react-oauth/google": "^0.13.4",
+    "@types/react": "^19.2.7",
+    "@types/react-facebook-login": "^4.1.11",
+    "autoprefixer": "^10.4.23",
+    "graphql": "^16.12.0",
+    "isomorphic-dompurify": "^2.35.0",
+    "lodash": "^4.17.21",
+    "motion": "^12.23.26",
+    "next": "16.1.1",
+    "next-seo": "^6.6.0",
+    "next-sitemap": "^4.2.3",
+    "node-fetch": "^3.3.2",
+    "nprogress": "^0.2.0",
+    "postcss": "^8.5.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-facebook-login": "^4.1.1",
+    "react-hook-form": "^7.69.0",
+    "use-places-autocomplete": "^4.0.1",
+    "uuid": "^13.0.0",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.13.16",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.57.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/google.maps": "^3.58.1",
+    "@types/lodash": "^4.17.21",
+    "@types/node": "24.10.4",
+    "@types/nprogress": "^0.2.3",
+    "@types/react-dom": "^19.2.3",
+    "@types/uuid": "^11.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.50.1",
+    "@typescript-eslint/parser": "^8.50.1",
+    "babel-plugin-styled-components": "^2.1.4",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.1.1",
+    "postcss-preset-env": "^10.5.0",
+    "prettier": "^3.7.4",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.63.0"
+  },
+  "browserslist": [
+    "defaults",
+    "not IE 11",
+    "maintained node versions"
+  ]
+}
+```
+
+## File: src/pages/debug-category.tsx
+```typescript
+import React from 'react';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_CATEGORY_NODE_BY_SLUG, GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
+export const config = {
+  runtime: 'experimental-edge',
+};
+const DebugCategory = ({ logs }: { logs: string[] }) => {
+  return (
+    <div className="p-5 font-mono">
+      <h1>Category Debug (SSR)</h1>
+      <pre className="bg-gray-100 p-2.5 whitespace-pre-wrap">
+        {logs.join('\n')}
+      </pre>
+    </div>
+  );
+};
+export const getServerSideProps = async () => {
+  const logs: string[] = [];
+  const addLog = (msg: string) => logs.push(msg);
+  const categorySlug = 'hoodies';
+  try {
+    addLog(`--- TEST 1: CATEGORY ---`);
+    addLog(`Fetching category node...`);
+    const { data: categoryData } = await client.query({
+      query: GET_CATEGORY_NODE_BY_SLUG,
+      variables: { slug: [categorySlug] },
+      fetchPolicy: 'no-cache',
+    });
+    addLog(`Category Result: ${JSON.stringify(categoryData)}`);
+  } catch (error: any) {
+    addLog(`CATEGORY ERROR: ${error.message}`);
+  }
+  try {
+    addLog(`\n--- TEST 2: PRODUCT ---`);
+    // Try to fetch a product to see if general connectivity works
+    // We don't know a valid slug, but we can try a search or just use the same slug
+    addLog(`Fetching product (using 'hoodie' as slug)...`);
+    const { data: productData } = await client.query({
+      query: GET_SINGLE_PRODUCT,
+      variables: { slug: 'hoodie' }, // Common slug
+      fetchPolicy: 'no-cache',
+    });
+    addLog(`Product Result: Success (found: ${!!productData?.product})`);
+  } catch (error: any) {
+    addLog(`PRODUCT ERROR: ${error.message}`);
+  }
+  return {
+    props: {
+      logs
+    }
+  };
+};
+export default DebugCategory;
+```
+
+## File: src/pages/search.tsx
+```typescript
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Head from 'next/head';
+import Layout from '@/components/Layout/Layout.component';
+import ProductList from '@/components/Product/ProductList.component';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
+import { SEARCH_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
+import { GetServerSideProps } from 'next';
+import client from '@/utils/apollo/ApolloClient';
+export const config = {
+  runtime: 'experimental-edge',
+};
+interface SearchPageProps {
+    products: any[];
+    pageInfo: any;
+    searchTerm: string;
+    error?: string;
+}
+const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: SearchPageProps) => {
+    const router = useRouter();
+    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        const handleStart = (url: string) => {
+            // Only show loading if the search term changes (query param 'q')
+            if (url !== router.asPath) {
+                setLoading(true);
+            }
+        };
+        const handleComplete = () => setLoading(false);
+        router.events.on('routeChangeStart', handleStart);
+        router.events.on('routeChangeComplete', handleComplete);
+        router.events.on('routeChangeError', handleComplete);
+        return () => {
+            router.events.off('routeChangeStart', handleStart);
+            router.events.off('routeChangeComplete', handleComplete);
+            router.events.off('routeChangeError', handleComplete);
+        };
+    }, [router]);
+    // Keep router for navigation, but use props for data
+    // We can still use state if we want to support client-side updates without reload, 
+    // but ProductList handles pagination/filtering internally now.
+    // However, if the user changes the search term in the URL, the page will reload (SSR).
+    // If there's an error from SSR, show it.
+    return (
+        <Layout title={`Search: ${searchTerm}`} fullWidth={true}>
+            <Head>
+                <title>{`Search Results for "${searchTerm}" | Shopwice`}</title>
+            </Head>
+            <div className="pt-1 pb-1">
+                <div className="container mx-auto px-4 py-4">
+                    <h1 className="text-xl font-bold mb-4">
+                        Search Results for <span className="text-orange-600">{`"${searchTerm}"`}</span>
+                    </h1>
+                </div>
+                {loading ? (
+                    <div className="flex justify-center items-center min-h-[400px]">
+                        <LoadingSpinner color="orange" size="lg" />
+                    </div>
+                ) : (
+                    <>
+                        {serverError && (
+                            <div className="text-center py-10">
+                                <p className="text-red-500">Error loading search results. Please try again.</p>
+                                <p className="text-sm text-gray-500 mt-2">{serverError}</p>
+                            </div>
+                        )}
+                        {!serverError && products.length === 0 && searchTerm && (
+                            <div className="text-center py-10">
+                                <p className="text-gray-600 text-lg">{`No products found matching "${searchTerm}"`}</p>
+                                <p className="text-gray-500 mt-2">Try checking your spelling or using different keywords.</p>
+                            </div>
+                        )}
+                        {!serverError && products.length > 0 && (
+                            <div className="pt-1 pb-1">
+                                <ProductList
+                                    products={products}
+                                    pageInfo={pageInfo}
+                                    query={SEARCH_PRODUCTS_QUERY}
+                                    queryVariables={{ search: searchTerm }}
+                                    // Removed useDirectFetch to use Apollo Client
+                                    context={{}}
+                                />
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        </Layout>
+    );
+};
+export const getServerSideProps: GetServerSideProps = async (context) => {
+    const searchTerm = context.query.q as string || '';
+    if (!searchTerm) {
+        return {
+            props: {
+                products: [],
+                pageInfo: null,
+                searchTerm: ''
+            }
+        };
+    }
+    try {
+        const { data } = await client.query({
+            query: SEARCH_PRODUCTS_QUERY,
+            variables: { search: searchTerm, first: 24 },
+            fetchPolicy: 'network-only'
+        });
+        return {
+            props: {
+                products: data?.products?.nodes || [],
+                pageInfo: data?.products?.pageInfo || null,
+                searchTerm
+            }
+        };
+    } catch (error: any) {
+        console.error('Search SSR Error:', error);
+        return {
+            props: {
+                products: [],
+                pageInfo: null,
+                searchTerm,
+                error: error.message || 'An error occurred'
+            }
+        };
+    }
+};
+export default SearchPage;
+```
+
 ## File: src/utils/gql/GQL_QUERIES.ts
 ```typescript
 import { gql } from '@apollo/client';
@@ -21168,29 +21443,29 @@ export const GET_SINGLE_PRODUCT = gql`
           description
           fullHead
         }
-        ... on SimpleProduct {
-          sku
-          totalSales
-        }
-        ... on VariableProduct {
-          sku
-          totalSales
-          allPaColor {
-            nodes {
-              name
-            }
-          }
-          allPaSize {
-            nodes {
-              name
-            }
-          }
-          variations(first: 50) {
-            nodes {
-              ...VariationFields
-            }
-          }
-        }
+        # ... on SimpleProduct {
+        #   sku
+        #   totalSales
+        # }
+        # ... on VariableProduct {
+        #   sku
+        #   totalSales
+        #   allPaColor {
+        #     nodes {
+        #       name
+        #     }
+        #   }
+        #   allPaSize {
+        #     nodes {
+        #       name
+        #     }
+        #   }
+        #   variations(first: 50) {
+        #     nodes {
+        #       ...VariationFields
+        #     }
+        #   }
+        # }
       }
     }
   }
@@ -21829,614 +22104,6 @@ export const GET_RECENT_REVIEWS_QUERY = gql`
 }
   ${PRODUCT_CARD_FIELDS_FRAGMENT}
 `;
-```
-
-## File: package.json
-```json
-{
-  "name": "shopwice",
-  "version": "1.2.4",
-  "private": true,
-  "scripts": {
-    "lhci": "lhci autorun",
-    "lhci:perf": "lhci autorun --collect.settings.preset=perf",
-    "lhci:desktop": "lhci autorun --collect.settings.preset=desktop",
-    "dev": "next dev --turbopack",
-    "pages:build": "npx @cloudflare/next-on-pages",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
-    "format": "prettier --write \"**/*.{js,ts,tsx,json}\"",
-    "playwright": "npx playwright test",
-    "playwright:ui": "npx playwright test --ui",
-    "playwright:debug": "npx playwright test --debug",
-    "playwright:codegen": "playwright codegen",
-    "refresh": "rm -rf node_modules && rm package-lock.json && npm i && npm run format",
-    "generate-reviews": "node scripts/generate-reviews.js",
-    "postbuild": "next-sitemap"
-  },
-  "keywords": [
-    "next.js",
-    "next",
-    "javascript",
-    "framer"
-  ],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@apollo/client": "^3.12.0",
-    "@react-google-maps/api": "^2.20.8",
-    "@react-oauth/google": "^0.13.4",
-    "@types/react": "^19.2.7",
-    "@types/react-facebook-login": "^4.1.11",
-    "autoprefixer": "^10.4.23",
-    "graphql": "^16.12.0",
-    "isomorphic-dompurify": "^2.35.0",
-    "lodash": "^4.17.21",
-    "motion": "^12.23.26",
-    "next": "16.1.1",
-    "next-seo": "^6.6.0",
-    "next-sitemap": "^4.2.3",
-    "node-fetch": "^3.3.2",
-    "nprogress": "^0.2.0",
-    "postcss": "^8.5.6",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-facebook-login": "^4.1.1",
-    "react-hook-form": "^7.69.0",
-    "use-places-autocomplete": "^4.0.1",
-    "uuid": "^13.0.0",
-    "zustand": "^5.0.9"
-  },
-  "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
-    "@lhci/cli": "^0.15.1",
-    "@playwright/test": "^1.57.0",
-    "@tailwindcss/typography": "^0.5.19",
-    "@types/google.maps": "^3.58.1",
-    "@types/lodash": "^4.17.21",
-    "@types/node": "24.10.4",
-    "@types/nprogress": "^0.2.3",
-    "@types/react-dom": "^19.2.3",
-    "@types/uuid": "^11.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.50.1",
-    "@typescript-eslint/parser": "^8.50.1",
-    "babel-plugin-styled-components": "^2.1.4",
-    "eslint": "^9.39.2",
-    "eslint-config-next": "^16.1.1",
-    "postcss-preset-env": "^10.5.0",
-    "prettier": "^3.7.4",
-    "tailwindcss": "^3.4.19",
-    "typescript": "^5.9.3",
-    "wrangler": "^4.63.0"
-  },
-  "browserslist": [
-    "defaults",
-    "not IE 11",
-    "maintained node versions"
-  ]
-}
-```
-
-## File: src/pages/debug-category.tsx
-```typescript
-import React from 'react';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_NODE_BY_SLUG, GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
-export const config = {
-  runtime: 'experimental-edge',
-};
-const DebugCategory = ({ logs }: { logs: string[] }) => {
-  return (
-    <div className="p-5 font-mono">
-      <h1>Category Debug (SSR)</h1>
-      <pre className="bg-gray-100 p-2.5 whitespace-pre-wrap">
-        {logs.join('\n')}
-      </pre>
-    </div>
-  );
-};
-export const getServerSideProps = async () => {
-  const logs: string[] = [];
-  const addLog = (msg: string) => logs.push(msg);
-  const categorySlug = 'hoodies';
-  try {
-    addLog(`--- TEST 1: CATEGORY ---`);
-    addLog(`Fetching category node...`);
-    const { data: categoryData } = await client.query({
-      query: GET_CATEGORY_NODE_BY_SLUG,
-      variables: { slug: [categorySlug] },
-      fetchPolicy: 'no-cache',
-    });
-    addLog(`Category Result: ${JSON.stringify(categoryData)}`);
-  } catch (error: any) {
-    addLog(`CATEGORY ERROR: ${error.message}`);
-  }
-  try {
-    addLog(`\n--- TEST 2: PRODUCT ---`);
-    // Try to fetch a product to see if general connectivity works
-    // We don't know a valid slug, but we can try a search or just use the same slug
-    addLog(`Fetching product (using 'hoodie' as slug)...`);
-    const { data: productData } = await client.query({
-      query: GET_SINGLE_PRODUCT,
-      variables: { slug: 'hoodie' }, // Common slug
-      fetchPolicy: 'no-cache',
-    });
-    addLog(`Product Result: Success (found: ${!!productData?.product})`);
-  } catch (error: any) {
-    addLog(`PRODUCT ERROR: ${error.message}`);
-  }
-  return {
-    props: {
-      logs
-    }
-  };
-};
-export default DebugCategory;
-```
-
-## File: src/pages/search.tsx
-```typescript
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import Head from 'next/head';
-import Layout from '@/components/Layout/Layout.component';
-import ProductList from '@/components/Product/ProductList.component';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-import { SEARCH_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
-import { GetServerSideProps } from 'next';
-import client from '@/utils/apollo/ApolloClient';
-export const config = {
-  runtime: 'experimental-edge',
-};
-interface SearchPageProps {
-    products: any[];
-    pageInfo: any;
-    searchTerm: string;
-    error?: string;
-}
-const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: SearchPageProps) => {
-    const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    useEffect(() => {
-        const handleStart = (url: string) => {
-            // Only show loading if the search term changes (query param 'q')
-            if (url !== router.asPath) {
-                setLoading(true);
-            }
-        };
-        const handleComplete = () => setLoading(false);
-        router.events.on('routeChangeStart', handleStart);
-        router.events.on('routeChangeComplete', handleComplete);
-        router.events.on('routeChangeError', handleComplete);
-        return () => {
-            router.events.off('routeChangeStart', handleStart);
-            router.events.off('routeChangeComplete', handleComplete);
-            router.events.off('routeChangeError', handleComplete);
-        };
-    }, [router]);
-    // Keep router for navigation, but use props for data
-    // We can still use state if we want to support client-side updates without reload, 
-    // but ProductList handles pagination/filtering internally now.
-    // However, if the user changes the search term in the URL, the page will reload (SSR).
-    // If there's an error from SSR, show it.
-    return (
-        <Layout title={`Search: ${searchTerm}`} fullWidth={true}>
-            <Head>
-                <title>{`Search Results for "${searchTerm}" | Shopwice`}</title>
-            </Head>
-            <div className="pt-1 pb-1">
-                <div className="container mx-auto px-4 py-4">
-                    <h1 className="text-xl font-bold mb-4">
-                        Search Results for <span className="text-orange-600">{`"${searchTerm}"`}</span>
-                    </h1>
-                </div>
-                {loading ? (
-                    <div className="flex justify-center items-center min-h-[400px]">
-                        <LoadingSpinner color="orange" size="lg" />
-                    </div>
-                ) : (
-                    <>
-                        {serverError && (
-                            <div className="text-center py-10">
-                                <p className="text-red-500">Error loading search results. Please try again.</p>
-                                <p className="text-sm text-gray-500 mt-2">{serverError}</p>
-                            </div>
-                        )}
-                        {!serverError && products.length === 0 && searchTerm && (
-                            <div className="text-center py-10">
-                                <p className="text-gray-600 text-lg">{`No products found matching "${searchTerm}"`}</p>
-                                <p className="text-gray-500 mt-2">Try checking your spelling or using different keywords.</p>
-                            </div>
-                        )}
-                        {!serverError && products.length > 0 && (
-                            <div className="pt-1 pb-1">
-                                <ProductList
-                                    products={products}
-                                    pageInfo={pageInfo}
-                                    query={SEARCH_PRODUCTS_QUERY}
-                                    queryVariables={{ search: searchTerm }}
-                                    // Removed useDirectFetch to use Apollo Client
-                                    context={{}}
-                                />
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-        </Layout>
-    );
-};
-export const getServerSideProps: GetServerSideProps = async (context) => {
-    const searchTerm = context.query.q as string || '';
-    if (!searchTerm) {
-        return {
-            props: {
-                products: [],
-                pageInfo: null,
-                searchTerm: ''
-            }
-        };
-    }
-    try {
-        const { data } = await client.query({
-            query: SEARCH_PRODUCTS_QUERY,
-            variables: { search: searchTerm, first: 24 },
-            fetchPolicy: 'network-only'
-        });
-        return {
-            props: {
-                products: data?.products?.nodes || [],
-                pageInfo: data?.products?.pageInfo || null,
-                searchTerm
-            }
-        };
-    } catch (error: any) {
-        console.error('Search SSR Error:', error);
-        return {
-            props: {
-                products: [],
-                pageInfo: null,
-                searchTerm,
-                error: error.message || 'An error occurred'
-            }
-        };
-    }
-};
-export default SearchPage;
-```
-
-## File: src/pages/location/[slug].tsx
-```typescript
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_LOCATION_DATA_BY_SLUG, GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/LOCATION_QUERIES';
-import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
-export const config = {
-  runtime: 'experimental-edge',
-};
-/**
- * Display location page with filtering, sorting, and infinite scroll
- */
-const LocationPage = ({
-    locationName,
-    products,
-    pageInfo,
-    slug,
-    attr,
-    term,
-}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
-    const hasAttrFilter = Boolean(attrTax && term);
-    const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    useEffect(() => {
-        const handleStart = (url: string) => {
-            if (url !== router.asPath) {
-                setLoading(true);
-            }
-        };
-        const handleComplete = () => setLoading(false);
-        router.events.on('routeChangeStart', handleStart);
-        router.events.on('routeChangeComplete', handleComplete);
-        router.events.on('routeChangeError', handleComplete);
-        return () => {
-            router.events.off('routeChangeStart', handleStart);
-            router.events.off('routeChangeComplete', handleComplete);
-            router.events.off('routeChangeError', handleComplete);
-        };
-    }, [router]);
-    return (
-        <TaxonomyListingPage
-            title={locationName || 'Location'}
-            products={products}
-            pageInfo={pageInfo}
-            slug={slug}
-            query={hasAttrFilter ? GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_LOCATION_DATA_BY_SLUG}
-            queryVariables={hasAttrFilter
-                ? { slug, attrTax, attrTerm: [term] }
-                : { slug }}
-            emptyMessage="No products found for this location"
-            fetchAllForSort={true}
-            loading={loading}
-        />
-    );
-};
-export default LocationPage;
-export const getServerSideProps: GetServerSideProps = async ({
-    query: { slug, attr, term },
-}) => {
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-    const attrTax = typeof attr === 'string' ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
-    const hasAttrFilter = Boolean(attrTax && term);
-    const res = await client.query({
-        query: hasAttrFilter ? GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_LOCATION_DATA_BY_SLUG,
-        variables: hasAttrFilter
-            ? { slug: slug, attrTax, attrTerm: [term], after: null }
-            : { slug: slug, after: null },
-    });
-    const locationData = res.data.productLocation;
-    const productsData = res.data.products;
-    const products = productsData ? productsData.nodes : [];
-    const pageInfo = productsData ? productsData.pageInfo : { hasNextPage: false, endCursor: null };
-    const locationName = locationData ? locationData.name : slug;
-    return {
-        props: {
-            locationName: locationName as string,
-            products,
-            pageInfo,
-            slug: slug as string,
-            attr: typeof attr === 'string' ? attr : '',
-            term: typeof term === 'string' ? term : '',
-        },
-    };
-};
-```
-
-## File: src/utils/apollo/ApolloClient.js
-```javascript
-/*eslint complexity: ["error", 8]*/
-import {
-  ApolloClient,
-  InMemoryCache,
-  createHttpLink,
-  ApolloLink,
-} from '@apollo/client';
-const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-const getLocalStorageJson = (key) => {
-  if (typeof window === 'undefined') return null;
-  return JSON.parse(localStorage.getItem(key));
-};
-const shouldLogSession = (operationName) =>
-  operationName === 'addToCart' || operationName === 'GET_CART';
-const getSessionHeader = (sessionData, operationName) => {
-  if (!sessionData?.token || !sessionData?.createdTime || operationName === 'CreateUser') {
-    return null;
-  }
-  const { token, createdTime } = sessionData;
-  if (Date.now() - createdTime > SEVEN_DAYS) {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('woo-session');
-    }
-    return null;
-  }
-  const cleanToken = token.replace(/^Session\s+/i, '');
-  return `Session ${cleanToken}`;
-};
-const getAuthHeader = (authData, operationName) => {
-  if (!authData?.authToken || operationName === 'CreateUser') return null;
-  return `Bearer ${authData.authToken}`;
-};
-const getSessionFromHeaders = (headers) => {
-  if (!headers) return null;
-  return headers.get('woocommerce-session') || headers.get('x-woocommerce-session') || null;
-};
-const persistSession = (session) => {
-  if (!session || typeof window === 'undefined') return;
-  if (session === 'false') {
-    localStorage.removeItem('woo-session');
-    return;
-  }
-  localStorage.setItem(
-    'woo-session',
-    JSON.stringify({ token: session, createdTime: Date.now() }),
-  );
-};
-const handleInvalidSession = (errors) => {
-  if (!errors || typeof window === 'undefined') return;
-  const invalid = errors.some((err) => err.message === "The 'woocommerce-session' header is invalid");
-  if (invalid) {
-    localStorage.removeItem('woo-session');
-    window.location.reload();
-  }
-};
-/**
- * Middleware operation
- * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
- */
-export const middleware = new ApolloLink((operation, forward) => {
-  /**
-   * If session data exist in local storage, set value as session header.
-   */
-  const sessionData = getLocalStorageJson('woo-session');
-  const authData = getLocalStorageJson('auth-data');
-  const headers = {};
-  // Middleware Log
-  if (shouldLogSession(operation.operationName)) {
-    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
-  }
-  const sessionHeader = getSessionHeader(sessionData, operation.operationName);
-  if (sessionHeader) {
-    headers['woocommerce-session'] = sessionHeader;
-  }
-  const authHeader = getAuthHeader(authData, operation.operationName);
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
-  }
-  operation.setContext({
-    headers,
-  });
-  return forward(operation);
-});
-/**
- * Afterware operation.
- *
- * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
- */
-export const afterware = new ApolloLink((operation, forward) =>
-  forward(operation).map((response) => {
-    /**
-   * Check for session header and update session in local storage accordingly.
-   */
-  const context = operation.getContext();
-  const responseHeaders = context?.response?.headers;
-  const session = getSessionFromHeaders(responseHeaders);
-  if (operation.operationName === 'AddToCart' || operation.operationName === 'GET_CART') {
-    console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session: ${session}`);
-  }
-  persistSession(session);
-  handleInvalidSession(response.errors);
-    return response;
-  }),
-);
-const clientSide = typeof window === 'undefined';
-// Apollo GraphQL client.
-const linkUri = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql';
-const linkCredentials = 'omit';
-/**
- * Custom fetch wrapper to capture session headers directly from the response.
- * This ensures session tokens are saved even if Apollo Link context doesn't propagate headers.
- */
-const customFetch = async (uri, options) => {
-  const response = await fetch(uri, options);
-  if (typeof window !== 'undefined') {
-    const sessionHeader = response.headers.get('woocommerce-session') || 
-                          response.headers.get('x-woocommerce-session');
-    if (sessionHeader) {
-      console.log('[Apollo customFetch] Captured Session Header:', sessionHeader);
-      localStorage.setItem(
-        'woo-session',
-        JSON.stringify({ token: sessionHeader, createdTime: Date.now() }),
-      );
-    }
-  }
-  return response;
-};
-const client = new ApolloClient({
-  ssrMode: clientSide,
-  link: middleware.concat(
-    afterware.concat(
-      createHttpLink({
-        uri: linkUri,
-        fetch: customFetch,
-        credentials: linkCredentials, // Include credentials for OUR domain only
-      }),
-    ),
-  ),
-  cache: new InMemoryCache({
-    possibleTypes: {
-      Product: ['SimpleProduct', 'VariableProduct', 'ExternalProduct', 'GroupProduct'],
-    },
-    typePolicies: {
-      Query: {
-        fields: {
-          products: {
-            keyArgs: ['where'],
-            merge(existing, incoming, { args }) {
-              if (!existing) return incoming;
-              const { after } = args || {};
-              if (after) {
-                return {
-                  ...incoming,
-                  nodes: [...(existing.nodes || []), ...(incoming.nodes || [])],
-                };
-              }
-              return incoming;
-            },
-          },
-        },
-      },
-      // Disable automatic normalization for Product types to avoid missing field errors
-      // Products will be cached by query instead of by ID
-      Product: {
-        keyFields: false,
-        fields: {
-          // Handle nullable fields gracefully
-          databaseId: { read(existing) { return existing || null; } },
-          date: { read(existing) { return existing || null; } },
-          averageRating: { read(existing) { return existing || null; } },
-          reviewCount: { read(existing) { return existing || null; } },
-          stockQuantity: { read(existing) { return existing || null; } },
-          image: { read(existing) { return existing || null; } },
-          productCategories: {
-            read(existing) { return existing || { nodes: [] }; },
-            merge(existing, incoming) { return incoming || { nodes: [] }; },
-          },
-          productBrand: {
-            read(existing) { return existing || { nodes: [] }; },
-            merge(existing, incoming) { return incoming || { nodes: [] }; },
-          },
-          productLocation: {
-            read(existing) { return existing || { nodes: [] }; },
-            merge(existing, incoming) { return incoming || { nodes: [] }; },
-          },
-          attributes: {
-            read(existing) { return existing || { nodes: [] }; },
-            merge(existing, incoming) { return incoming || { nodes: [] }; },
-          },
-        },
-      },
-      ProductCategory: { keyFields: ['slug'] },
-      Cart: {
-        fields: {
-          contents: { merge(existing, incoming) { return incoming; } },
-          total: { merge(existing, incoming) { return incoming; } },
-          items: { merge(existing, incoming) { return incoming; } },
-          itemCount: { merge(existing, incoming) { return incoming; } },
-          totals: { merge(existing, incoming) { return incoming; } },
-        },
-      },
-      CartItem: {
-        keyFields: ['key'],
-        fields: {
-          quantity: { merge(existing, incoming) { return incoming; } },
-          total: { merge(existing, incoming) { return incoming; } },
-        },
-      },
-      VariableProduct: {
-        keyFields: false,
-        fields: {
-          variations: {
-            merge(existing, incoming) { return incoming; },
-          },
-        },
-      },
-      ProductVariation: { keyFields: false },
-      SimpleProduct: { keyFields: false },
-      ExternalProduct: { keyFields: false },
-      GroupProduct: { keyFields: false },
-      MediaItem: { keyFields: ['id'] },
-      TermNode: { keyFields: false },
-      Attribute: {
-        keyFields: false,
-        fields: {
-          nodes: {
-            read(existing) { return existing || []; },
-            merge(existing, incoming) { return incoming || []; },
-          },
-        },
-      },
-    },
-  }),
-});
-export default client;
 ```
 
 ## File: src/components/Product/SingleProductFinal.component.tsx
@@ -23120,6 +22787,339 @@ const SingleProductFinal = ({
     );
 };
 export default SingleProductFinal;
+```
+
+## File: src/pages/location/[slug].tsx
+```typescript
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_LOCATION_DATA_BY_SLUG, GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/LOCATION_QUERIES';
+import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
+export const config = {
+  runtime: 'experimental-edge',
+};
+/**
+ * Display location page with filtering, sorting, and infinite scroll
+ */
+const LocationPage = ({
+    locationName,
+    products,
+    pageInfo,
+    slug,
+    attr,
+    term,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
+    const hasAttrFilter = Boolean(attrTax && term);
+    const router = useRouter();
+    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        const handleStart = (url: string) => {
+            if (url !== router.asPath) {
+                setLoading(true);
+            }
+        };
+        const handleComplete = () => setLoading(false);
+        router.events.on('routeChangeStart', handleStart);
+        router.events.on('routeChangeComplete', handleComplete);
+        router.events.on('routeChangeError', handleComplete);
+        return () => {
+            router.events.off('routeChangeStart', handleStart);
+            router.events.off('routeChangeComplete', handleComplete);
+            router.events.off('routeChangeError', handleComplete);
+        };
+    }, [router]);
+    return (
+        <TaxonomyListingPage
+            title={locationName || 'Location'}
+            products={products}
+            pageInfo={pageInfo}
+            slug={slug}
+            query={hasAttrFilter ? GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_LOCATION_DATA_BY_SLUG}
+            queryVariables={hasAttrFilter
+                ? { slug, attrTax, attrTerm: [term] }
+                : { slug }}
+            emptyMessage="No products found for this location"
+            fetchAllForSort={true}
+            loading={loading}
+        />
+    );
+};
+export default LocationPage;
+export const getServerSideProps: GetServerSideProps = async ({
+    query: { slug, attr, term },
+}) => {
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+    const attrTax = typeof attr === 'string' ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
+    const hasAttrFilter = Boolean(attrTax && term);
+    const res = await client.query({
+        query: hasAttrFilter ? GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_LOCATION_DATA_BY_SLUG,
+        variables: hasAttrFilter
+            ? { slug: slug, attrTax, attrTerm: [term], after: null }
+            : { slug: slug, after: null },
+    });
+    const locationData = res.data.productLocation;
+    const productsData = res.data.products;
+    const products = productsData ? productsData.nodes : [];
+    const pageInfo = productsData ? productsData.pageInfo : { hasNextPage: false, endCursor: null };
+    const locationName = locationData ? locationData.name : slug;
+    return {
+        props: {
+            locationName: locationName as string,
+            products,
+            pageInfo,
+            slug: slug as string,
+            attr: typeof attr === 'string' ? attr : '',
+            term: typeof term === 'string' ? term : '',
+        },
+    };
+};
+```
+
+## File: src/utils/apollo/ApolloClient.js
+```javascript
+/*eslint complexity: ["error", 8]*/
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  ApolloLink,
+} from '@apollo/client';
+const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+const getLocalStorageJson = (key) => {
+  if (typeof window === 'undefined') return null;
+  return JSON.parse(localStorage.getItem(key));
+};
+const shouldLogSession = (operationName) =>
+  operationName === 'addToCart' || operationName === 'GET_CART';
+const getSessionHeader = (sessionData, operationName) => {
+  if (!sessionData?.token || !sessionData?.createdTime || operationName === 'CreateUser') {
+    return null;
+  }
+  const { token, createdTime } = sessionData;
+  if (Date.now() - createdTime > SEVEN_DAYS) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('woo-session');
+    }
+    return null;
+  }
+  const cleanToken = token.replace(/^Session\s+/i, '');
+  return `Session ${cleanToken}`;
+};
+const getAuthHeader = (authData, operationName) => {
+  if (!authData?.authToken || operationName === 'CreateUser') return null;
+  return `Bearer ${authData.authToken}`;
+};
+const getSessionFromHeaders = (headers) => {
+  if (!headers) return null;
+  return headers.get('woocommerce-session') || headers.get('x-woocommerce-session') || null;
+};
+const persistSession = (session) => {
+  if (!session || typeof window === 'undefined') return;
+  if (session === 'false') {
+    localStorage.removeItem('woo-session');
+    return;
+  }
+  localStorage.setItem(
+    'woo-session',
+    JSON.stringify({ token: session, createdTime: Date.now() }),
+  );
+};
+const handleInvalidSession = (errors) => {
+  if (!errors || typeof window === 'undefined') return;
+  const invalid = errors.some((err) => err.message === "The 'woocommerce-session' header is invalid");
+  if (invalid) {
+    localStorage.removeItem('woo-session');
+    window.location.reload();
+  }
+};
+/**
+ * Middleware operation
+ * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
+ */
+export const middleware = new ApolloLink((operation, forward) => {
+  /**
+   * If session data exist in local storage, set value as session header.
+   */
+  const sessionData = getLocalStorageJson('woo-session');
+  const authData = getLocalStorageJson('auth-data');
+  const headers = {};
+  // Middleware Log
+  if (shouldLogSession(operation.operationName)) {
+    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
+  }
+  const sessionHeader = getSessionHeader(sessionData, operation.operationName);
+  if (sessionHeader) {
+    headers['woocommerce-session'] = sessionHeader;
+  }
+  const authHeader = getAuthHeader(authData, operation.operationName);
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
+  }
+  operation.setContext({
+    headers,
+  });
+  return forward(operation);
+});
+/**
+ * Afterware operation.
+ *
+ * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
+ */
+export const afterware = new ApolloLink((operation, forward) =>
+  forward(operation).map((response) => {
+    /**
+   * Check for session header and update session in local storage accordingly.
+   */
+  const context = operation.getContext();
+  const responseHeaders = context?.response?.headers;
+  const session = getSessionFromHeaders(responseHeaders);
+  if (operation.operationName === 'AddToCart' || operation.operationName === 'GET_CART') {
+    console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session: ${session}`);
+  }
+  persistSession(session);
+  handleInvalidSession(response.errors);
+    return response;
+  }),
+);
+const clientSide = typeof window === 'undefined';
+// Apollo GraphQL client.
+const linkUri = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql';
+const linkCredentials = 'omit';
+/**
+ * Custom fetch wrapper to capture session headers directly from the response.
+ * This ensures session tokens are saved even if Apollo Link context doesn't propagate headers.
+ */
+const customFetch = async (uri, options) => {
+  const response = await fetch(uri, options);
+  if (typeof window !== 'undefined') {
+    const sessionHeader = response.headers.get('woocommerce-session') || 
+                          response.headers.get('x-woocommerce-session');
+    if (sessionHeader) {
+      console.log('[Apollo customFetch] Captured Session Header:', sessionHeader);
+      localStorage.setItem(
+        'woo-session',
+        JSON.stringify({ token: sessionHeader, createdTime: Date.now() }),
+      );
+    }
+  }
+  return response;
+};
+const client = new ApolloClient({
+  ssrMode: clientSide,
+  link: middleware.concat(
+    afterware.concat(
+      createHttpLink({
+        uri: linkUri,
+        fetch: customFetch,
+        credentials: linkCredentials, // Include credentials for OUR domain only
+      }),
+    ),
+  ),
+  cache: new InMemoryCache({
+    possibleTypes: {
+      Product: ['SimpleProduct', 'VariableProduct', 'ExternalProduct', 'GroupProduct'],
+    },
+    typePolicies: {
+      Query: {
+        fields: {
+          products: {
+            keyArgs: ['where'],
+            merge(existing, incoming, { args }) {
+              if (!existing) return incoming;
+              const { after } = args || {};
+              if (after) {
+                return {
+                  ...incoming,
+                  nodes: [...(existing.nodes || []), ...(incoming.nodes || [])],
+                };
+              }
+              return incoming;
+            },
+          },
+        },
+      },
+      // Disable automatic normalization for Product types to avoid missing field errors
+      // Products will be cached by query instead of by ID
+      Product: {
+        keyFields: false,
+        fields: {
+          // Handle nullable fields gracefully
+          databaseId: { read(existing) { return existing || null; } },
+          date: { read(existing) { return existing || null; } },
+          averageRating: { read(existing) { return existing || null; } },
+          reviewCount: { read(existing) { return existing || null; } },
+          stockQuantity: { read(existing) { return existing || null; } },
+          image: { read(existing) { return existing || null; } },
+          productCategories: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          productBrand: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          productLocation: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          attributes: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+        },
+      },
+      ProductCategory: { keyFields: ['slug'] },
+      Cart: {
+        fields: {
+          contents: { merge(existing, incoming) { return incoming; } },
+          total: { merge(existing, incoming) { return incoming; } },
+          items: { merge(existing, incoming) { return incoming; } },
+          itemCount: { merge(existing, incoming) { return incoming; } },
+          totals: { merge(existing, incoming) { return incoming; } },
+        },
+      },
+      CartItem: {
+        keyFields: ['key'],
+        fields: {
+          quantity: { merge(existing, incoming) { return incoming; } },
+          total: { merge(existing, incoming) { return incoming; } },
+        },
+      },
+      VariableProduct: {
+        keyFields: false,
+        fields: {
+          variations: {
+            merge(existing, incoming) { return incoming; },
+          },
+        },
+      },
+      ProductVariation: { keyFields: false },
+      SimpleProduct: { keyFields: false },
+      ExternalProduct: { keyFields: false },
+      GroupProduct: { keyFields: false },
+      MediaItem: { keyFields: ['id'] },
+      TermNode: { keyFields: false },
+      Attribute: {
+        keyFields: false,
+        fields: {
+          nodes: {
+            read(existing) { return existing || []; },
+            merge(existing, incoming) { return incoming || []; },
+          },
+        },
+      },
+    },
+  }),
+});
+export default client;
 ```
 
 ## File: src/pages/api/reset-session.ts
