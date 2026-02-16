@@ -13360,188 +13360,6 @@ export const ATTRIBUTE_FIELDS = gql`
 `;
 ```
 
-## File: src/utils/gql/LOCATION_QUERIES.ts
-```typescript
-import { gql } from '@apollo/client';
-import { PRODUCT_CARD_FIELDS_FRAGMENT } from './GQL_QUERIES';
-// For location pages - fetch products and filter client-side
-export const GET_LOCATION_PRODUCTS = gql`
-  query LocationProducts($after: String) {
-    products(first: 1000, after: $after) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        ...ProductCardFields
-      }
-    }
-  }
-  ${PRODUCT_CARD_FIELDS_FRAGMENT}
-`;
-export const GET_LOCATION_DATA_BY_SLUG = gql`
-  query LocationData($slug: ID!, $after: String) {
-    productLocation(id: $slug, idType: SLUG) {
-      id
-      name
-    }
-    products(
-      first: 50
-      after: $after
-      where: { 
-        taxonomyFilter: { 
-          filters: [{ taxonomy: PRODUCTLOCATION, terms: [$slug] }] 
-        } 
-      }
-    ) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        ...ProductCardFields
-      }
-    }
-  }
-  ${PRODUCT_CARD_FIELDS_FRAGMENT}
-`;
-export const GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE = gql`
-  query LocationDataWithAttribute($slug: ID!, $attrTax: TaxonomyEnum!, $attrTerm: [String]!, $after: String) {
-    productLocation(id: $slug, idType: SLUG) {
-      id
-      name
-    }
-    products(
-      first: 50
-      after: $after
-      where: {
-        taxQuery: {
-          taxArray: [
-            {
-              taxonomy: PRODUCTLOCATION
-              field: SLUG
-              terms: [$slug]
-            }
-            {
-              taxonomy: $attrTax
-              field: NAME
-              terms: $attrTerm
-            }
-          ]
-        }
-      }
-    ) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        ...ProductCardFields
-      }
-    }
-  }
-  ${PRODUCT_CARD_FIELDS_FRAGMENT}
-`;
-```
-
-## File: src/utils/gql/TAXONOMY_QUERIES.ts
-```typescript
-import { gql } from '@apollo/client';
-import { PRODUCT_CARD_FIELDS_FRAGMENT } from './GQL_QUERIES';
-// For brand pages - fetch products and filter client-side
-export const GET_BRAND_PRODUCTS = gql`
-  query BrandProducts($after: String) {
-    products(first: 24, after: $after) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        ...ProductCardFields
-      }
-    }
-  }
-  ${PRODUCT_CARD_FIELDS_FRAGMENT}
-`;
-export const GET_BRAND_DATA_BY_SLUG = gql`
-  query BrandData($id: ID!, $slug: [String], $after: String) {
-    productBrand(id: $id, idType: SLUG) {
-      id
-      name
-      children {
-        nodes {
-          id
-          name
-          slug
-        }
-      }
-    }
-    products(
-      first: 24
-      after: $after
-      where: { 
-        taxonomyFilter: { 
-          filters: [{ taxonomy: PRODUCT_BRAND, terms: $slug }] 
-        } 
-      }
-    ) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        ...ProductCardFields
-      }
-    }
-  }
-  ${PRODUCT_CARD_FIELDS_FRAGMENT}
-`;
-export const GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE = gql`
-  query BrandDataWithAttribute($id: ID!, $slug: [String], $attrTax: TaxonomyEnum!, $attrTerm: [String]!, $after: String) {
-    productBrand(id: $id, idType: SLUG) {
-      id
-      name
-      children {
-        nodes {
-          id
-          name
-          slug
-        }
-      }
-    }
-    products(
-      first: 24
-      after: $after
-      where: {
-        taxQuery: {
-          taxArray: [
-            {
-              taxonomy: PRODUCTBRAND
-              field: SLUG
-              terms: $slug
-            }
-            {
-              taxonomy: $attrTax
-              field: NAME
-              terms: $attrTerm
-            }
-          ]
-        }
-      }
-    ) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        ...ProductCardFields
-      }
-    }
-  }
-  ${PRODUCT_CARD_FIELDS_FRAGMENT}
-`;
-```
-
 ## File: categories.txt
 ```
 - Accessories (accessories) [5]
@@ -16764,6 +16582,192 @@ export const CLEAR_CART_MUTATION = gql`
 // Note: WC GraphQL doesn't have a direct 'emptyCart' mutation exposed by default in some versions.
 // We usually empty it by removing all items or setting quantity to 0.
 // We will use the existing UPDATE_CART logic to loop through and remove all items in the frontend component.
+```
+
+## File: src/utils/gql/LOCATION_QUERIES.ts
+```typescript
+import { gql } from '@apollo/client';
+import { PRODUCT_CARD_FIELDS_FRAGMENT } from './GQL_QUERIES';
+// For location pages - fetch products and filter client-side
+export const GET_LOCATION_PRODUCTS = gql`
+  query LocationProducts($after: String) {
+    products(first: 1000, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ...ProductCardFields
+      }
+    }
+  }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
+`;
+export const GET_LOCATION_DATA_BY_SLUG = gql`
+  query LocationData($slug: ID!, $after: String) {
+    productLocation(id: $slug, idType: SLUG) {
+      id
+      name
+    }
+    products(
+      first: 50
+      after: $after
+      where: { 
+        taxQuery: { taxArray: [{ taxonomy: PRODUCTLOCATION, field: SLUG, terms: [$slug] }] } 
+      }
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ...ProductCardFields
+      }
+    }
+  }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
+`;
+export const GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE = gql`
+  query LocationDataWithAttribute($slug: ID!, $attrTax: TaxonomyEnum!, $attrTerm: [String]!, $after: String) {
+    productLocation(id: $slug, idType: SLUG) {
+      id
+      name
+    }
+    products(
+      first: 50
+      after: $after
+      where: {
+        taxQuery: {
+          taxArray: [
+            {
+              taxonomy: PRODUCTLOCATION
+              field: SLUG
+              terms: [$slug]
+            }
+            {
+              taxonomy: $attrTax
+              field: NAME
+              terms: $attrTerm
+            }
+          ]
+        }
+      }
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ...ProductCardFields
+      }
+    }
+  }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
+`;
+```
+
+## File: src/utils/gql/TAXONOMY_QUERIES.ts
+```typescript
+import { gql } from '@apollo/client';
+import { PRODUCT_CARD_FIELDS_FRAGMENT } from './GQL_QUERIES';
+// For brand pages - fetch products and filter client-side
+export const GET_BRAND_PRODUCTS = gql`
+  query BrandProducts($after: String) {
+    products(first: 24, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ...ProductCardFields
+      }
+    }
+  }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
+`;
+export const GET_BRAND_DATA_BY_SLUG = gql`
+  query BrandData($id: ID!, $slug: [String], $after: String) {
+    productBrand(id: $id, idType: SLUG) {
+      id
+      name
+      children {
+        nodes {
+          id
+          name
+          slug
+        }
+      }
+    }
+    products(
+      first: 24
+      after: $after
+      where: { 
+        taxQuery: {
+          taxArray: [
+            {
+              taxonomy: PRODUCTBRAND
+              field: SLUG
+              terms: $slug
+            }
+          ]
+        } 
+      }
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ...ProductCardFields
+      }
+    }
+  }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
+`;
+export const GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE = gql`
+  query BrandDataWithAttribute($id: ID!, $slug: [String], $attrTax: TaxonomyEnum!, $attrTerm: [String]!, $after: String) {
+    productBrand(id: $id, idType: SLUG) {
+      id
+      name
+      children {
+        nodes {
+          id
+          name
+          slug
+        }
+      }
+    }
+    products(
+      first: 24
+      after: $after
+      where: {
+        taxQuery: {
+          taxArray: [
+            {
+              taxonomy: PRODUCTBRAND
+              field: SLUG
+              terms: $slug
+            }
+            {
+              taxonomy: $attrTax
+              field: NAME
+              terms: $attrTerm
+            }
+          ]
+        }
+      }
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ...ProductCardFields
+      }
+    }
+  }
+  ${PRODUCT_CARD_FIELDS_FRAGMENT}
+`;
 ```
 
 ## File: src/utils/auth.ts
@@ -21198,7 +21202,7 @@ export const GET_SINGLE_PRODUCT = gql`
  */
 export const FETCH_FIRST_PRODUCTS_FROM_HOODIES_QUERY = `
  query MyQuery {
-  products(first: 4, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["hoodies"] }] } }) {
+  products(first: 4, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["hoodies"] }] } }) {
     nodes {
       databaseId
       name
@@ -21275,8 +21279,14 @@ export const GET_CATEGORY_DATA_BY_SLUG = gql`
       first: $first,
       after: $after,
       where: {
-        taxonomyFilter: {
-          filters: [{ taxonomy: PRODUCTCATEGORY, terms: $slug }]
+        taxQuery: {
+          taxArray: [
+            {
+              taxonomy: PRODUCTCAT
+              field: SLUG
+              terms: $slug
+            }
+          ]
         }
       }
     ) {
@@ -21679,7 +21689,7 @@ export const FETCH_BEST_SELLING_PRODUCTS_QUERY = gql`
 `;
 export const FETCH_AIR_CONDITIONER_PRODUCTS_QUERY = gql`
   query FetchAirConditionerProducts {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["air-conditioners"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["air-conditioners"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -21689,7 +21699,7 @@ export const FETCH_AIR_CONDITIONER_PRODUCTS_QUERY = gql`
 `;
 export const FETCH_MOBILE_PHONES_ON_SALE_QUERY = gql`
   query FetchMobilePhonesOnSale {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["mobile-phones"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["mobile-phones"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -21699,7 +21709,7 @@ export const FETCH_MOBILE_PHONES_ON_SALE_QUERY = gql`
 `;
 export const FETCH_LAPTOPS_QUERY = gql`
   query FetchLaptops {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["laptops"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["laptops"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -21709,7 +21719,7 @@ export const FETCH_LAPTOPS_QUERY = gql`
 `;
 export const FETCH_SPEAKERS_QUERY = gql`
   query FetchSpeakers {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["speakers"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["speakers"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -21719,7 +21729,7 @@ export const FETCH_SPEAKERS_QUERY = gql`
 `;
 export const FETCH_TELEVISIONS_QUERY = gql`
   query FetchTelevisions {
-  products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["televisions"] }] } }) {
+  products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["televisions"] }] } }) {
       nodes {
         ...ProductCardFields
     }
@@ -21747,27 +21757,27 @@ export const FETCH_HOME_PAGE_DATA = gql`
         ...HomeProductCardFields
     }
   }
-  airConditionerProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["air-conditioners"] }] } }) {
+  airConditionerProducts: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["air-conditioners"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  mobilePhonesOnSale: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["mobile-phones"] }] } }) {
+  mobilePhonesOnSale: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["mobile-phones"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  laptopsProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["laptops"] }] } }) {
+  laptopsProducts: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["laptops"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  speakersProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["speakers"] }] } }) {
+  speakersProducts: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["speakers"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
   }
-  televisionsProducts: products(first: 12, where: { taxonomyFilter: { filters: [{ taxonomy: PRODUCTCATEGORY, terms: ["televisions"] }] } }) {
+  televisionsProducts: products(first: 12, where: { taxQuery: { taxArray: [{ taxonomy: PRODUCTCAT, field: SLUG, terms: ["televisions"] }] } }) {
       nodes {
         ...HomeProductCardFields
     }
@@ -23136,206 +23146,6 @@ export default function handler(req: NextRequest) {
 }
 ```
 
-## File: src/pages/404.tsx
-```typescript
-import Link from 'next/link';
-import Layout from '@/components/Layout/Layout.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
-import ProductCard from '@/components/Product/ProductCard.component';
-import { Product } from '@/types/product';
-export const config = {
-    runtime: 'experimental-edge',
-};
-interface Custom404Props {
-    bestSellers: Product[];
-    newest: Product[];
-    topRated: Product[];
-}
-export default function Custom404({ bestSellers, newest, topRated }: Custom404Props) {
-    return (
-        <Layout title="Page Not Found" fullWidth={false}>
-            <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 text-center border-b border-gray-100 pb-12">
-                <h1 className="text-[150px] leading-none font-bold text-gray-100 select-none">404</h1>
-                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 -mt-8 mb-4">
-                    Oops! Page Not Found
-                </h2>
-                <p className="text-gray-500 max-w-md mx-auto mb-8">
-                    The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
-                </p>
-                <Link
-                    href="/"
-                    className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-0.5"
-                >
-                    Go Back Home
-                </Link>
-            </div>
-            <div className="py-12 space-y-16">
-                {/* Best Sellers */}
-                {bestSellers?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-blue-600 pl-3">
-                            Best Sellers
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {bestSellers.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-                {/* New Arrivals */}
-                {newest?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-green-500 pl-3">
-                            New Arrivals
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {newest.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-                {/* Top Rated */}
-                {topRated?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-yellow-500 pl-3">
-                            Top Rated Products
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {topRated.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-            </div>
-        </Layout>
-    );
-}
-export async function getStaticProps() {
-    try {
-        const { data } = await client.query({
-            query: GET_404_PAGE_PRODUCTS,
-        });
-        return {
-            props: {
-                bestSellers: data?.bestSellers?.nodes || [],
-                newest: data?.newest?.nodes || [],
-                topRated: data?.topRated?.nodes || [],
-            },
-        };
-    } catch (error) {
-        console.error('Error fetching 404 page products:', error);
-        return {
-            props: {
-                bestSellers: [],
-                newest: [],
-                topRated: [],
-            },
-        };
-    }
-}
-```
-
-## File: src/pages/shoes.tsx
-```typescript
-import React from 'react';
-import { GetStaticProps } from 'next';
-import Layout from '@/components/Layout/Layout.component';
-import ProductList from '@/components/Product/ProductList.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
-import BackButton from '@/components/UI/BackButton.component';
-export const config = {
-  runtime: 'experimental-edge',
-};
-interface ShoesPageProps {
-    category: any;
-    products: any[];
-    pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string | null;
-    };
-    slug: string;
-}
-const ShoesPage = ({ category, products, pageInfo, slug }: ShoesPageProps) => {
-    return (
-        <Layout title={category?.name || 'Shoes'} fullWidth={true}>
-            <div className="px-2 md:px-4 pt-1 pb-1">
-                <BackButton />
-                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
-                    {category?.name?.toLowerCase() || 'Shoes'}
-                </h1>
-                {category?.description && (
-                    <div
-                        className="mb-10 text-gray-500 max-w-3xl"
-                        dangerouslySetInnerHTML={{ __html: category.description }}
-                    />
-                )}
-                <ProductList
-                    products={products}
-                    pageInfo={pageInfo}
-                    slug={slug}
-                    query={GET_CATEGORY_DATA_BY_SLUG}
-                    queryVariables={{ slug: [slug], categoryId: category.databaseId }}
-                    totalCount={category?.count}
-                />
-            </div>
-        </Layout>
-    );
-};
-export default ShoesPage;
-export const getStaticProps: GetStaticProps = async () => {
-    const slug = 'shoes'; // Hardcoded slug
-    try {
-        // Step 1: Resolve slug to ID
-        const { data: catData } = await client.query({
-            query: GET_CATEGORY_DATA_BY_SLUG,
-            variables: { slug: [slug], categoryId: null, first: 0 },
-        });
-        const category = catData?.productCategories?.nodes?.[0];
-        if (!category) {
-            return {
-                props: {
-                    category: { name: 'Shoes' },
-                    products: [],
-                    pageInfo: { hasNextPage: false, endCursor: null },
-                    slug: 'shoes'
-                },
-                revalidate: 60,
-            };
-        }
-        const categoryId = category.databaseId;
-        // Step 2: Fetch products by categoryId
-        const { data } = await client.query({
-            query: GET_CATEGORY_DATA_BY_SLUG,
-            variables: { slug: [slug], categoryId, first: 24 },
-        });
-        return {
-            props: {
-                category,
-                products: data?.products?.nodes || [],
-                pageInfo: data?.products?.pageInfo || { hasNextPage: false, endCursor: null },
-                slug,
-            },
-            revalidate: 60,
-        };
-    } catch (error) {
-        console.error('Error fetching shoes data:', error);
-        return {
-            props: {
-                category: { name: 'Shoes' },
-                products: [],
-                pageInfo: { hasNextPage: false, endCursor: null },
-                slug: 'shoes'
-            }
-        };
-    }
-};
-```
-
 ## File: src/pages/brand/[slug].tsx
 ```typescript
 import { useState, useEffect } from 'react';
@@ -23683,127 +23493,197 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res, quer
 };
 ```
 
-## File: src/pages/categories.tsx
+## File: src/pages/404.tsx
 ```typescript
-import { NextPage, InferGetStaticPropsType, GetStaticProps } from 'next';
-import Categories from '@/components/Category/Categories.component';
+import Link from 'next/link';
 import Layout from '@/components/Layout/Layout.component';
 import client from '@/utils/apollo/ApolloClient';
-import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
-export const config = {
-  runtime: 'experimental-edge',
-};
-/**
- * Category page displays all of the categories
- */
-const categories: NextPage = ({
-  categories,
-}: InferGetStaticPropsType<typeof getStaticProps>) => (
-  <Layout title="categories">
-    {categories && <Categories categories={categories} />}
-  </Layout>
-);
-export default categories;
-export const getStaticProps: GetStaticProps = async () => {
-  try {
-    const result = await client.query({
-      query: FETCH_ALL_CATEGORIES_QUERY,
-    });
-    const nodes = result.data?.productCategories?.nodes || [];
-    const rootCategories = nodes.filter((node: any) => !node.parent || Number(node.parent) === 0);
-    return {
-      props: {
-        categories: rootCategories,
-      },
-      revalidate: 60,
-    };
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    return {
-      props: {
-        categories: [],
-      },
-      revalidate: 10,
-    };
-  }
-};
+import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
+import ProductCard from '@/components/Product/ProductCard.component';
+import { Product } from '@/types/product';
+interface Custom404Props {
+    bestSellers: Product[];
+    newest: Product[];
+    topRated: Product[];
+}
+export default function Custom404({ bestSellers, newest, topRated }: Custom404Props) {
+    return (
+        <Layout title="Page Not Found" fullWidth={false}>
+            <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 text-center border-b border-gray-100 pb-12">
+                <h1 className="text-[150px] leading-none font-bold text-gray-100 select-none">404</h1>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 -mt-8 mb-4">
+                    Oops! Page Not Found
+                </h2>
+                <p className="text-gray-500 max-w-md mx-auto mb-8">
+                    The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+                </p>
+                <Link
+                    href="/"
+                    className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-0.5"
+                >
+                    Go Back Home
+                </Link>
+            </div>
+            <div className="py-12 space-y-16">
+                {/* Best Sellers */}
+                {bestSellers?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-blue-600 pl-3">
+                            Best Sellers
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {bestSellers.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {/* New Arrivals */}
+                {newest?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-green-500 pl-3">
+                            New Arrivals
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {newest.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {/* Top Rated */}
+                {topRated?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-yellow-500 pl-3">
+                            Top Rated Products
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {topRated.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+            </div>
+        </Layout>
+    );
+}
+export async function getStaticProps() {
+    try {
+        const { data } = await client.query({
+            query: GET_404_PAGE_PRODUCTS,
+        });
+        return {
+            props: {
+                bestSellers: data?.bestSellers?.nodes || [],
+                newest: data?.newest?.nodes || [],
+                topRated: data?.topRated?.nodes || [],
+            },
+        };
+    } catch (error) {
+        console.error('Error fetching 404 page products:', error);
+        return {
+            props: {
+                bestSellers: [],
+                newest: [],
+                topRated: [],
+            },
+        };
+    }
+}
 ```
 
-## File: src/pages/products.tsx
+## File: src/pages/shoes.tsx
 ```typescript
-import Head from 'next/head';
+import React from 'react';
+import { GetStaticProps } from 'next';
 import Layout from '@/components/Layout/Layout.component';
 import ProductList from '@/components/Product/ProductList.component';
 import client from '@/utils/apollo/ApolloClient';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-import { FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
-import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
-export const config = {
-  runtime: 'experimental-edge',
-};
-const Products: NextPage = ({
-  products,
-  pageInfo,
-  loading,
-}: InferGetStaticPropsType<typeof getStaticProps>) => {
-  if (loading)
+import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
+import BackButton from '@/components/UI/BackButton.component';
+interface ShoesPageProps {
+    category: any;
+    products: any[];
+    pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string | null;
+    };
+    slug: string;
+}
+const ShoesPage = ({ category, products, pageInfo, slug }: ShoesPageProps) => {
     return (
-      <Layout title="Products">
-        <div className="flex justify-center items-center min-h-screen">
-          <LoadingSpinner />
-        </div>
-      </Layout>
+        <Layout title={category?.name || 'Shoes'} fullWidth={true}>
+            <div className="px-2 md:px-4 pt-1 pb-1">
+                <BackButton />
+                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
+                    {category?.name?.toLowerCase() || 'Shoes'}
+                </h1>
+                {category?.description && (
+                    <div
+                        className="mb-10 text-gray-500 max-w-3xl"
+                        dangerouslySetInnerHTML={{ __html: category.description }}
+                    />
+                )}
+                <ProductList
+                    products={products}
+                    pageInfo={pageInfo}
+                    slug={slug}
+                    query={GET_CATEGORY_DATA_BY_SLUG}
+                    queryVariables={{ slug: [slug], categoryId: category.databaseId }}
+                    totalCount={category?.count}
+                />
+            </div>
+        </Layout>
     );
-  if (!products)
-    return (
-      <Layout title="Products">
-        <div className="flex justify-center items-center min-h-screen">
-          <p className="text-red-500">No products found</p>
-        </div>
-      </Layout>
-    );
-  return (
-    <Layout title="Products" fullWidth={true}>
-      <Head>
-        <title>Products | WooCommerce Next.js</title>
-      </Head>
-      <div className="pt-1 pb-1">
-        <ProductList
-          products={products}
-          pageInfo={pageInfo}
-          query={FETCH_ALL_PRODUCTS_QUERY}
-        />
-      </div>
-    </Layout>
-  );
 };
-export default Products;
+export default ShoesPage;
 export const getStaticProps: GetStaticProps = async () => {
-  try {
-    const { data, loading, networkStatus } = await client.query({
-      query: FETCH_ALL_PRODUCTS_QUERY,
-    });
-    return {
-      props: {
-        products: data?.products?.nodes || [],
-        pageInfo: data?.products?.pageInfo || {},
-        loading,
-        networkStatus,
-      },
-      revalidate: 60,
-    };
-  } catch (error) {
-    console.warn('Failed to fetch products during build:', error);
-    return {
-      props: {
-        products: [],
-        pageInfo: {},
-        loading: false,
-        networkStatus: 8, // Error status
-      },
-      revalidate: 60,
-    };
-  }
+    const slug = 'shoes'; // Hardcoded slug
+    try {
+        // Step 1: Resolve slug to ID
+        const { data: catData } = await client.query({
+            query: GET_CATEGORY_DATA_BY_SLUG,
+            variables: { slug: [slug], categoryId: null, first: 0 },
+        });
+        const category = catData?.productCategories?.nodes?.[0];
+        if (!category) {
+            return {
+                props: {
+                    category: { name: 'Shoes' },
+                    products: [],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    slug: 'shoes'
+                },
+                revalidate: 60,
+            };
+        }
+        const categoryId = category.databaseId;
+        // Step 2: Fetch products by categoryId
+        const { data } = await client.query({
+            query: GET_CATEGORY_DATA_BY_SLUG,
+            variables: { slug: [slug], categoryId, first: 24 },
+        });
+        return {
+            props: {
+                category,
+                products: data?.products?.nodes || [],
+                pageInfo: data?.products?.pageInfo || { hasNextPage: false, endCursor: null },
+                slug,
+            },
+            revalidate: 60,
+        };
+    } catch (error) {
+        console.error('Error fetching shoes data:', error);
+        return {
+            props: {
+                category: { name: 'Shoes' },
+                products: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+                slug: 'shoes'
+            }
+        };
+    }
 };
 ```
 
@@ -24005,6 +23885,124 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res }) =>
 };
 ```
 
+## File: src/pages/categories.tsx
+```typescript
+import { NextPage, InferGetStaticPropsType, GetStaticProps } from 'next';
+import Categories from '@/components/Category/Categories.component';
+import Layout from '@/components/Layout/Layout.component';
+import client from '@/utils/apollo/ApolloClient';
+import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
+/**
+ * Category page displays all of the categories
+ */
+const categories: NextPage = ({
+  categories,
+}: InferGetStaticPropsType<typeof getStaticProps>) => (
+  <Layout title="categories">
+    {categories && <Categories categories={categories} />}
+  </Layout>
+);
+export default categories;
+export const getStaticProps: GetStaticProps = async () => {
+  try {
+    const result = await client.query({
+      query: FETCH_ALL_CATEGORIES_QUERY,
+    });
+    const nodes = result.data?.productCategories?.nodes || [];
+    const rootCategories = nodes.filter((node: any) => !node.parent || Number(node.parent) === 0);
+    return {
+      props: {
+        categories: rootCategories,
+      },
+      revalidate: 60,
+    };
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return {
+      props: {
+        categories: [],
+      },
+      revalidate: 10,
+    };
+  }
+};
+```
+
+## File: src/pages/products.tsx
+```typescript
+import Head from 'next/head';
+import Layout from '@/components/Layout/Layout.component';
+import ProductList from '@/components/Product/ProductList.component';
+import client from '@/utils/apollo/ApolloClient';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
+import { FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
+import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
+const Products: NextPage = ({
+  products,
+  pageInfo,
+  loading,
+}: InferGetStaticPropsType<typeof getStaticProps>) => {
+  if (loading)
+    return (
+      <Layout title="Products">
+        <div className="flex justify-center items-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+      </Layout>
+    );
+  if (!products)
+    return (
+      <Layout title="Products">
+        <div className="flex justify-center items-center min-h-screen">
+          <p className="text-red-500">No products found</p>
+        </div>
+      </Layout>
+    );
+  return (
+    <Layout title="Products" fullWidth={true}>
+      <Head>
+        <title>Products | WooCommerce Next.js</title>
+      </Head>
+      <div className="pt-1 pb-1">
+        <ProductList
+          products={products}
+          pageInfo={pageInfo}
+          query={FETCH_ALL_PRODUCTS_QUERY}
+        />
+      </div>
+    </Layout>
+  );
+};
+export default Products;
+export const getStaticProps: GetStaticProps = async () => {
+  try {
+    const { data, loading, networkStatus } = await client.query({
+      query: FETCH_ALL_PRODUCTS_QUERY,
+    });
+    return {
+      props: {
+        products: data?.products?.nodes || [],
+        pageInfo: data?.products?.pageInfo || {},
+        loading,
+        networkStatus,
+      },
+      revalidate: 60,
+    };
+  } catch (error) {
+    console.warn('Failed to fetch products during build:', error);
+    return {
+      props: {
+        products: [],
+        pageInfo: {},
+        loading: false,
+        networkStatus: 8, // Error status
+      },
+      revalidate: 60,
+    };
+  }
+};
+```
+
 ## File: src/pages/index.tsx
 ```typescript
 import dynamic from 'next/dynamic';
@@ -24020,9 +24018,6 @@ import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
 import { FETCH_HOME_PAGE_SSG } from '@/utils/gql/GQL_QUERIES';
 import { useGlobalStore } from '@/stores/globalStore';
 import { useEffect } from 'react';
-export const config = {
-  runtime: 'experimental-edge',
-};
 const SectionSkeleton = () => (
   <div className="px-4 md:px-6 py-6">
     <div className="h-5 w-48 bg-gray-200 rounded animate-pulse mb-4" aria-hidden="true" />
