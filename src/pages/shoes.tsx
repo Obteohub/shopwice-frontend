@@ -33,7 +33,6 @@ const ShoesPage = ({ category, products, pageInfo, slug }: ShoesPageProps) => {
                 )}
                 <ProductList
                     products={products}
-                    title={category?.name || 'Shoes'}
                     pageInfo={pageInfo}
                     slug={slug}
                     query={GET_CATEGORY_DATA_BY_SLUG}
