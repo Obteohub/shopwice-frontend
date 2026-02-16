@@ -6,9 +6,7 @@ import ProductCard from '@/components/Product/ProductCard.component';
 import { Product } from '@/types/product';
 
 
-export const config = {
-    runtime: 'experimental-edge',
-};
+
 
 interface Custom404Props {
     bestSellers: Product[];
