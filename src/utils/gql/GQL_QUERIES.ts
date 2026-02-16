@@ -130,29 +130,29 @@ export const GET_SINGLE_PRODUCT = gql`
           fullHead
         }
 
-        ... on SimpleProduct {
-          sku
-          totalSales
-        }
-        ... on VariableProduct {
-          sku
-          totalSales
-          allPaColor {
-            nodes {
-              name
-            }
-          }
-          allPaSize {
-            nodes {
-              name
-            }
-          }
-          variations(first: 50) {
-            nodes {
-              ...VariationFields
-            }
-          }
-        }
+        # ... on SimpleProduct {
+        #   sku
+        #   totalSales
+        # }
+        # ... on VariableProduct {
+        #   sku
+        #   totalSales
+        #   allPaColor {
+        #     nodes {
+        #       name
+        #     }
+        #   }
+        #   allPaSize {
+        #     nodes {
+        #       name
+        #     }
+        #   }
+        #   variations(first: 50) {
+        #     nodes {
+        #       ...VariationFields
+        #     }
+        #   }
+        # }
       }
     }
   }

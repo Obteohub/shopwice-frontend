@@ -30,8 +30,9 @@ export const IMAGE_FIELDS = gql`
  * Used for: categories, brands, locations, and other taxonomy terms
  * Eliminates ~40+ duplicate field definitions
  */
+
 export const TERM_FIELDS = gql`
-  fragment TermFields on TermNode {
+  fragment TermFields on ProductCategory {
     id
     databaseId
     name
@@ -77,7 +78,7 @@ export const VARIATION_FIELDS = gql`
       nodes {
         id
         name
-        value
+        # value removed as it does not exist on Attribute
       }
     }
   }
