@@ -16874,29 +16874,6 @@ is null
 null/missing
 ```
 
-## File: wrangler.toml
-```toml
-name = "shopwice-pages"
-compatibility_date = "2026-02-05"
-compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
-pages_build_output_dir = ".vercel/output/static"
-
-[vars]
-NEXT_PUBLIC_SITE_URL = "https://shopwice.com"
-NEXT_PUBLIC_GRAPHQL_URL = "https://api.shopwice.com/graphql"
-NEXT_PUBLIC_REST_API_URL = "https://api.shopwice.com/api"
-NEXT_PUBLIC_STORE_API_URL = "https://api.shopwice.com/api"
-WORDPRESS_API_URL = "https://api.shopwice.com/api"
-
-[[services]]
-binding = "WORKER_SELF_REFERENCE"
-service = "shopwice"
-
-[[r2_buckets]]
-binding = "NEXT_INC_CACHE_R2_BUCKET"
-bucket_name = "shopwice-media"
-```
-
 ## File: src/components/Cart/CartContents.component.tsx
 ```typescript
 import { useState, useEffect } from 'react';
@@ -19266,6 +19243,168 @@ const ProductList = ({
 export default ProductList;
 ```
 
+## File: src/components/Product/RecentRefurbishedReviews.component.tsx
+```typescript
+import React, { useMemo, useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useQuery } from '@apollo/client';
+import { GET_RECENT_REVIEWS_QUERY } from '@/utils/gql/GQL_QUERIES';
+const RecentRefurbishedReviews = () => {
+    const { data, loading, error } = useQuery(GET_RECENT_REVIEWS_QUERY, {
+        fetchPolicy: 'cache-first',
+    });
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const isClient = typeof window !== 'undefined';
+    const reviews = useMemo(() => {
+        const products = data?.products?.nodes || [];
+        const flattened = products.flatMap((product: any) => {
+            const productName = product?.name || 'Product';
+            const productSlug = product?.slug || '';
+            const productImage = product?.image?.sourceUrl || '';
+            const productLink = productSlug ? `/product/${productSlug}` : '#';
+            const nodes = product?.reviews?.nodes || [];
+            return nodes.map((review: any) => ({
+                id: review.id,
+                reviewer: review?.author?.node?.name || 'Customer',
+                date_created: review?.date,
+                review: review?.content || '',
+                rating: review?.rating ?? 0,
+                product_name: productName,
+                product_image: productImage,
+                product_permalink: productLink,
+            }));
+        });
+        return flattened.slice(0, 10);
+    }, [data]);
+    const nextSlide = () => {
+        setCurrentIndex((prev) => (prev + 1) % reviews.length);
+    };
+    const prevSlide = () => {
+        setCurrentIndex((prev) => (prev - 1 + reviews.length) % reviews.length);
+    };
+    if (!isClient) return null;
+    if (loading && reviews.length === 0) return (
+        <div className="mt-6 border-t border-gray-100 pt-4 relative group animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-48 mb-3"></div>
+            <div className="relative overflow-hidden min-h-[140px] bg-gray-50 rounded-lg border border-gray-100 p-4">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <div className="h-3 bg-gray-200 rounded w-20"></div>
+                        <div className="flex gap-0.5">
+                            {[...Array(5)].map((_, i) => <div key={i} className="w-3 h-3 bg-gray-200 rounded-full"></div>)}
+                        </div>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded w-16"></div>
+                </div>
+                <div className="space-y-2 mt-2">
+                    <div className="h-2 bg-gray-200 rounded w-full"></div>
+                    <div className="h-2 bg-gray-200 rounded w-5/6"></div>
+                    <div className="h-2 bg-gray-200 rounded w-4/6"></div>
+                </div>
+            </div>
+        </div>
+    );
+    if (error && reviews.length === 0) return null;
+    if (reviews.length === 0 && !loading) return null;
+    const currentReview = reviews[currentIndex];
+    return (
+        <div className="mt-6 border-t border-gray-100 pt-4 relative group">
+            <h4 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-tight">Recent Customer Feedback</h4>
+            <div className="relative overflow-hidden min-h-[140px] bg-gray-50 rounded-lg border border-gray-100">
+                {reviews.length > 1 && (
+                    <>
+                        <button
+                            onClick={prevSlide}
+                            aria-label="Previous review"
+                            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-white shadow-md text-gray-600 hover:text-blue-600 focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
+                        </button>
+                        <button
+                            onClick={nextSlide}
+                            aria-label="Next review"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-white shadow-md text-gray-600 hover:text-blue-600 focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
+                        </button>
+                    </>
+                )}
+                {currentReview && (
+                    <div className="min-w-full p-4 flex flex-col justify-between bg-white">
+                        <div>
+                            <div className="flex gap-3 mb-3">
+                                {currentReview.product_image && (
+                                    <div className="w-14 h-14 relative rounded-lg border border-gray-100 flex-shrink-0 overflow-hidden shadow-sm bg-white">
+                                        <Image
+                                            src={currentReview.product_image}
+                                            alt={currentReview.product_name || 'Product'}
+                                            fill
+                                            className="object-cover"
+                                        />
+                                    </div>
+                                )}
+                                <div className="flex flex-col flex-grow min-w-0 pt-0.5">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="font-bold text-gray-900 text-[11px] uppercase tracking-wider truncate">{currentReview.reviewer}</span>
+                                        <span className="text-gray-400 text-[9px] font-medium uppercase tracking-tighter">
+                                            {currentReview.date_created ? new Date(currentReview.date_created).toLocaleDateString() : ''}
+                                        </span>
+                                    </div>
+                                    {currentReview.rating > 0 && (
+                                        <div className="flex text-yellow-400 mt-0.5">
+                                            {[...Array(5)].map((_, i) => (
+                                                <svg
+                                                    key={i}
+                                                    className={`w-2.5 h-2.5 ${i < currentReview.rating ? 'fill-current' : 'text-gray-200'}`}
+                                                    viewBox="0 0 20 20"
+                                                    fill="currentColor"
+                                                >
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                </svg>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div
+                                className="text-gray-600 mb-3 leading-relaxed text-xs line-clamp-3 italic opacity-80"
+                                dangerouslySetInnerHTML={{ __html: currentReview.review }}
+                            />
+                        </div>
+                        {currentReview.product_permalink && currentReview.product_name && (
+                            <div className="mt-auto space-y-3">
+                                <Link
+                                    href={currentReview.product_permalink}
+                                    className="text-[10px] text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 font-bold uppercase tracking-tight border-t border-gray-50 pt-2"
+                                >
+                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                                    View Item
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+            {reviews.length > 1 && (
+                <div className="flex justify-center gap-1.5 mt-2">
+                    {reviews.map((_: any, idx: number) => (
+                        <button
+                            key={idx}
+                            onClick={() => setCurrentIndex(idx)}
+                            className={`w-1.5 h-1.5 rounded-full transition-colors ${idx === currentIndex ? 'bg-blue-600' : 'bg-gray-300 hover:bg-gray-400'
+                                }`}
+                            aria-label={`Go to slide ${idx + 1}`}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+export default RecentRefurbishedReviews;
+```
+
 ## File: src/components/User/CustomerAccount.component.tsx
 ```typescript
 import { useQuery, useMutation } from '@apollo/client';
@@ -19652,95 +19791,6 @@ const AccountDetailsForm = ({ customer }: { customer: any }) => {
 export default CustomerAccount;
 ```
 
-## File: src/pages/api/graphql.ts
-```typescript
-import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'edge';
-/**
- * GraphQL Proxy Endpoint
- * 
- * Proxies requests to WooCommerce GraphQL API.
- * Refactored for Next.js Edge Runtime.
- */
-export default async function handler(req: NextRequest) {
-    // Only allow POST requests
-    if (req.method !== 'POST') {
-        return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
-    }
-    try {
-        const graphqlUrl = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql';
-        // Parse body
-        let body;
-        try {
-            body = await req.json();
-        } catch (e) {
-            return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-        }
-        console.log('[GraphQL Proxy] Operation:', body?.operationName);
-        // Prepare headers for upstream
-        const upstreamHeaders = new Headers();
-        upstreamHeaders.set('Content-Type', 'application/json');
-        // Forward session headers
-        const sessionHeader = req.headers.get('woocommerce-session') || req.headers.get('x-woocommerce-session');
-        if (sessionHeader) {
-            upstreamHeaders.set('woocommerce-session', sessionHeader);
-        }
-        const authHeader = req.headers.get('authorization');
-        if (authHeader) {
-            upstreamHeaders.set('authorization', authHeader);
-        }
-        // Forward request
-        const upstreamResponse = await fetch(graphqlUrl, {
-            method: 'POST',
-            credentials: 'omit',
-            headers: upstreamHeaders,
-            body: JSON.stringify(body),
-        });
-        // Parse upstream response
-        let data;
-        const contentType = upstreamResponse.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            try {
-                data = await upstreamResponse.json();
-            } catch {
-                return NextResponse.json({ error: 'Invalid JSON from upstream' }, { status: 502 });
-            }
-        } else {
-            const text = await upstreamResponse.text();
-            return NextResponse.json({ error: 'Upstream returned non-JSON', status: upstreamResponse.status, body: text.substring(0, 200) }, { status: upstreamResponse.status || 502 });
-        }
-        // Create response
-        const res = NextResponse.json(data, { status: upstreamResponse.status });
-        // Forward specific headers back to client
-        const newSessionToken = upstreamResponse.headers.get('woocommerce-session') || upstreamResponse.headers.get('x-woocommerce-session');
-        if (newSessionToken) {
-            res.headers.set('woocommerce-session', newSessionToken);
-        }
-        // Handle Set-Cookie
-        // In Edge, accessing Set-Cookie from fetch response can be restricted or implementation dependent, 
-        // but if available we forward it.
-        const setCookie = upstreamResponse.headers.get('set-cookie');
-        if (setCookie) {
-            // Check for session cookie if header wasn't present
-            if (!newSessionToken) {
-                const match = setCookie.match(/wp_woocommerce_session_[^=]+=([^;]+)/);
-                if (match && match[1]) {
-                    res.headers.set('woocommerce-session', match[1]);
-                }
-            }
-            res.headers.set('set-cookie', setCookie);
-        }
-        return res;
-    } catch (error) {
-        console.error('[GraphQL Proxy] Error:', error);
-        return NextResponse.json({
-            error: 'Failed to proxy GraphQL request',
-            details: error instanceof Error ? error.message : 'Unknown error'
-        }, { status: 500 });
-    }
-}
-```
-
 ## File: src/pages/_app.tsx
 ```typescript
 // Imports
@@ -19787,190 +19837,6 @@ function MyApp({ Component, pageProps }: AppProps) {
   );
 }
 export default MyApp;
-```
-
-## File: src/pages/debug-category.tsx
-```typescript
-import React from 'react';
-export const runtime = 'edge';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_NODE_BY_SLUG, GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
-const DebugCategory = ({ logs }: { logs: string[] }) => {
-  return (
-    <div className="p-5 font-mono">
-      <h1>Category Debug (SSR)</h1>
-      <pre className="bg-gray-100 p-2.5 whitespace-pre-wrap">
-        {logs.join('\n')}
-      </pre>
-    </div>
-  );
-};
-export const getServerSideProps = async () => {
-  const logs: string[] = [];
-  const addLog = (msg: string) => logs.push(msg);
-  const categorySlug = 'hoodies';
-  try {
-    addLog(`--- TEST 1: CATEGORY ---`);
-    addLog(`Fetching category node...`);
-    const { data: categoryData } = await client.query({
-      query: GET_CATEGORY_NODE_BY_SLUG,
-      variables: { slug: [categorySlug] },
-      fetchPolicy: 'no-cache',
-    });
-    addLog(`Category Result: ${JSON.stringify(categoryData)}`);
-  } catch (error: any) {
-    addLog(`CATEGORY ERROR: ${error.message}`);
-  }
-  try {
-    addLog(`\n--- TEST 2: PRODUCT ---`);
-    // Try to fetch a product to see if general connectivity works
-    // We don't know a valid slug, but we can try a search or just use the same slug
-    addLog(`Fetching product (using 'hoodie' as slug)...`);
-    const { data: productData } = await client.query({
-      query: GET_SINGLE_PRODUCT,
-      variables: { slug: 'hoodie' }, // Common slug
-      fetchPolicy: 'no-cache',
-    });
-    addLog(`Product Result: Success (found: ${!!productData?.product})`);
-  } catch (error: any) {
-    addLog(`PRODUCT ERROR: ${error.message}`);
-  }
-  return {
-    props: {
-      logs
-    }
-  };
-};
-export default DebugCategory;
-```
-
-## File: src/pages/search.tsx
-```typescript
-import { useState, useEffect } from 'react';
-export const runtime = 'edge';
-import { useRouter } from 'next/router';
-import Head from 'next/head';
-import Layout from '@/components/Layout/Layout.component';
-import ProductList from '@/components/Product/ProductList.component';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-import { SEARCH_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
-import { GetServerSideProps } from 'next';
-import client from '@/utils/apollo/ApolloClient';
-interface SearchPageProps {
-    products: any[];
-    pageInfo: any;
-    searchTerm: string;
-    error?: string;
-}
-const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: SearchPageProps) => {
-    const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    useEffect(() => {
-        const handleStart = (url: string) => {
-            // Only show loading if the search term changes (query param 'q')
-            if (url !== router.asPath) {
-                setLoading(true);
-            }
-        };
-        const handleComplete = () => setLoading(false);
-        router.events.on('routeChangeStart', handleStart);
-        router.events.on('routeChangeComplete', handleComplete);
-        router.events.on('routeChangeError', handleComplete);
-        return () => {
-            router.events.off('routeChangeStart', handleStart);
-            router.events.off('routeChangeComplete', handleComplete);
-            router.events.off('routeChangeError', handleComplete);
-        };
-    }, [router]);
-    // Keep router for navigation, but use props for data
-    // We can still use state if we want to support client-side updates without reload, 
-    // but ProductList handles pagination/filtering internally now.
-    // However, if the user changes the search term in the URL, the page will reload (SSR).
-    // If there's an error from SSR, show it.
-    return (
-        <Layout title={`Search: ${searchTerm}`} fullWidth={true}>
-            <Head>
-                <title>{`Search Results for "${searchTerm}" | Shopwice`}</title>
-            </Head>
-            <div className="pt-1 pb-1">
-                <div className="container mx-auto px-4 py-4">
-                    <h1 className="text-xl font-bold mb-4">
-                        Search Results for <span className="text-orange-600">{`"${searchTerm}"`}</span>
-                    </h1>
-                </div>
-                {loading ? (
-                    <div className="flex justify-center items-center min-h-[400px]">
-                        <LoadingSpinner color="orange" size="lg" />
-                    </div>
-                ) : (
-                    <>
-                        {serverError && (
-                            <div className="text-center py-10">
-                                <p className="text-red-500">Error loading search results. Please try again.</p>
-                                <p className="text-sm text-gray-500 mt-2">{serverError}</p>
-                            </div>
-                        )}
-                        {!serverError && products.length === 0 && searchTerm && (
-                            <div className="text-center py-10">
-                                <p className="text-gray-600 text-lg">{`No products found matching "${searchTerm}"`}</p>
-                                <p className="text-gray-500 mt-2">Try checking your spelling or using different keywords.</p>
-                            </div>
-                        )}
-                        {!serverError && products.length > 0 && (
-                            <div className="pt-1 pb-1">
-                                <ProductList
-                                    products={products}
-                                    pageInfo={pageInfo}
-                                    query={SEARCH_PRODUCTS_QUERY}
-                                    queryVariables={{ search: searchTerm }}
-                                    // Removed useDirectFetch to use Apollo Client
-                                    context={{}}
-                                />
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-        </Layout>
-    );
-};
-export const getServerSideProps: GetServerSideProps = async (context) => {
-    const searchTerm = context.query.q as string || '';
-    if (!searchTerm) {
-        return {
-            props: {
-                products: [],
-                pageInfo: null,
-                searchTerm: ''
-            }
-        };
-    }
-    try {
-        const { data } = await client.query({
-            query: SEARCH_PRODUCTS_QUERY,
-            variables: { search: searchTerm, first: 24 },
-            fetchPolicy: 'network-only'
-        });
-        return {
-            props: {
-                products: data?.products?.nodes || [],
-                pageInfo: data?.products?.pageInfo || null,
-                searchTerm
-            }
-        };
-    } catch (error: any) {
-        console.error('Search SSR Error:', error);
-        return {
-            props: {
-                products: [],
-                pageInfo: null,
-                searchTerm,
-                error: error.message || 'An error occurred'
-            }
-        };
-    }
-};
-export default SearchPage;
 ```
 
 ## File: src/stores/globalStore.ts
@@ -20035,6 +19901,26 @@ export const useGlobalStore = create<GlobalState>()(
         }
     )
 );
+```
+
+## File: wrangler.toml
+```toml
+name = "shopwice-pages"
+compatibility_date = "2026-02-05"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+pages_build_output_dir = ".vercel/output/static"
+
+[vars]
+NEXT_PUBLIC_SITE_URL = "https://shopwice.com"
+NEXT_PUBLIC_GRAPHQL_URL = "https://api.shopwice.com/graphql"
+
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "shopwice"
+
+[[r2_buckets]]
+binding = "NEXT_INC_CACHE_R2_BUCKET"
+bucket_name = "shopwice-media"
 ```
 
 ## File: src/components/Product/AddToCart.component.tsx
@@ -20606,199 +20492,6 @@ const GlobalInitializer = () => {
 export default GlobalInitializer;
 ```
 
-## File: src/pages/location/[slug].tsx
-```typescript
-import { useState, useEffect } from 'react';
-export const runtime = 'edge';
-import { useRouter } from 'next/router';
-import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_LOCATION_DATA_BY_SLUG, GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/LOCATION_QUERIES';
-import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
-/**
- * Display location page with filtering, sorting, and infinite scroll
- */
-const LocationPage = ({
-    locationName,
-    products,
-    pageInfo,
-    slug,
-    attr,
-    term,
-}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
-    const hasAttrFilter = Boolean(attrTax && term);
-    const router = useRouter();
-    const [loading, setLoading] = useState(false);
-    useEffect(() => {
-        const handleStart = (url: string) => {
-            if (url !== router.asPath) {
-                setLoading(true);
-            }
-        };
-        const handleComplete = () => setLoading(false);
-        router.events.on('routeChangeStart', handleStart);
-        router.events.on('routeChangeComplete', handleComplete);
-        router.events.on('routeChangeError', handleComplete);
-        return () => {
-            router.events.off('routeChangeStart', handleStart);
-            router.events.off('routeChangeComplete', handleComplete);
-            router.events.off('routeChangeError', handleComplete);
-        };
-    }, [router]);
-    return (
-        <TaxonomyListingPage
-            title={locationName || 'Location'}
-            products={products}
-            pageInfo={pageInfo}
-            slug={slug}
-            query={hasAttrFilter ? GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_LOCATION_DATA_BY_SLUG}
-            queryVariables={hasAttrFilter
-                ? { slug, attrTax, attrTerm: [term] }
-                : { slug }}
-            emptyMessage="No products found for this location"
-            fetchAllForSort={true}
-            loading={loading}
-        />
-    );
-};
-export default LocationPage;
-export const getServerSideProps: GetServerSideProps = async ({
-    query: { slug, attr, term },
-}) => {
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-    const attrTax = typeof attr === 'string' ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
-    const hasAttrFilter = Boolean(attrTax && term);
-    const res = await client.query({
-        query: hasAttrFilter ? GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_LOCATION_DATA_BY_SLUG,
-        variables: hasAttrFilter
-            ? { slug: slug, attrTax, attrTerm: [term], after: null }
-            : { slug: slug, after: null },
-    });
-    const locationData = res.data.productLocation;
-    const productsData = res.data.products;
-    const products = productsData ? productsData.nodes : [];
-    const pageInfo = productsData ? productsData.pageInfo : { hasNextPage: false, endCursor: null };
-    const locationName = locationData ? locationData.name : slug;
-    return {
-        props: {
-            locationName: locationName as string,
-            products,
-            pageInfo,
-            slug: slug as string,
-            attr: typeof attr === 'string' ? attr : '',
-            term: typeof term === 'string' ? term : '',
-        },
-    };
-};
-```
-
-## File: src/pages/404.tsx
-```typescript
-import Link from 'next/link';
-export const runtime = 'edge';
-import Layout from '@/components/Layout/Layout.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
-import ProductCard from '@/components/Product/ProductCard.component';
-import { Product } from '@/types/product';
-interface Custom404Props {
-    bestSellers: Product[];
-    newest: Product[];
-    topRated: Product[];
-}
-export default function Custom404({ bestSellers, newest, topRated }: Custom404Props) {
-    return (
-        <Layout title="Page Not Found" fullWidth={false}>
-            <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 text-center border-b border-gray-100 pb-12">
-                <h1 className="text-[150px] leading-none font-bold text-gray-100 select-none">404</h1>
-                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 -mt-8 mb-4">
-                    Oops! Page Not Found
-                </h2>
-                <p className="text-gray-500 max-w-md mx-auto mb-8">
-                    The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
-                </p>
-                <Link
-                    href="/"
-                    className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-0.5"
-                >
-                    Go Back Home
-                </Link>
-            </div>
-            <div className="py-12 space-y-16">
-                {/* Best Sellers */}
-                {bestSellers?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-blue-600 pl-3">
-                            Best Sellers
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {bestSellers.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-                {/* New Arrivals */}
-                {newest?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-green-500 pl-3">
-                            New Arrivals
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {newest.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-                {/* Top Rated */}
-                {topRated?.length > 0 && (
-                    <section>
-                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-yellow-500 pl-3">
-                            Top Rated Products
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                            {topRated.map((product, index) => (
-                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
-                            ))}
-                        </div>
-                    </section>
-                )}
-            </div>
-        </Layout>
-    );
-}
-export async function getStaticProps() {
-    try {
-        const { data } = await client.query({
-            query: GET_404_PAGE_PRODUCTS,
-        });
-        return {
-            props: {
-                bestSellers: data?.bestSellers?.nodes || [],
-                newest: data?.newest?.nodes || [],
-                topRated: data?.topRated?.nodes || [],
-            },
-        };
-    } catch (error) {
-        console.error('Error fetching 404 page products:', error);
-        return {
-            props: {
-                bestSellers: [],
-                newest: [],
-                topRated: [],
-            },
-        };
-    }
-}
-```
-
 ## File: src/utils/functions/functions.tsx
 ```typescript
 /*eslint complexity: ["error", 20]*/
@@ -21153,199 +20846,174 @@ export const handleQuantityChange = (
 };
 ```
 
-## File: src/components/Product/RecentRefurbishedReviews.component.tsx
+## File: src/pages/api/graphql.ts
 ```typescript
-import React, { useMemo, useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useQuery } from '@apollo/client';
-import { GET_RECENT_REVIEWS_QUERY } from '@/utils/gql/GQL_QUERIES';
-const RecentRefurbishedReviews = () => {
-    const { data, loading, error } = useQuery(GET_RECENT_REVIEWS_QUERY, {
-        fetchPolicy: 'cache-first',
-    });
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const isClient = typeof window !== 'undefined';
-    const reviews = useMemo(() => {
-        const products = data?.products?.nodes || [];
-        const flattened = products.flatMap((product: any) => {
-            const productName = product?.name || 'Product';
-            const productSlug = product?.slug || '';
-            const productImage = product?.image?.sourceUrl || '';
-            const productLink = productSlug ? `/product/${productSlug}` : '#';
-            const nodes = product?.reviews?.nodes || [];
-            return nodes.map((review: any) => ({
-                id: review.id,
-                reviewer: review?.author?.node?.name || 'Customer',
-                date_created: review?.date,
-                review: review?.content || '',
-                rating: review?.rating ?? 0,
-                product_name: productName,
-                product_image: productImage,
-                product_permalink: productLink,
-            }));
+import { NextRequest, NextResponse } from 'next/server';
+export const runtime = 'edge';
+/**
+ * GraphQL Proxy Endpoint
+ * 
+ * Proxies requests to WooCommerce GraphQL API.
+ * Refactored for Next.js Edge Runtime.
+ */
+export default async function handler(req: NextRequest) {
+    // Only allow POST requests
+    if (req.method !== 'POST') {
+        return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+    }
+    try {
+        const graphqlUrl = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql';
+        // Parse body
+        let body;
+        try {
+            body = await req.json();
+        } catch (e) {
+            return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+        }
+        console.log('[GraphQL Proxy] Operation:', body?.operationName);
+        // Prepare headers for upstream
+        const upstreamHeaders = new Headers();
+        upstreamHeaders.set('Content-Type', 'application/json');
+        // Forward session headers
+        const sessionHeader = req.headers.get('woocommerce-session') || req.headers.get('x-woocommerce-session');
+        if (sessionHeader) {
+            upstreamHeaders.set('woocommerce-session', sessionHeader);
+        }
+        const authHeader = req.headers.get('authorization');
+        if (authHeader) {
+            upstreamHeaders.set('authorization', authHeader);
+        }
+        // Forward request
+        const upstreamResponse = await fetch(graphqlUrl, {
+            method: 'POST',
+            credentials: 'omit',
+            headers: upstreamHeaders,
+            body: JSON.stringify(body),
         });
-        return flattened.slice(0, 10);
-    }, [data]);
-    const nextSlide = () => {
-        setCurrentIndex((prev) => (prev + 1) % reviews.length);
-    };
-    const prevSlide = () => {
-        setCurrentIndex((prev) => (prev - 1 + reviews.length) % reviews.length);
-    };
-    if (!isClient) return null;
-    if (loading && reviews.length === 0) return (
-        <div className="mt-6 border-t border-gray-100 pt-4 relative group animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-48 mb-3"></div>
-            <div className="relative overflow-hidden min-h-[140px] bg-gray-50 rounded-lg border border-gray-100 p-4">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                        <div className="h-3 bg-gray-200 rounded w-20"></div>
-                        <div className="flex gap-0.5">
-                            {[...Array(5)].map((_, i) => <div key={i} className="w-3 h-3 bg-gray-200 rounded-full"></div>)}
-                        </div>
-                    </div>
-                    <div className="h-2 bg-gray-200 rounded w-16"></div>
-                </div>
-                <div className="space-y-2 mt-2">
-                    <div className="h-2 bg-gray-200 rounded w-full"></div>
-                    <div className="h-2 bg-gray-200 rounded w-5/6"></div>
-                    <div className="h-2 bg-gray-200 rounded w-4/6"></div>
-                </div>
-            </div>
-        </div>
-    );
-    if (error && reviews.length === 0) return null;
-    if (reviews.length === 0 && !loading) return null;
-    const currentReview = reviews[currentIndex];
-    return (
-        <div className="mt-6 border-t border-gray-100 pt-4 relative group">
-            <h4 className="text-sm font-bold text-gray-900 mb-3 uppercase tracking-tight">Recent Customer Feedback</h4>
-            <div className="relative overflow-hidden min-h-[140px] bg-gray-50 rounded-lg border border-gray-100">
-                {reviews.length > 1 && (
-                    <>
-                        <button
-                            onClick={prevSlide}
-                            aria-label="Previous review"
-                            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-white shadow-md text-gray-600 hover:text-blue-600 focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-                        </button>
-                        <button
-                            onClick={nextSlide}
-                            aria-label="Next review"
-                            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-white shadow-md text-gray-600 hover:text-blue-600 focus:outline-none opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                        </button>
-                    </>
-                )}
-                {currentReview && (
-                    <div className="min-w-full p-4 flex flex-col justify-between bg-white">
-                        <div>
-                            <div className="flex gap-3 mb-3">
-                                {currentReview.product_image && (
-                                    <div className="w-14 h-14 relative rounded-lg border border-gray-100 flex-shrink-0 overflow-hidden shadow-sm bg-white">
-                                        <Image
-                                            src={currentReview.product_image}
-                                            alt={currentReview.product_name || 'Product'}
-                                            fill
-                                            className="object-cover"
-                                        />
-                                    </div>
-                                )}
-                                <div className="flex flex-col flex-grow min-w-0 pt-0.5">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="font-bold text-gray-900 text-[11px] uppercase tracking-wider truncate">{currentReview.reviewer}</span>
-                                        <span className="text-gray-400 text-[9px] font-medium uppercase tracking-tighter">
-                                            {currentReview.date_created ? new Date(currentReview.date_created).toLocaleDateString() : ''}
-                                        </span>
-                                    </div>
-                                    {currentReview.rating > 0 && (
-                                        <div className="flex text-yellow-400 mt-0.5">
-                                            {[...Array(5)].map((_, i) => (
-                                                <svg
-                                                    key={i}
-                                                    className={`w-2.5 h-2.5 ${i < currentReview.rating ? 'fill-current' : 'text-gray-200'}`}
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                                </svg>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div
-                                className="text-gray-600 mb-3 leading-relaxed text-xs line-clamp-3 italic opacity-80"
-                                dangerouslySetInnerHTML={{ __html: currentReview.review }}
-                            />
-                        </div>
-                        {currentReview.product_permalink && currentReview.product_name && (
-                            <div className="mt-auto space-y-3">
-                                <Link
-                                    href={currentReview.product_permalink}
-                                    className="text-[10px] text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 font-bold uppercase tracking-tight border-t border-gray-50 pt-2"
-                                >
-                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
-                                    View Item
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-            {reviews.length > 1 && (
-                <div className="flex justify-center gap-1.5 mt-2">
-                    {reviews.map((_: any, idx: number) => (
-                        <button
-                            key={idx}
-                            onClick={() => setCurrentIndex(idx)}
-                            className={`w-1.5 h-1.5 rounded-full transition-colors ${idx === currentIndex ? 'bg-blue-600' : 'bg-gray-300 hover:bg-gray-400'
-                                }`}
-                            aria-label={`Go to slide ${idx + 1}`}
-                        />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-export default RecentRefurbishedReviews;
+        // Parse upstream response
+        let data;
+        const contentType = upstreamResponse.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            try {
+                data = await upstreamResponse.json();
+            } catch {
+                return NextResponse.json({ error: 'Invalid JSON from upstream' }, { status: 502 });
+            }
+        } else {
+            const text = await upstreamResponse.text();
+            return NextResponse.json({ error: 'Upstream returned non-JSON', status: upstreamResponse.status, body: text.substring(0, 200) }, { status: upstreamResponse.status || 502 });
+        }
+        // Create response
+        const res = NextResponse.json(data, { status: upstreamResponse.status });
+        // Forward specific headers back to client
+        const newSessionToken = upstreamResponse.headers.get('woocommerce-session') || upstreamResponse.headers.get('x-woocommerce-session');
+        if (newSessionToken) {
+            res.headers.set('woocommerce-session', newSessionToken);
+        }
+        // Handle Set-Cookie
+        // In Edge, accessing Set-Cookie from fetch response can be restricted or implementation dependent, 
+        // but if available we forward it.
+        const setCookie = upstreamResponse.headers.get('set-cookie');
+        if (setCookie) {
+            // Check for session cookie if header wasn't present
+            if (!newSessionToken) {
+                const match = setCookie.match(/wp_woocommerce_session_[^=]+=([^;]+)/);
+                if (match && match[1]) {
+                    res.headers.set('woocommerce-session', match[1]);
+                }
+            }
+            res.headers.set('set-cookie', setCookie);
+        }
+        return res;
+    } catch (error) {
+        console.error('[GraphQL Proxy] Error:', error);
+        return NextResponse.json({
+            error: 'Failed to proxy GraphQL request',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        }, { status: 500 });
+    }
+}
 ```
 
-## File: src/pages/brand/[slug].tsx
+## File: src/pages/debug-category.tsx
+```typescript
+import React from 'react';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_CATEGORY_NODE_BY_SLUG, GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
+export const runtime = 'experimental-edge';
+const DebugCategory = ({ logs }: { logs: string[] }) => {
+  return (
+    <div className="p-5 font-mono">
+      <h1>Category Debug (SSR)</h1>
+      <pre className="bg-gray-100 p-2.5 whitespace-pre-wrap">
+        {logs.join('\n')}
+      </pre>
+    </div>
+  );
+};
+export const getServerSideProps = async () => {
+  const logs: string[] = [];
+  const addLog = (msg: string) => logs.push(msg);
+  const categorySlug = 'hoodies';
+  try {
+    addLog(`--- TEST 1: CATEGORY ---`);
+    addLog(`Fetching category node...`);
+    const { data: categoryData } = await client.query({
+      query: GET_CATEGORY_NODE_BY_SLUG,
+      variables: { slug: [categorySlug] },
+      fetchPolicy: 'no-cache',
+    });
+    addLog(`Category Result: ${JSON.stringify(categoryData)}`);
+  } catch (error: any) {
+    addLog(`CATEGORY ERROR: ${error.message}`);
+  }
+  try {
+    addLog(`\n--- TEST 2: PRODUCT ---`);
+    // Try to fetch a product to see if general connectivity works
+    // We don't know a valid slug, but we can try a search or just use the same slug
+    addLog(`Fetching product (using 'hoodie' as slug)...`);
+    const { data: productData } = await client.query({
+      query: GET_SINGLE_PRODUCT,
+      variables: { slug: 'hoodie' }, // Common slug
+      fetchPolicy: 'no-cache',
+    });
+    addLog(`Product Result: Success (found: ${!!productData?.product})`);
+  } catch (error: any) {
+    addLog(`PRODUCT ERROR: ${error.message}`);
+  }
+  return {
+    props: {
+      logs
+    }
+  };
+};
+export default DebugCategory;
+```
+
+## File: src/pages/search.tsx
 ```typescript
 import { useState, useEffect } from 'react';
-export const runtime = 'edge';
 import { useRouter } from 'next/router';
-import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
+import Head from 'next/head';
+import Layout from '@/components/Layout/Layout.component';
+import ProductList from '@/components/Product/ProductList.component';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
+import { SEARCH_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
+import { GetServerSideProps } from 'next';
 import client from '@/utils/apollo/ApolloClient';
-import { GET_BRAND_DATA_BY_SLUG, GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/TAXONOMY_QUERIES';
-import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
-import Link from 'next/link';
-/**
- * Display brand page with filtering, sorting, and infinite scroll
- */
-const BrandPage = ({
-    brandName,
-    products,
-    pageInfo,
-    slug,
-    subBrands,
-    attr,
-    term,
-}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
-    const hasAttrFilter = Boolean(attrTax && term);
+export const runtime = 'experimental-edge';
+interface SearchPageProps {
+    products: any[];
+    pageInfo: any;
+    searchTerm: string;
+    error?: string;
+}
+const SearchPage = ({ products, pageInfo, searchTerm, error: serverError }: SearchPageProps) => {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     useEffect(() => {
         const handleStart = (url: string) => {
+            // Only show loading if the search term changes (query param 'q')
             if (url !== router.asPath) {
                 setLoading(true);
             }
@@ -21360,173 +21028,95 @@ const BrandPage = ({
             router.events.off('routeChangeError', handleComplete);
         };
     }, [router]);
-    const subBrandSlot = subBrands && subBrands.length > 0 ? (
-        <div className="flex flex-wrap gap-2 mb-4">
-            {subBrands.map((subBrand: any) => (
-                <Link
-                    key={subBrand.id}
-                    href={`/brand/${subBrand.slug}`}
-                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-[#2c3338] text-sm font-medium rounded-full transition-colors border border-gray-200 capitalize"
-                >
-                    {subBrand.name.toLowerCase()}
-                </Link>
-            ))}
-        </div>
-    ) : null;
+    // Keep router for navigation, but use props for data
+    // We can still use state if we want to support client-side updates without reload, 
+    // but ProductList handles pagination/filtering internally now.
+    // However, if the user changes the search term in the URL, the page will reload (SSR).
+    // If there's an error from SSR, show it.
     return (
-        <TaxonomyListingPage
-            title={brandName || 'Brand'}
-            products={products}
-            pageInfo={pageInfo}
-            slug={slug}
-            query={hasAttrFilter ? GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_BRAND_DATA_BY_SLUG}
-            queryVariables={hasAttrFilter
-                ? { id: slug, slug: [slug], attrTax, attrTerm: [term] }
-                : { id: slug, slug: [slug] }}
-            emptyMessage="No products found for this brand"
-            topSlot={subBrandSlot}
-            fetchAllForSort={true}
-            loading={loading}
-        />
-    );
-};
-export default BrandPage;
-export const getServerSideProps: GetServerSideProps = async ({ params, query }) => {
-    const slug = params?.slug as string;
-    const attr = (query?.attr as string | undefined) || '';
-    const term = (query?.term as string | undefined) || '';
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-    const attrTax = attrTaxonomyMap[attr.toLowerCase()];
-    const hasAttrFilter = Boolean(attrTax && term);
-    try {
-        const res = await client.query({
-            query: hasAttrFilter ? GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_BRAND_DATA_BY_SLUG,
-            variables: hasAttrFilter
-                ? { id: slug, slug: [slug], attrTax, attrTerm: [term], after: null }
-                : { id: slug, slug: [slug], after: null },
-            fetchPolicy: 'network-only'
-        });
-        const brandData = res.data.productBrand;
-        const productsData = res.data.products;
-        const products = productsData ? productsData.nodes : [];
-        const pageInfo = productsData ? productsData.pageInfo : { hasNextPage: false, endCursor: null };
-        const brandName = brandData ? brandData.name : slug;
-        const subBrands = brandData?.children?.nodes || [];
-        // Check if brand exists or has content, if strictly needed. 
-        // But for now, if data returns, we render.
-        return {
-            props: {
-                brandName: brandName as string,
-                products,
-                pageInfo,
-                slug,
-                subBrands,
-                attr,
-                term,
-            },
-        };
-    } catch (error) {
-        console.error("Error fetching brand data:", error);
-        return { notFound: true };
-    }
-};
-```
-
-## File: src/pages/shoes.tsx
-```typescript
-import React from 'react';
-import { GetStaticProps } from 'next';
-export const runtime = 'edge';
-import Layout from '@/components/Layout/Layout.component';
-import ProductList from '@/components/Product/ProductList.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
-import BackButton from '@/components/UI/BackButton.component';
-interface ShoesPageProps {
-    category: any;
-    products: any[];
-    pageInfo: {
-        hasNextPage: boolean;
-        endCursor: string | null;
-    };
-    slug: string;
-}
-const ShoesPage = ({ category, products, pageInfo, slug }: ShoesPageProps) => {
-    return (
-        <Layout title={category?.name || 'Shoes'} fullWidth={true}>
-            <div className="px-2 md:px-4 pt-1 pb-1">
-                <BackButton />
-                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
-                    {category?.name?.toLowerCase() || 'Shoes'}
-                </h1>
-                {category?.description && (
-                    <div
-                        className="mb-10 text-gray-500 max-w-3xl"
-                        dangerouslySetInnerHTML={{ __html: category.description }}
-                    />
+        <Layout title={`Search: ${searchTerm}`} fullWidth={true}>
+            <Head>
+                <title>{`Search Results for "${searchTerm}" | Shopwice`}</title>
+            </Head>
+            <div className="pt-1 pb-1">
+                <div className="container mx-auto px-4 py-4">
+                    <h1 className="text-xl font-bold mb-4">
+                        Search Results for <span className="text-orange-600">{`"${searchTerm}"`}</span>
+                    </h1>
+                </div>
+                {loading ? (
+                    <div className="flex justify-center items-center min-h-[400px]">
+                        <LoadingSpinner color="orange" size="lg" />
+                    </div>
+                ) : (
+                    <>
+                        {serverError && (
+                            <div className="text-center py-10">
+                                <p className="text-red-500">Error loading search results. Please try again.</p>
+                                <p className="text-sm text-gray-500 mt-2">{serverError}</p>
+                            </div>
+                        )}
+                        {!serverError && products.length === 0 && searchTerm && (
+                            <div className="text-center py-10">
+                                <p className="text-gray-600 text-lg">{`No products found matching "${searchTerm}"`}</p>
+                                <p className="text-gray-500 mt-2">Try checking your spelling or using different keywords.</p>
+                            </div>
+                        )}
+                        {!serverError && products.length > 0 && (
+                            <div className="pt-1 pb-1">
+                                <ProductList
+                                    products={products}
+                                    pageInfo={pageInfo}
+                                    query={SEARCH_PRODUCTS_QUERY}
+                                    queryVariables={{ search: searchTerm }}
+                                    // Removed useDirectFetch to use Apollo Client
+                                    context={{}}
+                                />
+                            </div>
+                        )}
+                    </>
                 )}
-                <ProductList
-                    products={products}
-                    pageInfo={pageInfo}
-                    slug={slug}
-                    query={GET_CATEGORY_DATA_BY_SLUG}
-                    queryVariables={{ slug: [slug], categoryId: category.databaseId }}
-                    totalCount={category?.count}
-                />
             </div>
         </Layout>
     );
 };
-export default ShoesPage;
-export const getStaticProps: GetStaticProps = async () => {
-    const slug = 'shoes'; // Hardcoded slug
-    try {
-        // Step 1: Resolve slug to ID
-        const { data: catData } = await client.query({
-            query: GET_CATEGORY_DATA_BY_SLUG,
-            variables: { slug: [slug], categoryId: null, first: 0 },
-        });
-        const category = catData?.productCategories?.nodes?.[0];
-        if (!category) {
-            return {
-                props: {
-                    category: { name: 'Shoes' },
-                    products: [],
-                    pageInfo: { hasNextPage: false, endCursor: null },
-                    slug: 'shoes'
-                },
-                revalidate: 60,
-            };
-        }
-        const categoryId = category.databaseId;
-        // Step 2: Fetch products by categoryId
-        const { data } = await client.query({
-            query: GET_CATEGORY_DATA_BY_SLUG,
-            variables: { slug: [slug], categoryId, first: 24 },
-        });
+export const getServerSideProps: GetServerSideProps = async (context) => {
+    const searchTerm = context.query.q as string || '';
+    if (!searchTerm) {
         return {
             props: {
-                category,
-                products: data?.products?.nodes || [],
-                pageInfo: data?.products?.pageInfo || { hasNextPage: false, endCursor: null },
-                slug,
-            },
-            revalidate: 60,
-        };
-    } catch (error) {
-        console.error('Error fetching shoes data:', error);
-        return {
-            props: {
-                category: { name: 'Shoes' },
                 products: [],
-                pageInfo: { hasNextPage: false, endCursor: null },
-                slug: 'shoes'
+                pageInfo: null,
+                searchTerm: ''
+            }
+        };
+    }
+    try {
+        const { data } = await client.query({
+            query: SEARCH_PRODUCTS_QUERY,
+            variables: { search: searchTerm, first: 24 },
+            fetchPolicy: 'network-only'
+        });
+        return {
+            props: {
+                products: data?.products?.nodes || [],
+                pageInfo: data?.products?.pageInfo || null,
+                searchTerm
+            }
+        };
+    } catch (error: any) {
+        console.error('Search SSR Error:', error);
+        return {
+            props: {
+                products: [],
+                pageInfo: null,
+                searchTerm,
+                error: error.message || 'An error occurred'
             }
         };
     }
 };
+export default SearchPage;
 ```
 
 ## File: next.config.js
@@ -21721,71 +21311,33 @@ module.exports = nextConfig;
 }
 ```
 
-## File: src/pages/api/reset-session.ts
+## File: src/pages/location/[slug].tsx
 ```typescript
-import { NextRequest, NextResponse } from 'next/server';
-export const runtime = 'edge';
-const buildExpiredCookie = (name: string) =>
-  `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax`;
-export default function handler(req: NextRequest) {
-  const cookieHeader = req.headers.get('cookie') || '';
-  const cookieNames = cookieHeader
-    .split(';')
-    .map((cookie) => cookie.split('=')[0]?.trim())
-    .filter((name) => name);
-  const expiredCookies = cookieNames.map((name) => buildExpiredCookie(name));
-  const res = NextResponse.json({ ok: true, cleared: cookieNames.length });
-  if (expiredCookies.length > 0) {
-    // Next.js Edge Runtime handles Set-Cookie via headers
-    expiredCookies.forEach(cookie => {
-      res.headers.append('Set-Cookie', cookie);
-    });
-  }
-  return res;
-}
-```
-
-## File: src/pages/product-category/[slug].tsx
-```typescript
-import React, { useEffect, useState } from 'react';
-export const runtime = 'edge';
-import { GetServerSideProps } from 'next';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 import client from '@/utils/apollo/ApolloClient';
-import { GET_CATEGORY_NODE_BY_SLUG, GET_CATEGORY_PRODUCTS_BY_ID, GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE } from '@/utils/gql/GQL_QUERIES';
-import { useLazyQuery } from '@apollo/client';
-import { Product } from '@/types/product';
-// ----- TypeScript Types -----
-interface CategoryNode {
-    databaseId: number;
-    name: string;
-    description?: string;
-    count: number;
-}
-interface PageInfo {
-    hasNextPage: boolean;
-    endCursor: string | null;
-}
-interface CategoryPageProps {
-    category: CategoryNode | null;
-    products: Product[];
-    pageInfo: PageInfo;
-    slug: string;
-    attr?: string;
-    term?: string;
-    categoryId?: number;
-    isError?: boolean;
-}
-// ----- Component -----
-const CategoryPage = ({ category: initialCategory, products: initialProducts, pageInfo: initialPageInfo, slug, attr, term, categoryId: initialCategoryId, isError }: CategoryPageProps) => {
-    const [category, setCategory] = useState<CategoryNode | null>(initialCategory);
-    const [products, setProducts] = useState<Product[]>(initialProducts);
-    const [pageInfo, setPageInfo] = useState<PageInfo>(initialPageInfo);
-    const [categoryId, setCategoryId] = useState<number | undefined>(initialCategoryId);
-    const [loading, setLoading] = useState(!!isError);
+import { GET_LOCATION_DATA_BY_SLUG, GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/LOCATION_QUERIES';
+import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
+export const runtime = 'experimental-edge';
+/**
+ * Display location page with filtering, sorting, and infinite scroll
+ */
+const LocationPage = ({
+    locationName,
+    products,
+    pageInfo,
+    slug,
+    attr,
+    term,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
+    const hasAttrFilter = Boolean(attrTax && term);
     const router = useRouter();
-    // Handle navigation loading state
+    const [loading, setLoading] = useState(false);
     useEffect(() => {
         const handleStart = (url: string) => {
             if (url !== router.asPath) {
@@ -21802,89 +21354,132 @@ const CategoryPage = ({ category: initialCategory, products: initialProducts, pa
             router.events.off('routeChangeError', handleComplete);
         };
     }, [router]);
-    // Sync state with props when navigating between categories
-    useEffect(() => {
-        setCategory(initialCategory);
-        setProducts(initialProducts);
-        setPageInfo(initialPageInfo);
-        setCategoryId(initialCategoryId);
-        setLoading(!!isError);
-    }, [initialCategory, initialProducts, initialPageInfo, initialCategoryId, isError]);
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
-    const hasAttrFilter = Boolean(attrTax && term);
-    const [getCategory] = useLazyQuery(GET_CATEGORY_NODE_BY_SLUG, { fetchPolicy: 'network-only' });
-    const [getProducts] = useLazyQuery(hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID, { fetchPolicy: 'network-only' });
-    useEffect(() => {
-        if (isError && slug) {
-            const fetchData = async () => {
-                try {
-                    setLoading(true);
-                    console.log('CSR Fallback: Fetching category...');
-                    const { data: catData } = await getCategory();
-                    const allCategories = catData?.productCategories?.nodes || [];
-                    const normalizedSlug = slug.toLowerCase();
-                    const catNode = allCategories.find((node: any) => node.slug?.toLowerCase() === normalizedSlug)
-                        || allCategories.find((node: any) => node.name?.toLowerCase() === normalizedSlug.replace(/-/g, ' '));
-                    if (catNode) {
-                        setCategory(catNode);
-                        setCategoryId(catNode.databaseId);
-                        console.log('CSR Fallback: Fetching products...');
-                        const variables = hasAttrFilter
-                            ? { categoryId: catNode.databaseId, attrTax, attrTerm: [term], first: 24 }
-                            : { categoryId: catNode.databaseId, first: 24 };
-                        const { data: prodData } = await getProducts({ variables });
-                        setProducts(prodData?.products?.nodes || []);
-                        setPageInfo(prodData?.products?.pageInfo || { hasNextPage: false, endCursor: null });
-                    }
-                } catch (err) {
-                    console.error('CSR Fallback Error:', err);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchData();
-        }
-    }, [isError, slug, attrTax, term, hasAttrFilter, getCategory, getProducts]);
-    const totalCount = category?.count || products.length;
-    if (loading && products.length === 0) {
-        return (
-            <TaxonomyListingPage
-                title={'Loading...'}
-                products={[]}
-                pageInfo={{ hasNextPage: false, endCursor: null }}
-                slug={slug}
-                query={hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID}
-                queryVariables={{}}
-                emptyMessage="Loading category data..."
-                totalCount={0}
-                loading={true}
-            />
-        );
-    }
     return (
         <TaxonomyListingPage
-            title={category?.name || 'Category'}
-            description={category?.description}
+            title={locationName || 'Location'}
             products={products}
             pageInfo={pageInfo}
             slug={slug}
-            query={hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID}
+            query={hasAttrFilter ? GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_LOCATION_DATA_BY_SLUG}
             queryVariables={hasAttrFilter
-                ? { categoryId, attrTax, attrTerm: [term], first: 24 }
-                : { categoryId, first: 24 }}
-            emptyMessage="No products found in this category"
-            totalCount={totalCount}
+                ? { slug, attrTax, attrTerm: [term] }
+                : { slug }}
+            emptyMessage="No products found for this location"
             fetchAllForSort={true}
             loading={loading}
         />
     );
 };
-export default CategoryPage;
-// ----- getServerSideProps -----
-export const getServerSideProps: GetServerSideProps = async ({ params, res, query }) => {
+export default LocationPage;
+export const getServerSideProps: GetServerSideProps = async ({
+    query: { slug, attr, term },
+}) => {
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+    const attrTax = typeof attr === 'string' ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
+    const hasAttrFilter = Boolean(attrTax && term);
+    const res = await client.query({
+        query: hasAttrFilter ? GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_LOCATION_DATA_BY_SLUG,
+        variables: hasAttrFilter
+            ? { slug: slug, attrTax, attrTerm: [term], after: null }
+            : { slug: slug, after: null },
+    });
+    const locationData = res.data.productLocation;
+    const productsData = res.data.products;
+    const products = productsData ? productsData.nodes : [];
+    const pageInfo = productsData ? productsData.pageInfo : { hasNextPage: false, endCursor: null };
+    const locationName = locationData ? locationData.name : slug;
+    return {
+        props: {
+            locationName: locationName as string,
+            products,
+            pageInfo,
+            slug: slug as string,
+            attr: typeof attr === 'string' ? attr : '',
+            term: typeof term === 'string' ? term : '',
+        },
+    };
+};
+```
+
+## File: src/pages/brand/[slug].tsx
+```typescript
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_BRAND_DATA_BY_SLUG, GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/TAXONOMY_QUERIES';
+import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
+import Link from 'next/link';
+export const runtime = 'experimental-edge';
+/**
+ * Display brand page with filtering, sorting, and infinite scroll
+ */
+const BrandPage = ({
+    brandName,
+    products,
+    pageInfo,
+    slug,
+    subBrands,
+    attr,
+    term,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
+    const hasAttrFilter = Boolean(attrTax && term);
+    const router = useRouter();
+    const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        const handleStart = (url: string) => {
+            if (url !== router.asPath) {
+                setLoading(true);
+            }
+        };
+        const handleComplete = () => setLoading(false);
+        router.events.on('routeChangeStart', handleStart);
+        router.events.on('routeChangeComplete', handleComplete);
+        router.events.on('routeChangeError', handleComplete);
+        return () => {
+            router.events.off('routeChangeStart', handleStart);
+            router.events.off('routeChangeComplete', handleComplete);
+            router.events.off('routeChangeError', handleComplete);
+        };
+    }, [router]);
+    const subBrandSlot = subBrands && subBrands.length > 0 ? (
+        <div className="flex flex-wrap gap-2 mb-4">
+            {subBrands.map((subBrand: any) => (
+                <Link
+                    key={subBrand.id}
+                    href={`/brand/${subBrand.slug}`}
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-[#2c3338] text-sm font-medium rounded-full transition-colors border border-gray-200 capitalize"
+                >
+                    {subBrand.name.toLowerCase()}
+                </Link>
+            ))}
+        </div>
+    ) : null;
+    return (
+        <TaxonomyListingPage
+            title={brandName || 'Brand'}
+            products={products}
+            pageInfo={pageInfo}
+            slug={slug}
+            query={hasAttrFilter ? GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_BRAND_DATA_BY_SLUG}
+            queryVariables={hasAttrFilter
+                ? { id: slug, slug: [slug], attrTax, attrTerm: [term] }
+                : { id: slug, slug: [slug] }}
+            emptyMessage="No products found for this brand"
+            topSlot={subBrandSlot}
+            fetchAllForSort={true}
+            loading={loading}
+        />
+    );
+};
+export default BrandPage;
+export const getServerSideProps: GetServerSideProps = async ({ params, query }) => {
     const slug = params?.slug as string;
     const attr = (query?.attr as string | undefined) || '';
     const term = (query?.term as string | undefined) || '';
@@ -21893,635 +21488,233 @@ export const getServerSideProps: GetServerSideProps = async ({ params, res, quer
     };
     const attrTax = attrTaxonomyMap[attr.toLowerCase()];
     const hasAttrFilter = Boolean(attrTax && term);
-    if (!slug) return { notFound: true };
     try {
-        // Cache control: 1 minute, background refresh
-        res.setHeader(
-            'Cache-Control',
-            'public, s-maxage=60, stale-while-revalidate=59'
-        );
-        const { data: categoryData } = await client.query({
-            query: GET_CATEGORY_NODE_BY_SLUG,
-            fetchPolicy: 'network-only',
-        });
-        const allCategories = categoryData?.productCategories?.nodes || [];
-        const normalizedSlug = slug.toLowerCase();
-        let categoryNode = allCategories.find((node: any) => node.slug?.toLowerCase() === normalizedSlug)
-            || allCategories.find((node: any) => node.name?.toLowerCase() === normalizedSlug.replace(/-/g, ' '));
-        if (!categoryNode) {
-            return {
-                props: {
-                    category: {
-                        databaseId: 0,
-                        name: slug.replace(/-/g, ' '),
-                        description: null,
-                        count: 0,
-                    },
-                    products: [],
-                    pageInfo: { hasNextPage: false, endCursor: null },
-                    slug,
-                    attr,
-                    term,
-                },
-            };
-        }
-        const categoryId = categoryNode.databaseId;
-        const { data: productsData } = await client.query({
-            query: hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID,
+        const res = await client.query({
+            query: hasAttrFilter ? GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_BRAND_DATA_BY_SLUG,
             variables: hasAttrFilter
-                ? { categoryId, attrTax, attrTerm: [term], first: 24 }
-                : { categoryId, first: 24 },
-            fetchPolicy: 'network-only',
+                ? { id: slug, slug: [slug], attrTax, attrTerm: [term], after: null }
+                : { id: slug, slug: [slug], after: null },
+            fetchPolicy: 'network-only'
         });
-        const products = productsData?.products?.nodes || [];
-        const pageInfo = productsData?.products?.pageInfo || { hasNextPage: false, endCursor: null };
+        const brandData = res.data.productBrand;
+        const productsData = res.data.products;
+        const products = productsData ? productsData.nodes : [];
+        const pageInfo = productsData ? productsData.pageInfo : { hasNextPage: false, endCursor: null };
+        const brandName = brandData ? brandData.name : slug;
+        const subBrands = brandData?.children?.nodes || [];
+        // Check if brand exists or has content, if strictly needed. 
+        // But for now, if data returns, we render.
         return {
             props: {
-                category: {
-                    databaseId: categoryNode.databaseId,
-                    name: categoryNode.name,
-                    description: categoryNode.description || null,
-                    count: categoryNode.count || 0,
-                },
+                brandName: brandName as string,
                 products,
                 pageInfo,
                 slug,
+                subBrands,
                 attr,
                 term,
-                categoryId,
             },
         };
     } catch (error) {
-        console.error('Error fetching category SSR:', error);
-        // Fallback to CSR
+        console.error("Error fetching brand data:", error);
+        return { notFound: true };
+    }
+};
+```
+
+## File: src/pages/404.tsx
+```typescript
+import Link from 'next/link';
+import Layout from '@/components/Layout/Layout.component';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
+import ProductCard from '@/components/Product/ProductCard.component';
+import { Product } from '@/types/product';
+interface Custom404Props {
+    bestSellers: Product[];
+    newest: Product[];
+    topRated: Product[];
+}
+export default function Custom404({ bestSellers, newest, topRated }: Custom404Props) {
+    return (
+        <Layout title="Page Not Found" fullWidth={false}>
+            <div className="flex flex-col items-center justify-center min-h-[50vh] px-4 text-center border-b border-gray-100 pb-12">
+                <h1 className="text-[150px] leading-none font-bold text-gray-100 select-none">404</h1>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 -mt-8 mb-4">
+                    Oops! Page Not Found
+                </h2>
+                <p className="text-gray-500 max-w-md mx-auto mb-8">
+                    The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
+                </p>
+                <Link
+                    href="/"
+                    className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 transform hover:-translate-y-0.5"
+                >
+                    Go Back Home
+                </Link>
+            </div>
+            <div className="py-12 space-y-16">
+                {/* Best Sellers */}
+                {bestSellers?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-blue-600 pl-3">
+                            Best Sellers
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {bestSellers.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {/* New Arrivals */}
+                {newest?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-green-500 pl-3">
+                            New Arrivals
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {newest.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {/* Top Rated */}
+                {topRated?.length > 0 && (
+                    <section>
+                        <h3 className="text-xl font-bold text-gray-900 mb-6 uppercase tracking-tight border-l-4 border-yellow-500 pl-3">
+                            Top Rated Products
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                            {topRated.map((product, index) => (
+                                <ProductCard key={product.databaseId || product.slug || index} {...product} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+            </div>
+        </Layout>
+    );
+}
+export async function getStaticProps() {
+    try {
+        const { data } = await client.query({
+            query: GET_404_PAGE_PRODUCTS,
+        });
         return {
             props: {
-                category: null,
-                products: [],
-                pageInfo: { hasNextPage: false, endCursor: null },
-                slug,
-                attr,
-                term,
-                isError: true,
+                bestSellers: data?.bestSellers?.nodes || [],
+                newest: data?.newest?.nodes || [],
+                topRated: data?.topRated?.nodes || [],
+            },
+        };
+    } catch (error) {
+        console.error('Error fetching 404 page products:', error);
+        return {
+            props: {
+                bestSellers: [],
+                newest: [],
+                topRated: [],
             },
         };
     }
-};
+}
 ```
 
-## File: src/pages/categories.tsx
+## File: src/pages/shoes.tsx
 ```typescript
-import { NextPage, InferGetStaticPropsType, GetStaticProps } from 'next';
-export const runtime = 'edge';
-import Categories from '@/components/Category/Categories.component';
-import Layout from '@/components/Layout/Layout.component';
-import client from '@/utils/apollo/ApolloClient';
-import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
-/**
- * Category page displays all of the categories
- */
-const categories: NextPage = ({
-  categories,
-}: InferGetStaticPropsType<typeof getStaticProps>) => (
-  <Layout title="categories">
-    {categories && <Categories categories={categories} />}
-  </Layout>
-);
-export default categories;
-export const getStaticProps: GetStaticProps = async () => {
-  try {
-    const result = await client.query({
-      query: FETCH_ALL_CATEGORIES_QUERY,
-    });
-    const nodes = result.data?.productCategories?.nodes || [];
-    const rootCategories = nodes.filter((node: any) => !node.parent || Number(node.parent) === 0);
-    return {
-      props: {
-        categories: rootCategories,
-      },
-      revalidate: 60,
-    };
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    return {
-      props: {
-        categories: [],
-      },
-      revalidate: 10,
-    };
-  }
-};
-```
-
-## File: src/pages/products.tsx
-```typescript
-import Head from 'next/head';
-export const runtime = 'edge';
+import React from 'react';
+import { GetStaticProps } from 'next';
 import Layout from '@/components/Layout/Layout.component';
 import ProductList from '@/components/Product/ProductList.component';
 import client from '@/utils/apollo/ApolloClient';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-import { FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
-import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
-const Products: NextPage = ({
-  products,
-  pageInfo,
-  loading,
-}: InferGetStaticPropsType<typeof getStaticProps>) => {
-  if (loading)
+import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
+import BackButton from '@/components/UI/BackButton.component';
+export const runtime = 'experimental-edge';
+interface ShoesPageProps {
+    category: any;
+    products: any[];
+    pageInfo: {
+        hasNextPage: boolean;
+        endCursor: string | null;
+    };
+    slug: string;
+}
+const ShoesPage = ({ category, products, pageInfo, slug }: ShoesPageProps) => {
     return (
-      <Layout title="Products">
-        <div className="flex justify-center items-center min-h-screen">
-          <LoadingSpinner />
-        </div>
-      </Layout>
+        <Layout title={category?.name || 'Shoes'} fullWidth={true}>
+            <div className="px-2 md:px-4 pt-1 pb-1">
+                <BackButton />
+                <h1 className="text-[22px] font-bold text-[#2c3338] mb-1 capitalize tracking-tight">
+                    {category?.name?.toLowerCase() || 'Shoes'}
+                </h1>
+                {category?.description && (
+                    <div
+                        className="mb-10 text-gray-500 max-w-3xl"
+                        dangerouslySetInnerHTML={{ __html: category.description }}
+                    />
+                )}
+                <ProductList
+                    products={products}
+                    pageInfo={pageInfo}
+                    slug={slug}
+                    query={GET_CATEGORY_DATA_BY_SLUG}
+                    queryVariables={{ slug: [slug], categoryId: category.databaseId }}
+                    totalCount={category?.count}
+                />
+            </div>
+        </Layout>
     );
-  if (!products)
-    return (
-      <Layout title="Products">
-        <div className="flex justify-center items-center min-h-screen">
-          <p className="text-red-500">No products found</p>
-        </div>
-      </Layout>
-    );
-  return (
-    <Layout title="Products" fullWidth={true}>
-      <Head>
-        <title>Products | WooCommerce Next.js</title>
-      </Head>
-      <div className="pt-1 pb-1">
-        <ProductList
-          products={products}
-          pageInfo={pageInfo}
-          query={FETCH_ALL_PRODUCTS_QUERY}
-        />
-      </div>
-    </Layout>
-  );
 };
-export default Products;
+export default ShoesPage;
 export const getStaticProps: GetStaticProps = async () => {
-  try {
-    const { data, loading, networkStatus } = await client.query({
-      query: FETCH_ALL_PRODUCTS_QUERY,
-    });
-    return {
-      props: {
-        products: data?.products?.nodes || [],
-        pageInfo: data?.products?.pageInfo || {},
-        loading,
-        networkStatus,
-      },
-      revalidate: 60,
-    };
-  } catch (error) {
-    console.warn('Failed to fetch products during build:', error);
-    return {
-      props: {
-        products: [],
-        pageInfo: {},
-        loading: false,
-        networkStatus: 8, // Error status
-      },
-      revalidate: 60,
-    };
-  }
-};
-```
-
-## File: src/pages/product/[slug].tsx
-```typescript
-// Imports - Updated Layout
-export const runtime = 'edge';
-// Components
-import SingleProduct from '@/components/Product/SingleProductFinal.component';
-import Layout from '@/components/Layout/Layout.component';
-// Utilities
-import client from '@/utils/apollo/ApolloClient';
-// Types
-import type {
-  NextPage,
-  GetServerSideProps,
-  InferGetServerSidePropsType,
-} from 'next';
-// GraphQL
-import { GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
-import { NextSeo, ProductJsonLd } from 'next-seo';
-/**
- * Display a single product with dynamic pretty urls
- * @function product
- * @param {InferGetServerSidePropsType<typeof getServerSideProps>} products
- * @returns {JSX.Element} - Rendered component
- */
-const ProductPage: NextPage = ({
-  product,
-  loading,
-  networkStatus,
-  isRefurbished
-}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-  const hasError = networkStatus === 8;
-  // --- SEO Preparation ---
-  // Safely extract data
-  const name = product?.name || 'Product';
-  const slug = product?.slug || '';
-  const description = product?.shortDescription?.replace(/<[^>]+>/g, '') || product?.description?.replace(/<[^>]+>/g, '').substring(0, 160) || '';
-  const mainImage = product?.image?.sourceUrl || '';
-  const gallery = product?.galleryImages?.nodes?.map((img: { sourceUrl: string }) => img.sourceUrl) || [];
-  const images = [mainImage, ...gallery].filter(Boolean).map(url => ({ url }));
-  // RankMath SEO Data (Fallback to Product Data)
-  const seo = product?.seo;
-  const seoTitle = seo?.title || name;
-  const seoDescription = seo?.description || description;
-  // Price & Currency (Assuming simple product for base price, or low price for variable)
-  // Converting 'GH₵100' -> 100
-  const priceStr = String(product?.price || product?.salePrice || product?.regularPrice || '0');
-  const priceAmount = parseFloat(priceStr.replace(/[^0-9.]/g, '')) || 0;
-  const currency = 'GHS'; // Ghana Cedis
-  // Stock
-  const isInstock = product?.stockStatus !== 'OUT_OF_STOCK';
-  const availability = isInstock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
-  // Ratings
-  const ratingValue = product?.averageRating || 0;
-  const reviewCount = product?.reviewCount || 0;
-  return (
-    <>
-      {product && (
-        <>
-          <NextSeo
-            title={seoTitle}
-            description={seoDescription}
-            canonical={`https://shopwice.com/product/${slug}`}
-            openGraph={{
-              type: 'product',
-              url: `https://shopwice.com/product/${slug}`,
-              title: seoTitle,
-              description: seoDescription,
-              images: images,
-            }}
-          />
-          <ProductJsonLd
-            productName={name}
-            images={images.map(i => i.url)}
-            description={description}
-            brand="Shopwice" // Or product.productBrand if available
-            // sku={product.sku} // Add to query if not present
-            offers={[
-              {
-                price: priceAmount.toString(),
-                priceCurrency: currency,
-                itemCondition: 'https://schema.org/NewCondition', // Assuming new
-                availability: availability,
-                url: `https://shopwice.com/product/${slug}`,
-                seller: {
-                  name: 'Shopwice',
-                },
-              },
-            ]}
-            aggregateRating={
-              reviewCount > 0
-                ? {
-                  ratingValue: ratingValue.toString(),
-                  reviewCount: reviewCount.toString(),
-                }
-                : undefined
-            }
-          />
-        </>
-      )}
-      <Layout title={`${product?.name ? product.name : ''}`} fullWidth>
-        {product ? (
-          <SingleProduct
-            product={product}
-            loading={loading}
-            isRefurbished={isRefurbished}
-          />
-        ) : (
-          <div className="mt-8 text-2xl text-center">Loading product...</div>
-        )}
-        {hasError && (
-          <div className="mt-8 text-2xl text-center">
-            Error loading product...
-          </div>
-        )}
-      </Layout>
-    </>
-  );
-};
-export default ProductPage;
-export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
-  try {
-    // Cache control for Server Side Rendering (s-maxage=60, stale-while-revalidate=59)
-    res.setHeader(
-      'Cache-Control',
-      'public, s-maxage=60, stale-while-revalidate=59'
-    );
-    const slug = params?.slug as string;
-    console.log('Fetching product for slug:', slug);
-    let product = null;
-    let loading = true;
-    let networkStatus;
-    // Search for product and filter by exact slug match
+    const slug = 'shoes'; // Hardcoded slug
     try {
-      const result = await client.query({
-        query: GET_SINGLE_PRODUCT,
-        variables: { slug },
-        fetchPolicy: 'no-cache'
-      });
-      // Get nodes from search results
-      const nodes = result.data?.products?.nodes || [];
-      // Find exact slug match (case-insensitive for better compatibility)
-      product = nodes.find((node: any) =>
-        node?.slug?.toLowerCase() === slug.toLowerCase()
-      ) || null;
-      // If no exact match but we have results, log for debugging
-      if (!product && nodes.length > 0) {
-        console.log(`[SSR] Search returned ${nodes.length} products but none matched slug exactly`);
-        console.log(`[SSR] Looking for: "${slug}", found: ${nodes.map((n: any) => n.slug).join(', ')}`);
-      }
-      loading = result.loading;
-      networkStatus = result.networkStatus;
-      console.log(`[SSR] Search result for ${slug}:`, product ? 'Found' : 'Not Found');
-    } catch (e) {
-      console.error(`[SSR] Product lookup failed for ${slug}`, e);
-    }
-    console.log(`[SSR] Final product result for ${slug}:`, product ? 'Found' : 'Not Found');
-    if (!product) {
-      console.log(`[SSR] 404 Triggered for product: ${params?.slug}. Product is null.`);
-      return { notFound: true };
-    }
-    // Server-side calculation for stability
-    // Enhanced Refurbished Check: Attributes OR Category
-    const isRefurbished =
-      product.attributes?.nodes?.some((attr: any) =>
-        attr.options?.some((opt: any) =>
-          String(opt).toLowerCase().includes('refurbish')
-        )
-      ) ||
-      product.productCategories?.nodes?.some((cat: any) =>
-        (cat.name && cat.name.toLowerCase().includes('refurbish')) ||
-        (cat.slug && cat.slug.toLowerCase().includes('refurbish'))
-      ) ||
-      false;
-    console.log(`[SSR] Product: ${product.name}`);
-    console.log(`[SSR] Type: ${product.__typename}`);
-    if (product.variations) {
-      console.log(`[SSR] Variations found: ${product.variations.nodes?.length || 0}`);
-    } else {
-      console.log(`[SSR] No variations field on product object`);
-    }
-    console.log(`[SSR] isRefurbished: ${isRefurbished}`);
-    return {
-      props: {
-        product,
-        loading,
-        networkStatus,
-        isRefurbished
-      },
-    };
-  } catch (error) {
-    console.error(error);
-    return { notFound: true };
-  }
-};
-```
-
-## File: src/utils/apollo/ApolloClient.js
-```javascript
-/*eslint complexity: ["error", 8]*/
-import {
-  ApolloClient,
-  InMemoryCache,
-  createHttpLink,
-  ApolloLink,
-} from '@apollo/client';
-const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-const getLocalStorageJson = (key) => {
-  if (typeof window === 'undefined') return null;
-  return JSON.parse(localStorage.getItem(key));
-};
-const shouldLogSession = (operationName) =>
-  operationName === 'addToCart' || operationName === 'GET_CART';
-const getSessionHeader = (sessionData, operationName) => {
-  if (!sessionData?.token || !sessionData?.createdTime || operationName === 'CreateUser') {
-    return null;
-  }
-  const { token, createdTime } = sessionData;
-  if (Date.now() - createdTime > SEVEN_DAYS) {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('woo-session');
-    }
-    return null;
-  }
-  const cleanToken = token.replace(/^Session\s+/i, '');
-  return `Session ${cleanToken}`;
-};
-const getAuthHeader = (authData, operationName) => {
-  if (!authData?.authToken || operationName === 'CreateUser') return null;
-  return `Bearer ${authData.authToken}`;
-};
-const getSessionFromHeaders = (headers) => {
-  if (!headers) return null;
-  return headers.get('woocommerce-session') || headers.get('x-woocommerce-session') || null;
-};
-const persistSession = (session) => {
-  if (!session || typeof window === 'undefined') return;
-  if (session === 'false') {
-    localStorage.removeItem('woo-session');
-    return;
-  }
-  localStorage.setItem(
-    'woo-session',
-    JSON.stringify({ token: session, createdTime: Date.now() }),
-  );
-};
-const handleInvalidSession = (errors) => {
-  if (!errors || typeof window === 'undefined') return;
-  const invalid = errors.some((err) => err.message === "The 'woocommerce-session' header is invalid");
-  if (invalid) {
-    localStorage.removeItem('woo-session');
-    window.location.reload();
-  }
-};
-/**
- * Middleware operation
- * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
- */
-export const middleware = new ApolloLink((operation, forward) => {
-  /**
-   * If session data exist in local storage, set value as session header.
-   */
-  const sessionData = getLocalStorageJson('woo-session');
-  const authData = getLocalStorageJson('auth-data');
-  const headers = {};
-  // Middleware Log
-  if (shouldLogSession(operation.operationName)) {
-    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
-  }
-  const sessionHeader = getSessionHeader(sessionData, operation.operationName);
-  if (sessionHeader) {
-    headers['woocommerce-session'] = sessionHeader;
-  }
-  const authHeader = getAuthHeader(authData, operation.operationName);
-  if (authHeader) {
-    headers['Authorization'] = authHeader;
-  }
-  operation.setContext({
-    headers,
-  });
-  return forward(operation);
-});
-/**
- * Afterware operation.
- *
- * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
- */
-export const afterware = new ApolloLink((operation, forward) =>
-  forward(operation).map((response) => {
-    /**
-   * Check for session header and update session in local storage accordingly.
-   */
-  const context = operation.getContext();
-  const responseHeaders = context?.response?.headers;
-  const session = getSessionFromHeaders(responseHeaders);
-  if (operation.operationName === 'AddToCart' || operation.operationName === 'GET_CART') {
-    console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session: ${session}`);
-  }
-  persistSession(session);
-  handleInvalidSession(response.errors);
-    return response;
-  }),
-);
-const clientSide = typeof window === 'undefined';
-// Apollo GraphQL client.
-const linkUri = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql';
-const linkCredentials = 'omit';
-/**
- * Custom fetch wrapper to capture session headers directly from the response.
- * This ensures session tokens are saved even if Apollo Link context doesn't propagate headers.
- */
-const customFetch = async (uri, options) => {
-  const response = await fetch(uri, options);
-  if (typeof window !== 'undefined') {
-    const sessionHeader = response.headers.get('woocommerce-session') || 
-                          response.headers.get('x-woocommerce-session');
-    if (sessionHeader) {
-      console.log('[Apollo customFetch] Captured Session Header:', sessionHeader);
-      localStorage.setItem(
-        'woo-session',
-        JSON.stringify({ token: sessionHeader, createdTime: Date.now() }),
-      );
-    }
-  }
-  return response;
-};
-const client = new ApolloClient({
-  ssrMode: clientSide,
-  link: middleware.concat(
-    afterware.concat(
-      createHttpLink({
-        uri: linkUri,
-        fetch: customFetch,
-        credentials: linkCredentials, // Include credentials for OUR domain only
-      }),
-    ),
-  ),
-  cache: new InMemoryCache({
-    possibleTypes: {
-      Product: ['SimpleProduct', 'VariableProduct', 'ExternalProduct', 'GroupProduct'],
-    },
-    typePolicies: {
-      Query: {
-        fields: {
-          products: {
-            keyArgs: ['where'],
-            merge(existing, incoming, { args }) {
-              if (!existing) return incoming;
-              const { after } = args || {};
-              if (after) {
-                return {
-                  ...incoming,
-                  nodes: [...(existing.nodes || []), ...(incoming.nodes || [])],
-                };
-              }
-              return incoming;
+        // Step 1: Resolve slug to ID
+        const { data: catData } = await client.query({
+            query: GET_CATEGORY_DATA_BY_SLUG,
+            variables: { slug: [slug], categoryId: null, first: 0 },
+        });
+        const category = catData?.productCategories?.nodes?.[0];
+        if (!category) {
+            return {
+                props: {
+                    category: { name: 'Shoes' },
+                    products: [],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    slug: 'shoes'
+                },
+                revalidate: 60,
+            };
+        }
+        const categoryId = category.databaseId;
+        // Step 2: Fetch products by categoryId
+        const { data } = await client.query({
+            query: GET_CATEGORY_DATA_BY_SLUG,
+            variables: { slug: [slug], categoryId, first: 24 },
+        });
+        return {
+            props: {
+                category,
+                products: data?.products?.nodes || [],
+                pageInfo: data?.products?.pageInfo || { hasNextPage: false, endCursor: null },
+                slug,
             },
-          },
-        },
-      },
-      // Disable automatic normalization for Product types to avoid missing field errors
-      // Products will be cached by query instead of by ID
-      Product: {
-        keyFields: false,
-        fields: {
-          // Handle nullable fields gracefully
-          databaseId: { read(existing) { return existing || null; } },
-          date: { read(existing) { return existing || null; } },
-          averageRating: { read(existing) { return existing || null; } },
-          reviewCount: { read(existing) { return existing || null; } },
-          stockQuantity: { read(existing) { return existing || null; } },
-          image: { read(existing) { return existing || null; } },
-          productCategories: {
-            read(existing) { return existing || { nodes: [] }; },
-            merge(existing, incoming) { return incoming || { nodes: [] }; },
-          },
-          productBrand: {
-            read(existing) { return existing || { nodes: [] }; },
-            merge(existing, incoming) { return incoming || { nodes: [] }; },
-          },
-          productLocation: {
-            read(existing) { return existing || { nodes: [] }; },
-            merge(existing, incoming) { return incoming || { nodes: [] }; },
-          },
-          attributes: {
-            read(existing) { return existing || { nodes: [] }; },
-            merge(existing, incoming) { return incoming || { nodes: [] }; },
-          },
-        },
-      },
-      ProductCategory: { keyFields: ['slug'] },
-      Cart: {
-        fields: {
-          contents: { merge(existing, incoming) { return incoming; } },
-          total: { merge(existing, incoming) { return incoming; } },
-          items: { merge(existing, incoming) { return incoming; } },
-          itemCount: { merge(existing, incoming) { return incoming; } },
-          totals: { merge(existing, incoming) { return incoming; } },
-        },
-      },
-      CartItem: {
-        keyFields: ['key'],
-        fields: {
-          quantity: { merge(existing, incoming) { return incoming; } },
-          total: { merge(existing, incoming) { return incoming; } },
-        },
-      },
-      VariableProduct: {
-        keyFields: false,
-        fields: {
-          variations: {
-            merge(existing, incoming) { return incoming; },
-          },
-        },
-      },
-      ProductVariation: { keyFields: false },
-      SimpleProduct: { keyFields: false },
-      ExternalProduct: { keyFields: false },
-      GroupProduct: { keyFields: false },
-      MediaItem: { keyFields: ['id'] },
-      TermNode: { keyFields: false },
-      Attribute: {
-        keyFields: false,
-        fields: {
-          nodes: {
-            read(existing) { return existing || []; },
-            merge(existing, incoming) { return incoming || []; },
-          },
-        },
-      },
-    },
-  }),
-});
-export default client;
+            revalidate: 60,
+        };
+    } catch (error) {
+        console.error('Error fetching shoes data:', error);
+        return {
+            props: {
+                category: { name: 'Shoes' },
+                products: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+                slug: 'shoes'
+            }
+        };
+    }
+};
 ```
 
 ## File: src/components/Product/SingleProductFinal.component.tsx
@@ -23207,174 +22400,611 @@ const SingleProductFinal = ({
 export default SingleProductFinal;
 ```
 
-## File: src/pages/index.tsx
+## File: src/pages/api/reset-session.ts
 ```typescript
-import dynamic from 'next/dynamic';
+import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'edge';
-import Hero from '@/components/Index/Hero.component';
-import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
-import SEOContent from '@/components/Index/SEOContent.component';
-import Layout from '@/components/Layout/Layout.component';
-// Utilities
-import client from '@/utils/apollo/ApolloClient';
-// Types
-import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
-// GraphQL
-import { FETCH_HOME_PAGE_SSG } from '@/utils/gql/GQL_QUERIES';
-import { useGlobalStore } from '@/stores/globalStore';
-import { useEffect } from 'react';
-const SectionSkeleton = () => (
-  <div className="px-4 md:px-6 py-6">
-    <div className="h-5 w-48 bg-gray-200 rounded animate-pulse mb-4" aria-hidden="true" />
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="h-40 bg-gray-100 rounded animate-pulse" aria-hidden="true" />
-      ))}
-    </div>
-  </div>
-);
-const TopRatedProducts = dynamic(() => import('@/components/Index/TopRatedProducts.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const AirConditionerProducts = dynamic(() => import('@/components/Index/AirConditionerProducts.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const MobilePhonesOnSale = dynamic(() => import('@/components/Index/MobilePhonesOnSale.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const LaptopsProducts = dynamic(() => import('@/components/Index/LaptopsProducts.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const SpeakersProducts = dynamic(() => import('@/components/Index/SpeakersProducts.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const TelevisionsProducts = dynamic(() => import('@/components/Index/TelevisionsProducts.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const BestSellingSlider = dynamic(() => import('@/components/Index/BestSellingSlider.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const WhyChooseUs = dynamic(() => import('@/components/Index/WhyChooseUs.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const PromoBoxes = dynamic(() => import('@/components/Index/PromoBoxes.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const InfoBanner = dynamic(() => import('@/components/Index/InfoBanner.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const Newsletter = dynamic(() => import('@/components/Index/Newsletter.component'), {
-  loading: () => <SectionSkeleton />,
-});
-const RecentRefurbishedReviews = dynamic(
-  () => import('@/components/Product/RecentRefurbishedReviews.component'),
-  {
-    loading: () => <SectionSkeleton />,
+const buildExpiredCookie = (name: string) =>
+  `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; HttpOnly; SameSite=Lax`;
+export default function handler(req: NextRequest) {
+  const cookieHeader = req.headers.get('cookie') || '';
+  const cookieNames = cookieHeader
+    .split(';')
+    .map((cookie) => cookie.split('=')[0]?.trim())
+    .filter((name) => name);
+  const expiredCookies = cookieNames.map((name) => buildExpiredCookie(name));
+  const res = NextResponse.json({ ok: true, cleared: cookieNames.length });
+  if (expiredCookies.length > 0) {
+    // Next.js Edge Runtime handles Set-Cookie via headers
+    expiredCookies.forEach(cookie => {
+      res.headers.append('Set-Cookie', cookie);
+    });
   }
-);
-/**
- * Main index page
- * @function Index
- * @param {InferGetStaticPropsType<typeof getStaticProps>} products
- * @returns {JSX.Element} - Rendered component
- */
-const Index: NextPage = ({
-  topRatedProducts: initialTopRated,
-  bestSellingProducts: initialBestSelling,
-  airConditionerProducts: initialAir,
-  mobilePhonesOnSale: initialMobile,
-  laptopsProducts: initialLaptops,
-  speakersProducts: initialSpeakers,
-  televisionsProducts: initialTelevisions,
-  promoProduct: initialPromo,
-}: InferGetStaticPropsType<typeof getStaticProps>) => {
-  const setHomeData = useGlobalStore((state) => state.setHomeData);
-  const homeData = useGlobalStore((state) => state.homeData);
-  const hasHydrated = useGlobalStore((state) => state.hasHydrated);
-  // If props are empty (build error), fallback to cached data from store
-  const topRatedProducts = initialTopRated?.length > 0 ? initialTopRated : (hasHydrated ? (homeData.topRatedProducts || []) : []);
-  const bestSellingProducts = initialBestSelling?.length > 0 ? initialBestSelling : (hasHydrated ? (homeData.bestSellingProducts || []) : []);
-  const airConditionerProducts = initialAir?.length > 0 ? initialAir : (hasHydrated ? (homeData.airConditionerProducts || []) : []);
-  const mobilePhonesOnSale = initialMobile?.length > 0 ? initialMobile : (hasHydrated ? (homeData.mobilePhonesOnSale || []) : []);
-  const laptopsProducts = initialLaptops?.length > 0 ? initialLaptops : (hasHydrated ? (homeData.laptopsProducts || []) : []);
-  const speakersProducts = initialSpeakers?.length > 0 ? initialSpeakers : (hasHydrated ? (homeData.speakersProducts || []) : []);
-  const televisionsProducts = initialTelevisions?.length > 0 ? initialTelevisions : (hasHydrated ? (homeData.televisionsProducts || []) : []);
-  const promoProduct = initialPromo || (hasHydrated ? homeData.promoProduct : null);
-  useEffect(() => {
-    if (initialTopRated?.length > 0) {
-      setHomeData({
-        topRatedProducts: initialTopRated,
-        bestSellingProducts: initialBestSelling,
-        airConditionerProducts: initialAir,
-        mobilePhonesOnSale: initialMobile,
-        laptopsProducts: initialLaptops,
-        speakersProducts: initialSpeakers,
-        televisionsProducts: initialTelevisions,
-        promoProduct: initialPromo
-      });
+  return res;
+}
+```
+
+## File: src/pages/product-category/[slug].tsx
+```typescript
+import React, { useEffect, useState } from 'react';
+import { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
+import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
+import client from '@/utils/apollo/ApolloClient';
+import { GET_CATEGORY_NODE_BY_SLUG, GET_CATEGORY_PRODUCTS_BY_ID, GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE } from '@/utils/gql/GQL_QUERIES';
+import { useLazyQuery } from '@apollo/client';
+import { Product } from '@/types/product';
+export const runtime = 'experimental-edge';
+// ----- TypeScript Types -----
+interface CategoryNode {
+    databaseId: number;
+    name: string;
+    description?: string;
+    count: number;
+}
+interface PageInfo {
+    hasNextPage: boolean;
+    endCursor: string | null;
+}
+interface CategoryPageProps {
+    category: CategoryNode | null;
+    products: Product[];
+    pageInfo: PageInfo;
+    slug: string;
+    attr?: string;
+    term?: string;
+    categoryId?: number;
+    isError?: boolean;
+}
+// ----- Component -----
+const CategoryPage = ({ category: initialCategory, products: initialProducts, pageInfo: initialPageInfo, slug, attr, term, categoryId: initialCategoryId, isError }: CategoryPageProps) => {
+    const [category, setCategory] = useState<CategoryNode | null>(initialCategory);
+    const [products, setProducts] = useState<Product[]>(initialProducts);
+    const [pageInfo, setPageInfo] = useState<PageInfo>(initialPageInfo);
+    const [categoryId, setCategoryId] = useState<number | undefined>(initialCategoryId);
+    const [loading, setLoading] = useState(!!isError);
+    const router = useRouter();
+    // Handle navigation loading state
+    useEffect(() => {
+        const handleStart = (url: string) => {
+            if (url !== router.asPath) {
+                setLoading(true);
+            }
+        };
+        const handleComplete = () => setLoading(false);
+        router.events.on('routeChangeStart', handleStart);
+        router.events.on('routeChangeComplete', handleComplete);
+        router.events.on('routeChangeError', handleComplete);
+        return () => {
+            router.events.off('routeChangeStart', handleStart);
+            router.events.off('routeChangeComplete', handleComplete);
+            router.events.off('routeChangeError', handleComplete);
+        };
+    }, [router]);
+    // Sync state with props when navigating between categories
+    useEffect(() => {
+        setCategory(initialCategory);
+        setProducts(initialProducts);
+        setPageInfo(initialPageInfo);
+        setCategoryId(initialCategoryId);
+        setLoading(!!isError);
+    }, [initialCategory, initialProducts, initialPageInfo, initialCategoryId, isError]);
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
+    const hasAttrFilter = Boolean(attrTax && term);
+    const [getCategory] = useLazyQuery(GET_CATEGORY_NODE_BY_SLUG, { fetchPolicy: 'network-only' });
+    const [getProducts] = useLazyQuery(hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID, { fetchPolicy: 'network-only' });
+    useEffect(() => {
+        if (isError && slug) {
+            const fetchData = async () => {
+                try {
+                    setLoading(true);
+                    console.log('CSR Fallback: Fetching category...');
+                    const { data: catData } = await getCategory();
+                    const allCategories = catData?.productCategories?.nodes || [];
+                    const normalizedSlug = slug.toLowerCase();
+                    const catNode = allCategories.find((node: any) => node.slug?.toLowerCase() === normalizedSlug)
+                        || allCategories.find((node: any) => node.name?.toLowerCase() === normalizedSlug.replace(/-/g, ' '));
+                    if (catNode) {
+                        setCategory(catNode);
+                        setCategoryId(catNode.databaseId);
+                        console.log('CSR Fallback: Fetching products...');
+                        const variables = hasAttrFilter
+                            ? { categoryId: catNode.databaseId, attrTax, attrTerm: [term], first: 24 }
+                            : { categoryId: catNode.databaseId, first: 24 };
+                        const { data: prodData } = await getProducts({ variables });
+                        setProducts(prodData?.products?.nodes || []);
+                        setPageInfo(prodData?.products?.pageInfo || { hasNextPage: false, endCursor: null });
+                    }
+                } catch (err) {
+                    console.error('CSR Fallback Error:', err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchData();
+        }
+    }, [isError, slug, attrTax, term, hasAttrFilter, getCategory, getProducts]);
+    const totalCount = category?.count || products.length;
+    if (loading && products.length === 0) {
+        return (
+            <TaxonomyListingPage
+                title={'Loading...'}
+                products={[]}
+                pageInfo={{ hasNextPage: false, endCursor: null }}
+                slug={slug}
+                query={hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID}
+                queryVariables={{}}
+                emptyMessage="Loading category data..."
+                totalCount={0}
+                loading={true}
+            />
+        );
     }
-  }, [initialTopRated, initialBestSelling, initialAir, initialMobile, initialLaptops, initialSpeakers, initialTelevisions, initialPromo, setHomeData]);
-  return (
-    <Layout title="Shop Online In Ghana | Shopwice" fullWidth={true}>
-      <div className="bg-[#F8F8F8]">
-        <Hero />
-        <FeaturedCategories />
-        <TopRatedProducts products={topRatedProducts} />
-        <AirConditionerProducts products={airConditionerProducts} />
-        <MobilePhonesOnSale products={mobilePhonesOnSale} />
-        <LaptopsProducts products={laptopsProducts} />
-        <SpeakersProducts products={speakersProducts} />
-        <TelevisionsProducts products={televisionsProducts} />
-        <WhyChooseUs />
-        <PromoBoxes promoProduct={promoProduct} />
-        <BestSellingSlider products={bestSellingProducts} />
-        <div className="container mx-auto px-4 mb-8">
-          <RecentRefurbishedReviews />
-        </div>
-        <InfoBanner />
-        <SEOContent />
-        <Newsletter />
-      </div>
-    </Layout>
-  );
+    return (
+        <TaxonomyListingPage
+            title={category?.name || 'Category'}
+            description={category?.description}
+            products={products}
+            pageInfo={pageInfo}
+            slug={slug}
+            query={hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID}
+            queryVariables={hasAttrFilter
+                ? { categoryId, attrTax, attrTerm: [term], first: 24 }
+                : { categoryId, first: 24 }}
+            emptyMessage="No products found in this category"
+            totalCount={totalCount}
+            fetchAllForSort={true}
+            loading={loading}
+        />
+    );
 };
-export default Index;
+export default CategoryPage;
+// ----- getServerSideProps -----
+export const getServerSideProps: GetServerSideProps = async ({ params, res, query }) => {
+    const slug = params?.slug as string;
+    const attr = (query?.attr as string | undefined) || '';
+    const term = (query?.term as string | undefined) || '';
+    const attrTaxonomyMap: Record<string, string> = {
+        pa_condition: 'PA_CONDITION',
+    };
+    const attrTax = attrTaxonomyMap[attr.toLowerCase()];
+    const hasAttrFilter = Boolean(attrTax && term);
+    if (!slug) return { notFound: true };
+    try {
+        // Cache control: 1 minute, background refresh
+        res.setHeader(
+            'Cache-Control',
+            'public, s-maxage=60, stale-while-revalidate=59'
+        );
+        const { data: categoryData } = await client.query({
+            query: GET_CATEGORY_NODE_BY_SLUG,
+            fetchPolicy: 'network-only',
+        });
+        const allCategories = categoryData?.productCategories?.nodes || [];
+        const normalizedSlug = slug.toLowerCase();
+        let categoryNode = allCategories.find((node: any) => node.slug?.toLowerCase() === normalizedSlug)
+            || allCategories.find((node: any) => node.name?.toLowerCase() === normalizedSlug.replace(/-/g, ' '));
+        if (!categoryNode) {
+            return {
+                props: {
+                    category: {
+                        databaseId: 0,
+                        name: slug.replace(/-/g, ' '),
+                        description: null,
+                        count: 0,
+                    },
+                    products: [],
+                    pageInfo: { hasNextPage: false, endCursor: null },
+                    slug,
+                    attr,
+                    term,
+                },
+            };
+        }
+        const categoryId = categoryNode.databaseId;
+        const { data: productsData } = await client.query({
+            query: hasAttrFilter ? GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE : GET_CATEGORY_PRODUCTS_BY_ID,
+            variables: hasAttrFilter
+                ? { categoryId, attrTax, attrTerm: [term], first: 24 }
+                : { categoryId, first: 24 },
+            fetchPolicy: 'network-only',
+        });
+        const products = productsData?.products?.nodes || [];
+        const pageInfo = productsData?.products?.pageInfo || { hasNextPage: false, endCursor: null };
+        return {
+            props: {
+                category: {
+                    databaseId: categoryNode.databaseId,
+                    name: categoryNode.name,
+                    description: categoryNode.description || null,
+                    count: categoryNode.count || 0,
+                },
+                products,
+                pageInfo,
+                slug,
+                attr,
+                term,
+                categoryId,
+            },
+        };
+    } catch (error) {
+        console.error('Error fetching category SSR:', error);
+        // Fallback to CSR
+        return {
+            props: {
+                category: null,
+                products: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+                slug,
+                attr,
+                term,
+                isError: true,
+            },
+        };
+    }
+};
+```
+
+## File: src/pages/categories.tsx
+```typescript
+import { NextPage, InferGetStaticPropsType, GetStaticProps } from 'next';
+import Categories from '@/components/Category/Categories.component';
+import Layout from '@/components/Layout/Layout.component';
+import client from '@/utils/apollo/ApolloClient';
+import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
+export const runtime = 'experimental-edge';
+/**
+ * Category page displays all of the categories
+ */
+const categories: NextPage = ({
+  categories,
+}: InferGetStaticPropsType<typeof getStaticProps>) => (
+  <Layout title="categories">
+    {categories && <Categories categories={categories} />}
+  </Layout>
+);
+export default categories;
 export const getStaticProps: GetStaticProps = async () => {
   try {
-    const { data } = await client.query({
-      query: FETCH_HOME_PAGE_SSG,
-      variables: { promoProductSlug: "microsoft-xbox-x-wireless-controller" }
+    const result = await client.query({
+      query: FETCH_ALL_CATEGORIES_QUERY,
     });
+    const nodes = result.data?.productCategories?.nodes || [];
+    const rootCategories = nodes.filter((node: any) => !node.parent || Number(node.parent) === 0);
     return {
       props: {
-        topRatedProducts: data?.topRatedProducts?.nodes || [],
-        bestSellingProducts: [],
-        airConditionerProducts: [],
-        mobilePhonesOnSale: [],
-        laptopsProducts: [],
-        speakersProducts: [],
-        televisionsProducts: [],
-        promoProduct: data?.promoProduct || null,
+        categories: rootCategories,
       },
       revalidate: 60,
     };
   } catch (error) {
-    console.error('Error in getStaticProps:', error);
+    console.error('Error fetching categories:', error);
     return {
       props: {
-        topRatedProducts: [],
-        bestSellingProducts: [],
-        airConditionerProducts: [],
-        mobilePhonesOnSale: [],
-        laptopsProducts: [],
-        speakersProducts: [],
-        televisionsProducts: [],
-        promoProduct: null,
+        categories: [],
       },
       revalidate: 10,
     };
   }
 };
+```
+
+## File: src/pages/products.tsx
+```typescript
+import Head from 'next/head';
+import Layout from '@/components/Layout/Layout.component';
+import ProductList from '@/components/Product/ProductList.component';
+import client from '@/utils/apollo/ApolloClient';
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
+import { FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
+import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
+export const runtime = 'experimental-edge';
+const Products: NextPage = ({
+  products,
+  pageInfo,
+  loading,
+}: InferGetStaticPropsType<typeof getStaticProps>) => {
+  if (loading)
+    return (
+      <Layout title="Products">
+        <div className="flex justify-center items-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+      </Layout>
+    );
+  if (!products)
+    return (
+      <Layout title="Products">
+        <div className="flex justify-center items-center min-h-screen">
+          <p className="text-red-500">No products found</p>
+        </div>
+      </Layout>
+    );
+  return (
+    <Layout title="Products" fullWidth={true}>
+      <Head>
+        <title>Products | WooCommerce Next.js</title>
+      </Head>
+      <div className="pt-1 pb-1">
+        <ProductList
+          products={products}
+          pageInfo={pageInfo}
+          query={FETCH_ALL_PRODUCTS_QUERY}
+        />
+      </div>
+    </Layout>
+  );
+};
+export default Products;
+export const getStaticProps: GetStaticProps = async () => {
+  try {
+    const { data, loading, networkStatus } = await client.query({
+      query: FETCH_ALL_PRODUCTS_QUERY,
+    });
+    return {
+      props: {
+        products: data?.products?.nodes || [],
+        pageInfo: data?.products?.pageInfo || {},
+        loading,
+        networkStatus,
+      },
+      revalidate: 60,
+    };
+  } catch (error) {
+    console.warn('Failed to fetch products during build:', error);
+    return {
+      props: {
+        products: [],
+        pageInfo: {},
+        loading: false,
+        networkStatus: 8, // Error status
+      },
+      revalidate: 60,
+    };
+  }
+};
+```
+
+## File: src/utils/apollo/ApolloClient.js
+```javascript
+/*eslint complexity: ["error", 8]*/
+import {
+  ApolloClient,
+  InMemoryCache,
+  createHttpLink,
+  ApolloLink,
+} from '@apollo/client';
+const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+const getLocalStorageJson = (key) => {
+  if (typeof window === 'undefined') return null;
+  return JSON.parse(localStorage.getItem(key));
+};
+const shouldLogSession = (operationName) =>
+  operationName === 'addToCart' || operationName === 'GET_CART';
+const getSessionHeader = (sessionData, operationName) => {
+  if (!sessionData?.token || !sessionData?.createdTime || operationName === 'CreateUser') {
+    return null;
+  }
+  const { token, createdTime } = sessionData;
+  if (Date.now() - createdTime > SEVEN_DAYS) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('woo-session');
+    }
+    return null;
+  }
+  const cleanToken = token.replace(/^Session\s+/i, '');
+  return `Session ${cleanToken}`;
+};
+const getAuthHeader = (authData, operationName) => {
+  if (!authData?.authToken || operationName === 'CreateUser') return null;
+  return `Bearer ${authData.authToken}`;
+};
+const getSessionFromHeaders = (headers) => {
+  if (!headers) return null;
+  return headers.get('woocommerce-session') || headers.get('x-woocommerce-session') || null;
+};
+const persistSession = (session) => {
+  if (!session || typeof window === 'undefined') return;
+  if (session === 'false') {
+    localStorage.removeItem('woo-session');
+    return;
+  }
+  localStorage.setItem(
+    'woo-session',
+    JSON.stringify({ token: session, createdTime: Date.now() }),
+  );
+};
+const handleInvalidSession = (errors) => {
+  if (!errors || typeof window === 'undefined') return;
+  const invalid = errors.some((err) => err.message === "The 'woocommerce-session' header is invalid");
+  if (invalid) {
+    localStorage.removeItem('woo-session');
+    window.location.reload();
+  }
+};
+/**
+ * Middleware operation
+ * If we have a session token in localStorage, add it to the GraphQL request as a Session header.
+ */
+export const middleware = new ApolloLink((operation, forward) => {
+  /**
+   * If session data exist in local storage, set value as session header.
+   */
+  const sessionData = getLocalStorageJson('woo-session');
+  const authData = getLocalStorageJson('auth-data');
+  const headers = {};
+  // Middleware Log
+  if (shouldLogSession(operation.operationName)) {
+    console.log(`[Apollo Middleware] Op: ${operation.operationName}, Session in Storage:`, sessionData);
+  }
+  const sessionHeader = getSessionHeader(sessionData, operation.operationName);
+  if (sessionHeader) {
+    headers['woocommerce-session'] = sessionHeader;
+  }
+  const authHeader = getAuthHeader(authData, operation.operationName);
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
+  }
+  operation.setContext({
+    headers,
+  });
+  return forward(operation);
+});
+/**
+ * Afterware operation.
+ *
+ * This catches the incoming session token and stores it in localStorage, for future GraphQL requests.
+ */
+export const afterware = new ApolloLink((operation, forward) =>
+  forward(operation).map((response) => {
+    /**
+   * Check for session header and update session in local storage accordingly.
+   */
+  const context = operation.getContext();
+  const responseHeaders = context?.response?.headers;
+  const session = getSessionFromHeaders(responseHeaders);
+  if (operation.operationName === 'AddToCart' || operation.operationName === 'GET_CART') {
+    console.log(`[Apollo Afterware] Op: ${operation.operationName}, Session: ${session}`);
+  }
+  persistSession(session);
+  handleInvalidSession(response.errors);
+    return response;
+  }),
+);
+const clientSide = typeof window === 'undefined';
+// Apollo GraphQL client.
+const linkUri = process.env.NEXT_PUBLIC_GRAPHQL_URL || 'https://api.shopwice.com/graphql';
+const linkCredentials = 'omit';
+/**
+ * Custom fetch wrapper to capture session headers directly from the response.
+ * This ensures session tokens are saved even if Apollo Link context doesn't propagate headers.
+ */
+const customFetch = async (uri, options) => {
+  const response = await fetch(uri, options);
+  if (typeof window !== 'undefined') {
+    const sessionHeader = response.headers.get('woocommerce-session') || 
+                          response.headers.get('x-woocommerce-session');
+    if (sessionHeader) {
+      console.log('[Apollo customFetch] Captured Session Header:', sessionHeader);
+      localStorage.setItem(
+        'woo-session',
+        JSON.stringify({ token: sessionHeader, createdTime: Date.now() }),
+      );
+    }
+  }
+  return response;
+};
+const client = new ApolloClient({
+  ssrMode: clientSide,
+  link: middleware.concat(
+    afterware.concat(
+      createHttpLink({
+        uri: linkUri,
+        fetch: customFetch,
+        credentials: linkCredentials, // Include credentials for OUR domain only
+      }),
+    ),
+  ),
+  cache: new InMemoryCache({
+    possibleTypes: {
+      Product: ['SimpleProduct', 'VariableProduct', 'ExternalProduct', 'GroupProduct'],
+    },
+    typePolicies: {
+      Query: {
+        fields: {
+          products: {
+            keyArgs: ['where'],
+            merge(existing, incoming, { args }) {
+              if (!existing) return incoming;
+              const { after } = args || {};
+              if (after) {
+                return {
+                  ...incoming,
+                  nodes: [...(existing.nodes || []), ...(incoming.nodes || [])],
+                };
+              }
+              return incoming;
+            },
+          },
+        },
+      },
+      // Disable automatic normalization for Product types to avoid missing field errors
+      // Products will be cached by query instead of by ID
+      Product: {
+        keyFields: false,
+        fields: {
+          // Handle nullable fields gracefully
+          databaseId: { read(existing) { return existing || null; } },
+          date: { read(existing) { return existing || null; } },
+          averageRating: { read(existing) { return existing || null; } },
+          reviewCount: { read(existing) { return existing || null; } },
+          stockQuantity: { read(existing) { return existing || null; } },
+          image: { read(existing) { return existing || null; } },
+          productCategories: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          productBrand: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          productLocation: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+          attributes: {
+            read(existing) { return existing || { nodes: [] }; },
+            merge(existing, incoming) { return incoming || { nodes: [] }; },
+          },
+        },
+      },
+      ProductCategory: { keyFields: ['slug'] },
+      Cart: {
+        fields: {
+          contents: { merge(existing, incoming) { return incoming; } },
+          total: { merge(existing, incoming) { return incoming; } },
+          items: { merge(existing, incoming) { return incoming; } },
+          itemCount: { merge(existing, incoming) { return incoming; } },
+          totals: { merge(existing, incoming) { return incoming; } },
+        },
+      },
+      CartItem: {
+        keyFields: ['key'],
+        fields: {
+          quantity: { merge(existing, incoming) { return incoming; } },
+          total: { merge(existing, incoming) { return incoming; } },
+        },
+      },
+      VariableProduct: {
+        keyFields: false,
+        fields: {
+          variations: {
+            merge(existing, incoming) { return incoming; },
+          },
+        },
+      },
+      ProductVariation: { keyFields: false },
+      SimpleProduct: { keyFields: false },
+      ExternalProduct: { keyFields: false },
+      GroupProduct: { keyFields: false },
+      MediaItem: { keyFields: ['id'] },
+      TermNode: { keyFields: false },
+      Attribute: {
+        keyFields: false,
+        fields: {
+          nodes: {
+            read(existing) { return existing || []; },
+            merge(existing, incoming) { return incoming || []; },
+          },
+        },
+      },
+    },
+  }),
+});
+export default client;
 ```
 
 ## File: src/utils/gql/GQL_QUERIES.ts
@@ -24156,4 +23786,370 @@ export const GET_RECENT_REVIEWS_QUERY = gql`
 }
   ${PRODUCT_CARD_FIELDS_FRAGMENT}
 `;
+```
+
+## File: src/pages/product/[slug].tsx
+```typescript
+// Imports - Updated Layout
+// Components
+import SingleProduct from '@/components/Product/SingleProductFinal.component';
+import Layout from '@/components/Layout/Layout.component';
+// Utilities
+import client from '@/utils/apollo/ApolloClient';
+// Types
+import type {
+  NextPage,
+  GetServerSideProps,
+  InferGetServerSidePropsType,
+} from 'next';
+// GraphQL
+import { GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
+import { NextSeo, ProductJsonLd } from 'next-seo';
+export const runtime = 'experimental-edge';
+/**
+ * Display a single product with dynamic pretty urls
+ * @function product
+ * @param {InferGetServerSidePropsType<typeof getServerSideProps>} products
+ * @returns {JSX.Element} - Rendered component
+ */
+const ProductPage: NextPage = ({
+  product,
+  loading,
+  networkStatus,
+  isRefurbished
+}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
+  const hasError = networkStatus === 8;
+  // --- SEO Preparation ---
+  // Safely extract data
+  const name = product?.name || 'Product';
+  const slug = product?.slug || '';
+  const description = product?.shortDescription?.replace(/<[^>]+>/g, '') || product?.description?.replace(/<[^>]+>/g, '').substring(0, 160) || '';
+  const mainImage = product?.image?.sourceUrl || '';
+  const gallery = product?.galleryImages?.nodes?.map((img: { sourceUrl: string }) => img.sourceUrl) || [];
+  const images = [mainImage, ...gallery].filter(Boolean).map(url => ({ url }));
+  // RankMath SEO Data (Fallback to Product Data)
+  const seo = product?.seo;
+  const seoTitle = seo?.title || name;
+  const seoDescription = seo?.description || description;
+  // Price & Currency (Assuming simple product for base price, or low price for variable)
+  // Converting 'GH₵100' -> 100
+  const priceStr = String(product?.price || product?.salePrice || product?.regularPrice || '0');
+  const priceAmount = parseFloat(priceStr.replace(/[^0-9.]/g, '')) || 0;
+  const currency = 'GHS'; // Ghana Cedis
+  // Stock
+  const isInstock = product?.stockStatus !== 'OUT_OF_STOCK';
+  const availability = isInstock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+  // Ratings
+  const ratingValue = product?.averageRating || 0;
+  const reviewCount = product?.reviewCount || 0;
+  return (
+    <>
+      {product && (
+        <>
+          <NextSeo
+            title={seoTitle}
+            description={seoDescription}
+            canonical={`https://shopwice.com/product/${slug}`}
+            openGraph={{
+              type: 'product',
+              url: `https://shopwice.com/product/${slug}`,
+              title: seoTitle,
+              description: seoDescription,
+              images: images,
+            }}
+          />
+          <ProductJsonLd
+            productName={name}
+            images={images.map(i => i.url)}
+            description={description}
+            brand="Shopwice" // Or product.productBrand if available
+            // sku={product.sku} // Add to query if not present
+            offers={[
+              {
+                price: priceAmount.toString(),
+                priceCurrency: currency,
+                itemCondition: 'https://schema.org/NewCondition', // Assuming new
+                availability: availability,
+                url: `https://shopwice.com/product/${slug}`,
+                seller: {
+                  name: 'Shopwice',
+                },
+              },
+            ]}
+            aggregateRating={
+              reviewCount > 0
+                ? {
+                  ratingValue: ratingValue.toString(),
+                  reviewCount: reviewCount.toString(),
+                }
+                : undefined
+            }
+          />
+        </>
+      )}
+      <Layout title={`${product?.name ? product.name : ''}`} fullWidth>
+        {product ? (
+          <SingleProduct
+            product={product}
+            loading={loading}
+            isRefurbished={isRefurbished}
+          />
+        ) : (
+          <div className="mt-8 text-2xl text-center">Loading product...</div>
+        )}
+        {hasError && (
+          <div className="mt-8 text-2xl text-center">
+            Error loading product...
+          </div>
+        )}
+      </Layout>
+    </>
+  );
+};
+export default ProductPage;
+export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
+  try {
+    // Cache control for Server Side Rendering (s-maxage=60, stale-while-revalidate=59)
+    res.setHeader(
+      'Cache-Control',
+      'public, s-maxage=60, stale-while-revalidate=59'
+    );
+    const slug = params?.slug as string;
+    console.log('Fetching product for slug:', slug);
+    let product = null;
+    let loading = true;
+    let networkStatus;
+    // Search for product and filter by exact slug match
+    try {
+      const result = await client.query({
+        query: GET_SINGLE_PRODUCT,
+        variables: { slug },
+        fetchPolicy: 'no-cache'
+      });
+      // Get nodes from search results
+      const nodes = result.data?.products?.nodes || [];
+      // Find exact slug match (case-insensitive for better compatibility)
+      product = nodes.find((node: any) =>
+        node?.slug?.toLowerCase() === slug.toLowerCase()
+      ) || null;
+      // If no exact match but we have results, log for debugging
+      if (!product && nodes.length > 0) {
+        console.log(`[SSR] Search returned ${nodes.length} products but none matched slug exactly`);
+        console.log(`[SSR] Looking for: "${slug}", found: ${nodes.map((n: any) => n.slug).join(', ')}`);
+      }
+      loading = result.loading;
+      networkStatus = result.networkStatus;
+      console.log(`[SSR] Search result for ${slug}:`, product ? 'Found' : 'Not Found');
+    } catch (e) {
+      console.error(`[SSR] Product lookup failed for ${slug}`, e);
+    }
+    console.log(`[SSR] Final product result for ${slug}:`, product ? 'Found' : 'Not Found');
+    if (!product) {
+      console.log(`[SSR] 404 Triggered for product: ${params?.slug}. Product is null.`);
+      return { notFound: true };
+    }
+    // Server-side calculation for stability
+    // Enhanced Refurbished Check: Attributes OR Category
+    const isRefurbished =
+      product.attributes?.nodes?.some((attr: any) =>
+        attr.options?.some((opt: any) =>
+          String(opt).toLowerCase().includes('refurbish')
+        )
+      ) ||
+      product.productCategories?.nodes?.some((cat: any) =>
+        (cat.name && cat.name.toLowerCase().includes('refurbish')) ||
+        (cat.slug && cat.slug.toLowerCase().includes('refurbish'))
+      ) ||
+      false;
+    console.log(`[SSR] Product: ${product.name}`);
+    console.log(`[SSR] Type: ${product.__typename}`);
+    if (product.variations) {
+      console.log(`[SSR] Variations found: ${product.variations.nodes?.length || 0}`);
+    } else {
+      console.log(`[SSR] No variations field on product object`);
+    }
+    console.log(`[SSR] isRefurbished: ${isRefurbished}`);
+    return {
+      props: {
+        product,
+        loading,
+        networkStatus,
+        isRefurbished
+      },
+    };
+  } catch (error) {
+    console.error(error);
+    return { notFound: true };
+  }
+};
+```
+
+## File: src/pages/index.tsx
+```typescript
+import dynamic from 'next/dynamic';
+import Hero from '@/components/Index/Hero.component';
+import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
+import SEOContent from '@/components/Index/SEOContent.component';
+import Layout from '@/components/Layout/Layout.component';
+// Utilities
+import client from '@/utils/apollo/ApolloClient';
+// Types
+import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
+// GraphQL
+import { FETCH_HOME_PAGE_SSG } from '@/utils/gql/GQL_QUERIES';
+import { useGlobalStore } from '@/stores/globalStore';
+import { useEffect } from 'react';
+export const runtime = 'experimental-edge';
+const SectionSkeleton = () => (
+  <div className="px-4 md:px-6 py-6">
+    <div className="h-5 w-48 bg-gray-200 rounded animate-pulse mb-4" aria-hidden="true" />
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="h-40 bg-gray-100 rounded animate-pulse" aria-hidden="true" />
+      ))}
+    </div>
+  </div>
+);
+const TopRatedProducts = dynamic(() => import('@/components/Index/TopRatedProducts.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const AirConditionerProducts = dynamic(() => import('@/components/Index/AirConditionerProducts.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const MobilePhonesOnSale = dynamic(() => import('@/components/Index/MobilePhonesOnSale.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const LaptopsProducts = dynamic(() => import('@/components/Index/LaptopsProducts.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const SpeakersProducts = dynamic(() => import('@/components/Index/SpeakersProducts.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const TelevisionsProducts = dynamic(() => import('@/components/Index/TelevisionsProducts.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const BestSellingSlider = dynamic(() => import('@/components/Index/BestSellingSlider.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const WhyChooseUs = dynamic(() => import('@/components/Index/WhyChooseUs.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const PromoBoxes = dynamic(() => import('@/components/Index/PromoBoxes.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const InfoBanner = dynamic(() => import('@/components/Index/InfoBanner.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const Newsletter = dynamic(() => import('@/components/Index/Newsletter.component'), {
+  loading: () => <SectionSkeleton />,
+});
+const RecentRefurbishedReviews = dynamic(
+  () => import('@/components/Product/RecentRefurbishedReviews.component'),
+  {
+    loading: () => <SectionSkeleton />,
+  }
+);
+/**
+ * Main index page
+ * @function Index
+ * @param {InferGetStaticPropsType<typeof getStaticProps>} products
+ * @returns {JSX.Element} - Rendered component
+ */
+const Index: NextPage = ({
+  topRatedProducts: initialTopRated,
+  bestSellingProducts: initialBestSelling,
+  airConditionerProducts: initialAir,
+  mobilePhonesOnSale: initialMobile,
+  laptopsProducts: initialLaptops,
+  speakersProducts: initialSpeakers,
+  televisionsProducts: initialTelevisions,
+  promoProduct: initialPromo,
+}: InferGetStaticPropsType<typeof getStaticProps>) => {
+  const setHomeData = useGlobalStore((state) => state.setHomeData);
+  const homeData = useGlobalStore((state) => state.homeData);
+  const hasHydrated = useGlobalStore((state) => state.hasHydrated);
+  // If props are empty (build error), fallback to cached data from store
+  const topRatedProducts = initialTopRated?.length > 0 ? initialTopRated : (hasHydrated ? (homeData.topRatedProducts || []) : []);
+  const bestSellingProducts = initialBestSelling?.length > 0 ? initialBestSelling : (hasHydrated ? (homeData.bestSellingProducts || []) : []);
+  const airConditionerProducts = initialAir?.length > 0 ? initialAir : (hasHydrated ? (homeData.airConditionerProducts || []) : []);
+  const mobilePhonesOnSale = initialMobile?.length > 0 ? initialMobile : (hasHydrated ? (homeData.mobilePhonesOnSale || []) : []);
+  const laptopsProducts = initialLaptops?.length > 0 ? initialLaptops : (hasHydrated ? (homeData.laptopsProducts || []) : []);
+  const speakersProducts = initialSpeakers?.length > 0 ? initialSpeakers : (hasHydrated ? (homeData.speakersProducts || []) : []);
+  const televisionsProducts = initialTelevisions?.length > 0 ? initialTelevisions : (hasHydrated ? (homeData.televisionsProducts || []) : []);
+  const promoProduct = initialPromo || (hasHydrated ? homeData.promoProduct : null);
+  useEffect(() => {
+    if (initialTopRated?.length > 0) {
+      setHomeData({
+        topRatedProducts: initialTopRated,
+        bestSellingProducts: initialBestSelling,
+        airConditionerProducts: initialAir,
+        mobilePhonesOnSale: initialMobile,
+        laptopsProducts: initialLaptops,
+        speakersProducts: initialSpeakers,
+        televisionsProducts: initialTelevisions,
+        promoProduct: initialPromo
+      });
+    }
+  }, [initialTopRated, initialBestSelling, initialAir, initialMobile, initialLaptops, initialSpeakers, initialTelevisions, initialPromo, setHomeData]);
+  return (
+    <Layout title="Shop Online In Ghana | Shopwice" fullWidth={true}>
+      <div className="bg-[#F8F8F8]">
+        <Hero />
+        <FeaturedCategories />
+        <TopRatedProducts products={topRatedProducts} />
+        <AirConditionerProducts products={airConditionerProducts} />
+        <MobilePhonesOnSale products={mobilePhonesOnSale} />
+        <LaptopsProducts products={laptopsProducts} />
+        <SpeakersProducts products={speakersProducts} />
+        <TelevisionsProducts products={televisionsProducts} />
+        <WhyChooseUs />
+        <PromoBoxes promoProduct={promoProduct} />
+        <BestSellingSlider products={bestSellingProducts} />
+        <div className="container mx-auto px-4 mb-8">
+          <RecentRefurbishedReviews />
+        </div>
+        <InfoBanner />
+        <SEOContent />
+        <Newsletter />
+      </div>
+    </Layout>
+  );
+};
+export default Index;
+export const getStaticProps: GetStaticProps = async () => {
+  try {
+    const { data } = await client.query({
+      query: FETCH_HOME_PAGE_SSG,
+      variables: { promoProductSlug: "microsoft-xbox-x-wireless-controller" }
+    });
+    return {
+      props: {
+        topRatedProducts: data?.topRatedProducts?.nodes || [],
+        bestSellingProducts: [],
+        airConditionerProducts: [],
+        mobilePhonesOnSale: [],
+        laptopsProducts: [],
+        speakersProducts: [],
+        televisionsProducts: [],
+        promoProduct: data?.promoProduct || null,
+      },
+      revalidate: 60,
+    };
+  } catch (error) {
+    console.error('Error in getStaticProps:', error);
+    return {
+      props: {
+        topRatedProducts: [],
+        bestSellingProducts: [],
+        airConditionerProducts: [],
+        mobilePhonesOnSale: [],
+        laptopsProducts: [],
+        speakersProducts: [],
+        televisionsProducts: [],
+        promoProduct: null,
+      },
+      revalidate: 10,
+    };
+  }
+};
 ```
