@@ -7,7 +7,9 @@ import { GET_CATEGORY_NODE_BY_SLUG, GET_CATEGORY_PRODUCTS_BY_ID, GET_CATEGORY_PR
 import { useLazyQuery } from '@apollo/client';
 import { Product } from '@/types/product';
 
-export const runtime = 'experimental-edge';
+export const config = {
+  runtime: 'experimental-edge',
+};
 
 // ----- TypeScript Types -----
 interface CategoryNode {

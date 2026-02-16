@@ -6,7 +6,9 @@ import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component
 import { FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
 import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
 
-export const runtime = 'experimental-edge';
+export const config = {
+  runtime: 'experimental-edge',
+};
 
 const Products: NextPage = ({
   products,
