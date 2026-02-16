@@ -7,9 +7,7 @@ import client from '@/utils/apollo/ApolloClient';
 import { GET_LOCATION_DATA_BY_SLUG, GET_LOCATION_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/LOCATION_QUERIES';
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
 
-export const config = {
-  runtime: 'experimental-edge',
-};
+
 
 /**
  * Display location page with filtering, sorting, and infinite scroll

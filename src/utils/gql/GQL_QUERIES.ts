@@ -286,7 +286,7 @@ export const GET_CATEGORY_NODE_BY_SLUG = gql`
 `;
 
 export const GET_CATEGORY_PRODUCTS_BY_ID = gql`
-  query CategoryProductsById($categoryId: Int!, $first: Int = 24, $after: String) {
+  query CategoryProductsById($categoryId: ID!, $first: Int = 24, $after: String) {
     products(
       first: $first
       after: $after
@@ -308,7 +308,7 @@ export const GET_CATEGORY_PRODUCTS_BY_ID = gql`
 
 export const GET_CATEGORY_PRODUCTS_BY_ID_WITH_ATTRIBUTE = gql`
   query CategoryProductsByIdWithAttribute(
-    $categoryId: Int!
+    $categoryId: ID!
     $attrTax: TaxonomyEnum!
     $attrTerm: [String]!
     $first: Int = 24

@@ -7,7 +7,7 @@
     "lhci:perf": "lhci autorun --collect.settings.preset=perf",
     "lhci:desktop": "lhci autorun --collect.settings.preset=desktop",
     "dev": "next dev --turbopack",
-    "pages:build": "npx @cloudflare/next-on-pages",
+    "pages:build": "npx @opennextjs/cloudflare",
     "build": "next build",
     "start": "next start",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
@@ -54,7 +54,6 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.13.16",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.19",

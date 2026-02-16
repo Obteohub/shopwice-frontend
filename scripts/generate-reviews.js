@@ -57,7 +57,7 @@ async function generateReviews() {
 
         console.log('Fetching product details via GraphQL...');
 
-        const gqlResponse = await fetch('https://shopwice.com/graphql', {
+        const gqlResponse = await fetch('https://api.shopwice.com/graphql', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

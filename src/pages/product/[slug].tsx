@@ -1,4 +1,5 @@
-// Imports - Updated Layout
+// pages/product/[slug].tsx
+
 // Components
 import SingleProduct from '@/components/Product/SingleProductFinal.component';
 import Layout from '@/components/Layout/Layout.component';
@@ -7,56 +8,62 @@ import Layout from '@/components/Layout/Layout.component';
 import client from '@/utils/apollo/ApolloClient';
 
 // Types
-import type {
-  NextPage,
-  GetServerSideProps,
-  InferGetServerSidePropsType,
-} from 'next';
+import type { NextPage, GetServerSideProps, InferGetServerSidePropsType } from 'next';
 
 // GraphQL
 import { GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
 import { NextSeo, ProductJsonLd } from 'next-seo';
 
-export const config = {
-  runtime: 'experimental-edge',
-};
-
 /**
- * Display a single product with dynamic pretty urls
- * @function product
- * @param {InferGetServerSidePropsType<typeof getServerSideProps>} products
- * @returns {JSX.Element} - Rendered component
+ * Display a single product with dynamic pretty urls (Pages Router + SSR)
  */
-const ProductPage: NextPage = ({
+
+type PageProps = InferGetServerSidePropsType<typeof getServerSideProps>;
+
+const ProductPage: NextPage<PageProps> = ({
   product,
   loading,
   networkStatus,
-  isRefurbished
-}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
+  isRefurbished,
+}) => {
   const hasError = networkStatus === 8;
+
   // --- SEO Preparation ---
-  // Safely extract data
   const name = product?.name || 'Product';
   const slug = product?.slug || '';
-  const description = product?.shortDescription?.replace(/<[^>]+>/g, '') || product?.description?.replace(/<[^>]+>/g, '').substring(0, 160) || '';
+
+  const clean = (html?: string) => (html ? html.replace(/<[^>]+>/g, '').trim() : '');
+
+  const description =
+    clean(product?.shortDescription) ||
+    clean(product?.description).slice(0, 160) ||
+    '';
+
   const mainImage = product?.image?.sourceUrl || '';
-  const gallery = product?.galleryImages?.nodes?.map((img: { sourceUrl: string }) => img.sourceUrl) || [];
-  const images = [mainImage, ...gallery].filter(Boolean).map(url => ({ url }));
+  const gallery =
+    product?.galleryImages?.nodes?.map((img: { sourceUrl: string }) => img.sourceUrl) || [];
+
+  const imageUrls = [mainImage, ...gallery].filter(Boolean) as string[];
+  const ogImages = imageUrls.map((url) => ({ url }));
 
   // RankMath SEO Data (Fallback to Product Data)
   const seo = product?.seo;
   const seoTitle = seo?.title || name;
   const seoDescription = seo?.description || description;
 
-  // Price & Currency (Assuming simple product for base price, or low price for variable)
-  // Converting 'GH₵100' -> 100
+  // Price & Currency
+  // Handles: "GH₵1,200.00", "₵1200", "1200"
   const priceStr = String(product?.price || product?.salePrice || product?.regularPrice || '0');
-  const priceAmount = parseFloat(priceStr.replace(/[^0-9.]/g, '')) || 0;
+  const priceAmount =
+    Number(priceStr.replace(/[^0-9.,]/g, '').replace(/,/g, '')) || 0;
+
   const currency = 'GHS'; // Ghana Cedis
 
   // Stock
   const isInstock = product?.stockStatus !== 'OUT_OF_STOCK';
-  const availability = isInstock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+  const availability = isInstock
+    ? 'https://schema.org/InStock'
+    : 'https://schema.org/OutOfStock';
 
   // Ratings
   const ratingValue = product?.averageRating || 0;
@@ -75,32 +82,30 @@ const ProductPage: NextPage = ({
               url: `https://shopwice.com/product/${slug}`,
               title: seoTitle,
               description: seoDescription,
-              images: images,
+              images: ogImages,
             }}
           />
+
           <ProductJsonLd
             productName={name}
-            images={images.map(i => i.url)}
+            images={imageUrls}
             description={description}
-            brand="Shopwice" // Or product.productBrand if available
-            // sku={product.sku} // Add to query if not present
+            brand="Shopwice"
             offers={[
               {
                 price: priceAmount.toString(),
                 priceCurrency: currency,
-                itemCondition: 'https://schema.org/NewCondition', // Assuming new
-                availability: availability,
+                itemCondition: 'https://schema.org/NewCondition',
+                availability,
                 url: `https://shopwice.com/product/${slug}`,
-                seller: {
-                  name: 'Shopwice',
-                },
+                seller: { name: 'Shopwice' },
               },
             ]}
             aggregateRating={
               reviewCount > 0
                 ? {
-                  ratingValue: ratingValue.toString(),
-                  reviewCount: reviewCount.toString(),
+                  ratingValue: String(ratingValue),
+                  reviewCount: String(reviewCount),
                 }
                 : undefined
             }
@@ -108,7 +113,7 @@ const ProductPage: NextPage = ({
         </>
       )}
 
-      <Layout title={`${product?.name ? product.name : ''}`} fullWidth>
+      <Layout title={product?.name ? product.name : ''} fullWidth>
         {product ? (
           <SingleProduct
             product={product}
@@ -118,105 +123,66 @@ const ProductPage: NextPage = ({
         ) : (
           <div className="mt-8 text-2xl text-center">Loading product...</div>
         )}
+
         {hasError && (
-          <div className="mt-8 text-2xl text-center">
-            Error loading product...
-          </div>
+          <div className="mt-8 text-2xl text-center">Error loading product...</div>
         )}
       </Layout>
     </>
   );
 };
 
-
 export default ProductPage;
 
 export const getServerSideProps: GetServerSideProps = async ({ params, res }) => {
   try {
-    // Cache control for Server Side Rendering (s-maxage=60, stale-while-revalidate=59)
+    // ✅ Pages Router SSR runs on Node.js runtime.
+    // ✅ Edge runtime config must NOT be used with getServerSideProps.
 
-    res.setHeader(
-      'Cache-Control',
-      'public, s-maxage=60, stale-while-revalidate=59'
-    );
+    // CDN caching for SSR HTML (works on Vercel/most CDNs when deployed properly)
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=59');
 
-    const slug = params?.slug as string;
-    console.log('Fetching product for slug:', slug);
+    const slug = String(params?.slug || '').trim();
+    if (!slug) return { notFound: true };
 
-    let product = null;
-    let loading = true;
-    let networkStatus;
+    const result = await client.query({
+      query: GET_SINGLE_PRODUCT,
+      variables: { slug },
+      fetchPolicy: 'no-cache',
+    });
 
-    // Search for product and filter by exact slug match
-    try {
-      const result = await client.query({
-        query: GET_SINGLE_PRODUCT,
-        variables: { slug },
-        fetchPolicy: 'no-cache'
-      });
+    const nodes = result.data?.products?.nodes || [];
 
-      // Get nodes from search results
-      const nodes = result.data?.products?.nodes || [];
-
-      // Find exact slug match (case-insensitive for better compatibility)
-      product = nodes.find((node: any) =>
-        node?.slug?.toLowerCase() === slug.toLowerCase()
-      ) || null;
-
-      // If no exact match but we have results, log for debugging
-      if (!product && nodes.length > 0) {
-        console.log(`[SSR] Search returned ${nodes.length} products but none matched slug exactly`);
-        console.log(`[SSR] Looking for: "${slug}", found: ${nodes.map((n: any) => n.slug).join(', ')}`);
-      }
-
-      loading = result.loading;
-      networkStatus = result.networkStatus;
-
-      console.log(`[SSR] Search result for ${slug}:`, product ? 'Found' : 'Not Found');
-    } catch (e) {
-      console.error(`[SSR] Product lookup failed for ${slug}`, e);
-    }
-
-    console.log(`[SSR] Final product result for ${slug}:`, product ? 'Found' : 'Not Found');
+    // Find exact slug match (case-insensitive)
+    const product =
+      nodes.find((node: any) => node?.slug?.toLowerCase() === slug.toLowerCase()) || null;
 
     if (!product) {
-      console.log(`[SSR] 404 Triggered for product: ${params?.slug}. Product is null.`);
       return { notFound: true };
     }
 
-    // Server-side calculation for stability
     // Enhanced Refurbished Check: Attributes OR Category
     const isRefurbished =
       product.attributes?.nodes?.some((attr: any) =>
-        attr.options?.some((opt: any) =>
-          String(opt).toLowerCase().includes('refurbish')
-        )
+        attr.options?.some((opt: any) => String(opt).toLowerCase().includes('refurbish'))
       ) ||
-      product.productCategories?.nodes?.some((cat: any) =>
-        (cat.name && cat.name.toLowerCase().includes('refurbish')) ||
-        (cat.slug && cat.slug.toLowerCase().includes('refurbish'))
-      ) ||
+      product.productCategories?.nodes?.some((cat: any) => {
+        const n = String(cat?.name || '').toLowerCase();
+        const s = String(cat?.slug || '').toLowerCase();
+        return n.includes('refurbish') || s.includes('refurbish');
+      }) ||
       false;
-
-    console.log(`[SSR] Product: ${product.name}`);
-    console.log(`[SSR] Type: ${product.__typename}`);
-    if (product.variations) {
-      console.log(`[SSR] Variations found: ${product.variations.nodes?.length || 0}`);
-    } else {
-      console.log(`[SSR] No variations field on product object`);
-    }
-    console.log(`[SSR] isRefurbished: ${isRefurbished}`);
 
     return {
       props: {
         product,
-        loading,
-        networkStatus,
-        isRefurbished
+        loading: Boolean(result.loading),
+        networkStatus: typeof result.networkStatus === 'number' ? result.networkStatus : 7,
+        isRefurbished,
       },
     };
   } catch (error) {
-    console.error(error);
+    console.error('[SSR] Product page error:', error);
     return { notFound: true };
   }
 };
