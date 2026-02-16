@@ -9,7 +9,7 @@ import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
 
 import Link from 'next/link';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 /**
  * Display brand page with filtering, sorting, and infinite scroll

@@ -8,7 +8,7 @@ import { SEARCH_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
 import { GetServerSideProps } from 'next';
 import client from '@/utils/apollo/ApolloClient';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 interface SearchPageProps {
     products: any[];

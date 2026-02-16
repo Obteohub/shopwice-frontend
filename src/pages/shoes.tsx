@@ -7,7 +7,7 @@ import client from '@/utils/apollo/ApolloClient';
 import { GET_CATEGORY_DATA_BY_SLUG } from '@/utils/gql/GQL_QUERIES';
 import BackButton from '@/components/UI/BackButton.component';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 interface ShoesPageProps {
     category: any;

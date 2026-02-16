@@ -6,7 +6,7 @@ import client from '@/utils/apollo/ApolloClient';
 
 import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 /**
  * Category page displays all of the categories

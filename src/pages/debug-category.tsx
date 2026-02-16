@@ -3,7 +3,7 @@ import React from 'react';
 import client from '@/utils/apollo/ApolloClient';
 import { GET_CATEGORY_NODE_BY_SLUG, GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 const DebugCategory = ({ logs }: { logs: string[] }) => {
   return (

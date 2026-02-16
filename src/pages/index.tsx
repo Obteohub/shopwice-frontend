@@ -16,7 +16,7 @@ import { FETCH_HOME_PAGE_SSG } from '@/utils/gql/GQL_QUERIES';
 import { useGlobalStore } from '@/stores/globalStore';
 import { useEffect } from 'react';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 const SectionSkeleton = () => (
   <div className="px-4 md:px-6 py-6">

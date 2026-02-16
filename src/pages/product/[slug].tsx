@@ -17,7 +17,7 @@ import type {
 import { GET_SINGLE_PRODUCT } from '@/utils/gql/GQL_QUERIES';
 import { NextSeo, ProductJsonLd } from 'next-seo';
 
-export const runtime = 'edge';
+export const runtime = 'experimental-edge';
 
 /**
  * Display a single product with dynamic pretty urls
