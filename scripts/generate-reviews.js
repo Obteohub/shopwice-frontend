@@ -29,79 +29,52 @@ async function generateReviews() {
         const productIds = [...new Set(reviewsData.map(r => r.product_id))];
         console.log(`Found ${productIds.length} unique product IDs.`);
 
-        const gqlQuery = `
-            query GetProductConditions($include: [ID]) {
-                products(where: { include: $include }, first: 100) {
-                    nodes {
-                        databaseId
-                        ... on SimpleProduct {
-                            attributes {
-                                nodes {
-                                    name
-                                    options
-                                }
-                            }
-                        }
-                        ... on VariableProduct {
-                            attributes {
-                                nodes {
-                                    name
-                                    options
-                                }
-                            }
-                        }
-                    }
+        if (productIds.length === 0) {
+            console.log('No products to fetch.');
+            return;
+        }
+
+        console.log('Fetching product details via REST API...');
+
+        // Fetch products by ID using REST API
+        // Note: WC REST API uses 'include' param for IDs
+        const productsResponse = await fetch(
+            `https://api.shopwice.com/api/products?include=${productIds.join(',')}&per_page=50`,
+            {
+                headers: {
+                    'User-Agent':
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 }
             }
-        `;
+        );
 
-        console.log('Fetching product details via GraphQL...');
-
-        const gqlResponse = await fetch('https://api.shopwice.com/graphql', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            },
-            body: JSON.stringify({
-                query: gqlQuery,
-                variables: {
-                    include: productIds.slice(0, 50)
-                }
-            })
-        });
-
-        if (!gqlResponse.ok) {
-            throw new Error(`GraphQL request failed: ${gqlResponse.status}`);
+        if (!productsResponse.ok) {
+            throw new Error(`Products REST API failed: ${productsResponse.status}`);
         }
 
-        const gqlJson = await gqlResponse.json();
+        const products = await productsResponse.json();
 
-        if (gqlJson.errors) {
-            throw new Error(
-                `GraphQL errors: ${JSON.stringify(gqlJson.errors)}`
-            );
-        }
-
-        const products = gqlJson?.data?.products?.nodes || [];
-        if (products.length === 0) {
-            console.warn('No products returned from GraphQL.');
+        if (!Array.isArray(products) || products.length === 0) {
+            console.warn('No products returned from REST API.');
             return;
         }
 
         const refurbishedProductIds = new Set(
             products
                 .filter(product =>
-                    product.attributes?.nodes?.some(attr =>
+                    product.attributes?.some(attr =>
                         attr.options?.some(opt =>
                             String(opt)
                                 .toLowerCase()
                                 .includes('refurbish')
                         )
+                    ) ||
+                    product.categories?.some(cat =>
+                        cat.name.toLowerCase().includes('refurbish') ||
+                        cat.slug.toLowerCase().includes('refurbish')
                     )
                 )
-                .map(p => p.databaseId)
+                .map(p => p.id)
         );
 
         const refurbishedReviews = reviewsData.filter(r =>
@@ -126,16 +99,18 @@ async function generateReviews() {
         };
 
         const dir = 'src/data';
-        fs.mkdirSync(dir, { recursive: true });
-
-        fs.writeFileSync(
-            `${dir}/refurbishedReviews.json`,
-            JSON.stringify(output, null, 2)
-        );
-
-        console.log(
-            '✅ Success! Reviews saved to src/data/refurbishedReviews.json'
-        );
+        try {
+            await fs.promises.mkdir(dir, { recursive: true });
+            await fs.promises.writeFile(
+                `${dir}/refurbishedReviews.json`,
+                JSON.stringify(output, null, 2)
+            );
+            console.log(
+                '✅ Success! Reviews saved to src/data/refurbishedReviews.json'
+            );
+        } catch (err) {
+            console.error('Error writing file:', err);
+        }
     } catch (error) {
         console.error('❌ Error generating reviews:', error.message);
     }

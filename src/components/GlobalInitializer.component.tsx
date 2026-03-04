@@ -1,134 +1,130 @@
-import { useEffect, useRef } from 'react';
-import { useQuery } from '@apollo/client';
-import { useGlobalStore } from '@/stores/globalStore';
-import {
-    FETCH_ALL_CATEGORIES_QUERY,
-    FETCH_HOME_PAGE_DATA,
-} from '@/utils/gql/GQL_QUERIES';
-// import StoreApiCartInitializer from '@/components/Cart/StoreApiCartInitializer.component';
+import { useEffect } from 'react';
+import { useCartStore } from '@/stores/cartStore';
+import { ApiError } from '@/utils/api';
+import { transformCartResponse } from '@/utils/cartTransformers';
+import { getCartFast } from '@/utils/cartClient';
+
+type IdleCallbackHandle = number;
+type IdleCallbackFn = (deadline: { didTimeout: boolean; timeRemaining: () => number }) => void;
+
+const hasWindow = typeof window !== 'undefined';
+
+const requestIdle = (cb: IdleCallbackFn, timeout = 1500): IdleCallbackHandle | null => {
+    if (!hasWindow) return null;
+    const w = window as Window & {
+        requestIdleCallback?: (callback: IdleCallbackFn, options?: { timeout: number }) => IdleCallbackHandle;
+    };
+    if (!w.requestIdleCallback) return null;
+    return w.requestIdleCallback(cb, { timeout });
+};
+
+const cancelIdle = (id: IdleCallbackHandle | null) => {
+    if (!hasWindow || id === null) return;
+    const w = window as Window & { cancelIdleCallback?: (handle: IdleCallbackHandle) => void };
+    w.cancelIdleCallback?.(id);
+};
+
+const getErrorStatus = (error: unknown): number => {
+    if (error instanceof ApiError && typeof error.status === 'number') {
+        return error.status;
+    }
+    if (
+        error &&
+        typeof error === 'object' &&
+        'status' in error &&
+        typeof (error as { status?: unknown }).status === 'number'
+    ) {
+        return Number((error as { status: number }).status);
+    }
+    return 0;
+};
 
 /**
- * GlobalInitializer
- * =================
- * Client-only bootstrapper for Shopwice.
- * - Warms Apollo cache
- * - Syncs shared data into Zustand
- * - Prevents hydration mismatches
- * - Avoids redundant store updates
+ * GlobalInitializer - Runs global initialization logic on app mount
+ * - Syncs cart from WooCommerce session
+ * - Categories are now loaded on-demand by components that need them
  */
 const GlobalInitializer = () => {
-    const isClient = typeof window !== 'undefined';
+    const { syncWithWooCommerce } = useCartStore();
 
-    // Prevent duplicate store writes
-    const categoriesHydrated = useRef(false);
-    const homeDataHydrated = useRef(false);
-
-    const setCategories = useGlobalStore((state) => state.setCategories);
-    const setHomeData = useGlobalStore((state) => state.setHomeData);
-
-    /**
-     * Ensure this only runs on the client
-     */
-    /**
-     * Fetch navigation categories
-     */
-    const {
-        data: categoryData,
-        error: categoryError,
-    } = useQuery(FETCH_ALL_CATEGORIES_QUERY, {
-        fetchPolicy: 'cache-first',
-        skip: !isClient,
-    });
-
-    /**
-     * Fetch homepage sections (cache warming)
-     */
-    const {
-        data: homeData,
-        error: homeError,
-    } = useQuery(FETCH_HOME_PAGE_DATA, {
-        variables: {
-            promoProductSlug: 'microsoft-xbox-x-wireless-controller',
-        },
-        fetchPolicy: 'cache-and-network',
-        skip: !isClient,
-    });
-
-    /**
-     * Sync categories → Zustand (once)
-     */
     useEffect(() => {
-        if (
-            categoriesHydrated.current ||
-            !categoryData?.productCategories?.nodes?.length
-        ) {
-            return;
+        if (hasWindow) {
+            const path = window.location.pathname;
+            const skipCartSync = path.startsWith('/cart') || path.startsWith('/checkout');
+            if (skipCartSync) {
+                return;
+            }
         }
 
-        setCategories(categoryData.productCategories.nodes);
-        categoriesHydrated.current = true;
-    }, [categoryData, setCategories]);
+        let isMounted = true;
 
-    /**
-     * Sync homepage data → Zustand (once)
-     */
-    useEffect(() => {
-        if (homeDataHydrated.current || !homeData) return;
+        const safeResetCart = () => {
+            if (!isMounted) return;
+            const existingCount = Number(useCartStore.getState().cart?.totalProductsCount || 0);
+            // Do not wipe a non-empty cart on transient sync failures.
+            if (existingCount > 0) return;
+            syncWithWooCommerce({ products: [], totalProductsCount: 0, totalProductsPrice: 0 });
+        };
 
-        const topRated = homeData.topRatedProducts?.nodes || [];
+        const shouldRetry = (error: unknown) => {
+            const status = getErrorStatus(error);
+            const message = String((error as Error)?.message || '').toLowerCase();
+            if (status >= 500) return true;
+            if (message.includes('fetch failed') || message.includes('network')) return true;
+            return false;
+        };
 
-        if (topRated.length > 0 && !topRated[0]?.slug) {
-            console.warn(
-                '[GlobalInitializer] Top rated product missing slug',
-                topRated[0]
-            );
+        const syncCart = async () => {
+            const maxAttempts = 3;
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+                try {
+                    const cart = await getCartFast({ maxAgeMs: 12000, view: 'mini' });
+                    if (!isMounted) return;
+                    if (cart) {
+                        syncWithWooCommerce(transformCartResponse(cart as any));
+                    }
+                    return;
+                } catch (error: unknown) {
+                    if (!isMounted) return;
+                    const is404 = getErrorStatus(error) === 404;
+                    if (error instanceof SyntaxError || is404) {
+                        // Expected when cart session is new or middleware returns empty.
+                        safeResetCart();
+                        return;
+                    }
+                    if (!shouldRetry(error) || attempt === maxAttempts) {
+                        console.error('[GlobalInitializer] Error syncing cart:', error);
+                        safeResetCart();
+                        return;
+                    }
+                    const delayMs = 500 * Math.pow(2, attempt - 1);
+                    await new Promise((resolve) => setTimeout(resolve, delayMs));
+                }
+            }
+        };
+
+        const runSync = () => {
+            void syncCart();
+        };
+
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let idleId: IdleCallbackHandle | null = null;
+
+        const scheduledIdle = requestIdle(runSync);
+        if (scheduledIdle !== null) {
+            idleId = scheduledIdle;
+        } else {
+            timeoutId = setTimeout(runSync, 400);
         }
 
-        setHomeData({
-            topRatedProducts: topRated,
-            bestSellingProducts:
-                homeData.bestSellingProducts?.nodes || [],
-            airConditionerProducts:
-                homeData.airConditionerProducts?.nodes || [],
-            mobilePhonesOnSale:
-                homeData.mobilePhonesOnSale?.nodes || [],
-            laptopsProducts:
-                homeData.laptopsProducts?.nodes || [],
-            speakersProducts:
-                homeData.speakersProducts?.nodes || [],
-            televisionsProducts:
-                homeData.televisionsProducts?.nodes || [],
-            promoProduct: homeData.promoProduct || null,
-        });
+        return () => {
+            isMounted = false;
+            if (timeoutId) clearTimeout(timeoutId);
+            cancelIdle(idleId);
+        };
+    }, [syncWithWooCommerce]);
 
-        homeDataHydrated.current = true;
-    }, [homeData, setHomeData]);
-
-    /**
-     * Optional: Log network errors (no UI crash)
-     */
-    useEffect(() => {
-        if (categoryError) {
-            console.error(
-                '[GlobalInitializer] Category fetch error:',
-                categoryError
-            );
-        }
-
-        if (homeError) {
-            console.error(
-                '[GlobalInitializer] Home data fetch error:',
-                homeError
-            );
-        }
-    }, [categoryError, homeError]);
-
-    return (
-        <>
-            {/* Cart bootstrap (disabled until Store API stabilizes) */}
-            {/* <StoreApiCartInitializer /> */}
-        </>
-    );
+    return null;
 };
 
 export default GlobalInitializer;

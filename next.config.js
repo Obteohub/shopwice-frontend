@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   compress: true,
+  devIndicators: false,
   compiler: {
     removeConsole: false,
   },
@@ -56,13 +57,35 @@ const nextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     qualities: [75, 90],
-    unoptimized: true,
-  },
-  i18n: {
-    locales: ['en'],
-    defaultLocale: 'en',
+    // Keep optimization enabled so Next can generate right-sized images per viewport.
+    unoptimized: false,
+    // Prefer modern formats to reduce bytes on hero image transfers.
+    formats: ['image/avif', 'image/webp'],
   },
   async headers() {
+    if (process.env.NODE_ENV !== 'production') {
+      return [
+        {
+          source: '/_next/static/:path*',
+          headers: [
+            {
+              key: 'Cache-Control',
+              value: 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            },
+          ],
+        },
+        {
+          source: '/_next/webpack-hmr',
+          headers: [
+            {
+              key: 'Cache-Control',
+              value: 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            },
+          ],
+        },
+      ];
+    }
+
     return [
       {
         source: '/:all*(svg|jpg|png|webp|avif|js|css|woff2)',
@@ -97,7 +120,21 @@ const nextConfig = {
       },
     ];
   },
-  
+  async redirects() {
+    return [
+      {
+        source: '/brand/von',
+        destination: '/brand/avon',
+        permanent: true,
+      },
+      {
+        source: '/brand/von/:path*',
+        destination: '/brand/avon/:path*',
+        permanent: true,
+      },
+    ];
+  },
+
 };
 
 module.exports = nextConfig;

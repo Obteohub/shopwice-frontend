@@ -1,7 +1,5 @@
 
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
-import { v4 as uuidv4 } from 'uuid';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Components
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
@@ -10,136 +8,220 @@ import CartSummary from './CartSummary.component';
 import EmptyCart from './EmptyCart.component';
 
 // Utils & State
-import { IProductRootObject, getFormattedCart } from '@/utils/functions/functions';
 import { useCartStore } from '@/stores/cartStore';
-import { GET_CART } from '@/utils/gql/GQL_QUERIES';
-import { UPDATE_CART } from '@/utils/gql/GQL_MUTATIONS';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
+import { RestCartItem, transformCartResponse } from '@/utils/cartTransformers';
+import {
+  clearCartResponseCache,
+  getCartFast,
+  setCartResponseCache,
+} from '@/utils/cartClient';
+
 
 const CartContents = () => {
   const { clearWooCommerceSession, syncWithWooCommerce } = useCartStore();
+  const debugCart = process.env.NEXT_PUBLIC_DEBUG_CART === 'true';
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [pendingQuantityKeys, setPendingQuantityKeys] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [cartData, setCartData] = useState<any>(null);
+  const quantityTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pendingQuantitiesRef = useRef<Record<string, number>>({});
 
-  // GraphQL Query
-  const { data, loading, error } = useQuery(GET_CART, {
-    fetchPolicy: 'cache-and-network',
-    notifyOnNetworkStatusChange: true,
-    onCompleted: (data) => {
-      console.log('[CartContents] Query Data:', data);
-    },
-    onError: (err) => {
-      console.error('[CartContents] Query Error:', err);
-    }
-  });
+  const loadCart = useCallback(async (force = false) => {
+    try {
+      // 1. Fetch data
+      const data: any = await getCartFast({ force, maxAgeMs: 0, view: 'mini' });
 
-  // GraphQL Mutation
-  const [updateCart, { loading: mutationLoading }] = useMutation(UPDATE_CART, {
-    onCompleted: (mutationData) => {
-      // Sync store with updated cart data
-      if (mutationData?.updateItemQuantities?.cart) {
-        const formattedCart = getFormattedCart({ cart: mutationData.updateItemQuantities.cart });
-        syncWithWooCommerce(formattedCart);
+      if (debugCart) {
+        console.info('[CartContents] Loaded cart', {
+          itemsCount: data?.items_count,
+          total: data?.totals?.total_price,
+        });
       }
-      setIsUpdating(false);
-    },
-    onError: (err) => {
-      console.error('[Cart] Mutation Error:', err);
-      alert(`Error updating cart: ${err.message}`);
-      setIsUpdating(false);
+
+      // 2. Sync with store (side effect)
+      const transformed = transformCartResponse(data);
+      syncWithWooCommerce(transformed);
+
+      return data;
+    } catch (err: any) {
+      console.error('[CartContents] Error loading cart:', err);
+      setError(err);
+      throw err;
     }
-  });
+  }, [debugCart, syncWithWooCommerce]);
 
-  // Derived Data
-  const cartData = data?.cart;
-  let cartItems: IProductRootObject[] = [];
+  // Fetch cart data
+  useEffect(() => {
+    let mounted = true;
 
-  if (cartData?.contents?.nodes?.length > 0) {
-    // Standard Schema
-    cartItems = cartData.contents.nodes;
-  } else if (cartData?.items?.length > 0) {
-    // Simplified Schema Fallback
-    console.log('[Cart] Using simplified items schema');
-    cartItems = cartData.items.map((item: any) => ({
-      key: item.key,
-      quantity: item.quantity,
-      total: item.line_total,
-      subtotal: item.line_total,
-      product: {
-        node: {
-          id: item.id,
-          databaseId: parseInt(item.id, 10),
-          name: item.name,
-          slug: '', // Unavailable in simple schema
-          type: 'simple',
-          image: {
-            sourceUrl: '/placeholder.png', // Unavailable in simple schema
-            altText: item.name
-          },
-          price: item.price,
+    const fetchCart = async () => {
+      if (mounted) setLoading(true);
+      try {
+        const data = await loadCart(true);
+        if (mounted) {
+          setCartData(data);
+          setLoading(false);
         }
-      },
-      // Map variations if available
-      variation: item.variation ? {
-        node: {
-           name: Array.isArray(item.variation) ? item.variation.join(', ') : item.variation,
-           price: item.price
-        }
-      } : null
-    }));
-  }
+      } catch {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    fetchCart();
+
+    return () => {
+      mounted = false;
+    };
+  }, [loadCart]);
+
+  const cartItems: RestCartItem[] = Array.isArray(cartData?.items)
+    ? cartData.items
+    : [];
+
+  const unwrapCartResponse = (response: any) => {
+    if (response && typeof response === 'object' && response.cart) {
+      return response.cart;
+    }
+    return response;
+  };
+
+  const setQuantityPending = (key: string, pending: boolean) => {
+    setPendingQuantityKeys((prev) => {
+      if (pending) {
+        return prev.includes(key) ? prev : [...prev, key];
+      }
+      return prev.filter((k) => k !== key);
+    });
+  };
+
+  const clearQuantityTimer = (key: string) => {
+    const timer = quantityTimersRef.current[key];
+    if (timer) {
+      clearTimeout(timer);
+      delete quantityTimersRef.current[key];
+    }
+    delete pendingQuantitiesRef.current[key];
+    setQuantityPending(key, false);
+  };
+
+  useEffect(() => {
+    return () => {
+      Object.values(quantityTimersRef.current).forEach((timer) => clearTimeout(timer));
+      quantityTimersRef.current = {};
+      pendingQuantitiesRef.current = {};
+    };
+  }, []);
 
   const hasItems = cartItems.length > 0;
-  
-  const cartTotal = cartData?.total || '0';
-  const cartSubtotal = cartData?.subtotal || cartTotal;
-  const totalProductsCount = cartData?.itemCount || cartItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
-  // Sync on load
-  useEffect(() => {
-    if (cartData) {
-      const formattedCart = getFormattedCart({ cart: cartData });
-      syncWithWooCommerce(formattedCart);
-    }
-  }, [cartData, syncWithWooCommerce]);
+  const cartTotal = cartData?.totals?.total_price || '0';
+  const cartSubtotal = cartData?.totals?.total_items || cartTotal;
+  const totalProductsCount = cartData?.items_count || 0;
+  const currencyMinorUnit = cartData?.totals?.currency_minor_unit ?? 2;
 
   // -------------------------------------------------------------------------
   // Handlers
   // -------------------------------------------------------------------------
   const handleSessionReset = async () => {
     console.warn('[Cart] Resetting Session due to sync error...');
+    clearCartResponseCache();
     clearWooCommerceSession();
     if (typeof window !== 'undefined') window.location.reload();
   };
 
-  const handleUpdateQuantity = (item: IProductRootObject, newQty: number) => {
+  const handleUpdateQuantity = async (item: RestCartItem, newQty: number) => {
     if (newQty < 1) return;
-    setIsUpdating(true);
-    
-    updateCart({
-      variables: {
-        input: {
-          clientMutationId: uuidv4(),
-          items: [{ key: item.key, quantity: newQty }]
-        }
-      }
+    const itemKey = item.key;
+
+    // Optimistic local update for snappier UI.
+    setCartData((prev: any) => {
+      if (!prev?.items || !Array.isArray(prev.items)) return prev;
+      const nextItems = prev.items.map((entry: RestCartItem) =>
+        entry.key === itemKey ? { ...entry, quantity: newQty } : entry,
+      );
+      const nextItemsCount = nextItems.reduce(
+        (sum: number, entry: RestCartItem) => sum + Number(entry?.quantity || 0),
+        0,
+      );
+      return {
+        ...prev,
+        items: nextItems,
+        items_count: nextItemsCount,
+      };
     });
+
+    pendingQuantitiesRef.current[itemKey] = newQty;
+    setQuantityPending(itemKey, true);
+
+    const existingTimer = quantityTimersRef.current[itemKey];
+    if (existingTimer) clearTimeout(existingTimer);
+
+    quantityTimersRef.current[itemKey] = setTimeout(async () => {
+      const quantityToCommit = pendingQuantitiesRef.current[itemKey];
+      delete pendingQuantitiesRef.current[itemKey];
+      delete quantityTimersRef.current[itemKey];
+
+      try {
+        if (debugCart) {
+          console.info('[Cart] Commit quantity', { key: itemKey, quantityToCommit });
+        }
+        const response: any = await api.post(ENDPOINTS.CART_UPDATE, {
+          key: itemKey,
+          quantity: quantityToCommit,
+        });
+
+        const nextCart = unwrapCartResponse(response);
+        setCartResponseCache(nextCart);
+        setCartData(nextCart);
+        syncWithWooCommerce(transformCartResponse(nextCart));
+      } catch (err: any) {
+        console.error('[Cart] Update Error:', err);
+        alert(`Error updating cart: ${err.message}`);
+        try {
+          const fresh = await loadCart(true);
+          setCartData(fresh);
+        } catch {
+          // ignore fallback refresh errors
+        }
+      } finally {
+        setQuantityPending(itemKey, false);
+      }
+    }, 250);
   };
 
-  const handleRemoveItem = (item: IProductRootObject) => {
+  const handleRemoveItem = async (item: RestCartItem) => {
     if (!confirm('Remove this item?')) return;
+    clearQuantityTimer(item.key);
     setIsUpdating(true);
-    
-    updateCart({
-      variables: {
-        input: {
-          clientMutationId: uuidv4(),
-          items: [{ key: item.key, quantity: 0 }]
-        }
+
+    try {
+      if (debugCart) {
+        console.info('[Cart] Remove item', { key: item.key });
       }
-    });
+      const response: any = await api.post(ENDPOINTS.CART_REMOVE, {
+        key: item.key
+      });
+
+      // Update local state and sync
+      const nextCart = unwrapCartResponse(response);
+      setCartResponseCache(nextCart);
+      setCartData(nextCart);
+      const transformed = transformCartResponse(nextCart);
+      syncWithWooCommerce(transformed);
+      setIsUpdating(false);
+    } catch (err: any) {
+      console.error('[Cart] Remove Error:', err);
+      alert(`Error removing item: ${err.message}`);
+      setIsUpdating(false);
+    }
   };
 
-  const handleClearCart = () => {
+  const handleClearCart = async () => {
     if (!showClearConfirm) {
       setShowClearConfirm(true);
       setTimeout(() => setShowClearConfirm(false), 3000);
@@ -149,21 +231,36 @@ const CartContents = () => {
     if (!cartItems.length) return;
 
     setIsUpdating(true);
+    Object.keys(quantityTimersRef.current).forEach((key) => clearQuantityTimer(key));
     setShowClearConfirm(false);
 
-    const itemsToClear = cartItems.map(item => ({
-      key: item.key,
-      quantity: 0
-    }));
-
-    updateCart({
-      variables: {
-        input: {
-          clientMutationId: uuidv4(),
-          items: itemsToClear
-        }
+    try {
+      if (debugCart) {
+        console.info('[Cart] Clear cart', { items: cartItems.length });
       }
-    });
+
+      // Use single clear endpoint instead of N remove calls.
+      const response: any = await api.del(ENDPOINTS.CART_CLEAR);
+      const nextCart = unwrapCartResponse(response);
+      if (nextCart?.items) {
+        setCartResponseCache(nextCart);
+        setCartData(nextCart);
+        syncWithWooCommerce(transformCartResponse(nextCart));
+      } else {
+        clearCartResponseCache();
+        setCartData({
+          items: [],
+          items_count: 0,
+          totals: { total_price: '0', total_items: '0', currency_minor_unit: 2 },
+        });
+        syncWithWooCommerce({ products: [], totalProductsCount: 0, totalProductsPrice: 0 });
+      }
+      setIsUpdating(false);
+    } catch (err: any) {
+      console.error('[Cart] Clear Error:', err);
+      alert(`Error clearing cart: ${err.message}`);
+      setIsUpdating(false);
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -208,7 +305,7 @@ const CartContents = () => {
     );
   }
 
-  const isSyncing = mutationLoading || isUpdating || (loading && !!cartData);
+  const isSyncing = isUpdating || loading || pendingQuantityKeys.length > 0;
 
   return (
     <div className="container mx-auto px-4 py-8 relative">
@@ -228,8 +325,8 @@ const CartContents = () => {
         <button
           onClick={handleClearCart}
           className={`${showClearConfirm
-              ? 'bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600'
-              : 'text-red-500 hover:text-red-700 font-medium hover:underline'
+            ? 'bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600'
+            : 'text-red-500 hover:text-red-700 font-medium hover:underline'
             } text-sm transition-all focus:outline-none`}
           disabled={isSyncing}
         >
@@ -247,7 +344,7 @@ const CartContents = () => {
                 item={item}
                 onUpdateQuantity={(newQty) => handleUpdateQuantity(item, newQty)}
                 onRemove={() => handleRemoveItem(item)}
-                loading={isSyncing}
+                loading={isUpdating || loading || pendingQuantityKeys.includes(item.key)}
               />
             ))}
           </div>
@@ -260,6 +357,7 @@ const CartContents = () => {
               subtotal={cartSubtotal}
               total={cartTotal}
               totalProductsCount={totalProductsCount}
+              currencyMinorUnit={currencyMinorUnit}
             />
           </div>
         </div>

@@ -1,12 +1,8 @@
 import { NextPage, InferGetStaticPropsType, GetStaticProps } from 'next';
 import Categories from '@/components/Category/Categories.component';
 import Layout from '@/components/Layout/Layout.component';
-
-import client from '@/utils/apollo/ApolloClient';
-
-import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
-
-
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
 
 /**
  * Category page displays all of the categories
@@ -19,17 +15,14 @@ const categories: NextPage = ({
   </Layout>
 );
 
-
 export default categories;
 
 export const getStaticProps: GetStaticProps = async () => {
   try {
-    const result = await client.query({
-      query: FETCH_ALL_CATEGORIES_QUERY,
-    });
+    const categories: any = await api.get(ENDPOINTS.CATEGORIES);
 
-    const nodes = result.data?.productCategories?.nodes || [];
-    const rootCategories = nodes.filter((node: any) => !node.parent || Number(node.parent) === 0);
+    // Filter root categories (parent is 0 or null)
+    const rootCategories = categories.filter((cat: any) => !cat.parent || Number(cat.parent) === 0);
 
     return {
       props: {

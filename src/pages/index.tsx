@@ -1,4 +1,5 @@
 import dynamic from 'next/dynamic';
+import { useEffect } from 'react';
 
 import Hero from '@/components/Index/Hero.component';
 import FeaturedCategories from '@/components/Index/FeaturedCategories.component';
@@ -6,17 +7,12 @@ import SEOContent from '@/components/Index/SEOContent.component';
 import Layout from '@/components/Layout/Layout.component';
 
 // Utilities
-import client from '@/utils/apollo/ApolloClient';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
+import { useGlobalStore } from '@/stores/globalStore';
 
 // Types
 import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
-
-// GraphQL
-import { FETCH_HOME_PAGE_SSG } from '@/utils/gql/GQL_QUERIES';
-import { useGlobalStore } from '@/stores/globalStore';
-import { useEffect } from 'react';
-
-
 
 const SectionSkeleton = () => (
   <div className="px-4 md:px-6 py-6">
@@ -72,7 +68,6 @@ const RecentRefurbishedReviews = dynamic(
 /**
  * Main index page
  * @function Index
- * @param {InferGetStaticPropsType<typeof getStaticProps>} products
  * @returns {JSX.Element} - Rendered component
  */
 
@@ -149,21 +144,20 @@ export default Index;
 
 export const getStaticProps: GetStaticProps = async () => {
   try {
-    const { data } = await client.query({
-      query: FETCH_HOME_PAGE_SSG,
-      variables: { promoProductSlug: "microsoft-xbox-x-wireless-controller" }
+    const allProducts: any = await api.get(ENDPOINTS.PRODUCTS, {
+      params: { per_page: 50 },
     });
 
     return {
       props: {
-        topRatedProducts: data?.topRatedProducts?.nodes || [],
-        bestSellingProducts: [],
-        airConditionerProducts: [],
-        mobilePhonesOnSale: [],
-        laptopsProducts: [],
-        speakersProducts: [],
-        televisionsProducts: [],
-        promoProduct: data?.promoProduct || null,
+        topRatedProducts: allProducts.slice(0, 8) || [],
+        bestSellingProducts: allProducts.slice(8, 16) || [],
+        airConditionerProducts: allProducts.slice(16, 24) || [],
+        mobilePhonesOnSale: allProducts.slice(24, 32) || [],
+        laptopsProducts: allProducts.slice(32, 40) || [],
+        speakersProducts: allProducts.slice(40, 44) || [],
+        televisionsProducts: allProducts.slice(44, 48) || [],
+        promoProduct: allProducts[0] || null,
       },
       revalidate: 60,
     };

@@ -13,6 +13,8 @@ interface IButtonProps {
   title?: string;
   selected?: boolean;
   className?: string; // Allow custom classes
+  type?: 'button' | 'submit' | 'reset';
+  onPointerEnter?: () => void;
 }
 
 /**
@@ -35,6 +37,8 @@ const Button = ({
   href,
   title,
   selected = false,
+  type,
+  onPointerEnter,
   ...props
 }: IButtonProps) => {
   const getVariantClasses = (variant: TButtonVariant = 'primary') => {
@@ -71,6 +75,8 @@ const Button = ({
       disabled={buttonDisabled}
       className={classes}
       title={title}
+      type={type}
+      onPointerEnter={onPointerEnter}
     >
       {children}
     </button>

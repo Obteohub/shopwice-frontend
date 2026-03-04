@@ -1,45 +1,46 @@
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useEffect, ComponentType } from 'react';
-import { useQuery } from '@apollo/client';
-import { GET_CURRENT_USER } from '../../utils/gql/GQL_QUERIES';
-import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
 
-const withAuth = <P extends object>(WrappedComponent: ComponentType<P>) => {
-  const Wrapper = (props: P) => {
+export default function withAuth(Component: any) {
+  return function AuthenticatedComponent(props: any) {
     const router = useRouter();
-    const { data, loading, error } = useQuery(GET_CURRENT_USER, {
-      errorPolicy: 'all',
-      fetchPolicy: 'cache-first',
-      nextFetchPolicy: 'cache-and-network',
-      returnPartialData: true,
-    });
-
-    const hasCustomer = Boolean(data?.customer);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-      if (!loading && (error || !hasCustomer)) {
-        router.push('/login');
-      }
-    }, [loading, error, hasCustomer, router]);
+      // Check if user is authenticated
+      const authData = localStorage.getItem('auth-data');
 
-    // Show loading while checking authentication
+      if (!authData) {
+        router.push('/login');
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(authData);
+        if (parsed.authToken) {
+          setIsAuthenticated(true);
+        } else {
+          router.push('/login');
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[withAuth] Invalid auth-data payload, redirecting to login.', error);
+        }
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    }, [router]);
+
     if (loading) {
-      return (
-        <div className="flex justify-center items-center min-h-screen">
-          <LoadingSpinner />
-        </div>
-      );
+      return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
     }
 
-    // If no customer data, don't render the component
-    if (!hasCustomer) {
+    if (!isAuthenticated) {
       return null;
     }
 
-    return <WrappedComponent {...props} />;
+    return <Component {...props} />;
   };
-
-  return Wrapper;
-};
-
-export default withAuth;
+}

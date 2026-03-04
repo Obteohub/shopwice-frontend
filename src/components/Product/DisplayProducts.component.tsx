@@ -1,28 +1,18 @@
 /*eslint complexity: ["error", 20]*/
 import Link from 'next/link';
-import { v4 as uuidv4 } from 'uuid';
+import Image from 'next/image';
 
 import { filteredVariantPrice, paddedPrice } from '@/utils/functions/functions';
+import { getSlugFromUrl } from '@/utils/functions/productUtils';
+import { firstValidImageUrl } from '@/utils/image';
 
 interface Image {
-  __typename: string;
   sourceUrl?: string;
-}
-
-interface Node {
-  __typename: string;
-  price: string;
-  regularPrice: string;
-  salePrice?: string;
-}
-
-interface Variations {
-  __typename: string;
-  nodes: Node[];
+  src?: string;
+  url?: string;
 }
 
 interface RootObject {
-  __typename: string;
   name: string;
   onSale: boolean;
   slug: string;
@@ -30,7 +20,11 @@ interface RootObject {
   price: string;
   regularPrice: string;
   salePrice?: string;
-  variations: Variations;
+  variations?: Array<{
+    price?: string;
+    regularPrice?: string;
+    salePrice?: string;
+  }> | null;
 }
 
 interface IDisplayProductsProps {
@@ -62,7 +56,7 @@ const DisplayProducts = ({ products }: IDisplayProductsProps) => (
             slug,
             image,
             variations,
-          }) => {
+          }, index) => {
             // Add padding/empty character after currency symbol here
             if (price) {
               price = paddedPrice(price, 'GH₵');
@@ -73,34 +67,40 @@ const DisplayProducts = ({ products }: IDisplayProductsProps) => (
             if (salePrice) {
               salePrice = paddedPrice(salePrice, 'GH₵');
             }
+            const imageUrl = firstValidImageUrl(image?.sourceUrl, image?.src, image?.url);
 
             return (
-              <div key={uuidv4()} className="group bg-white rounded-none border border-gray-100 flex flex-col h-full hover:shadow-2xl hover:-translate-y-1 transition-all duration-500">
-                <Link href={`/product/${encodeURIComponent(slug)}`} className="relative block aspect-square overflow-hidden bg-white px-2 pt-2">
+              <div key={`${slug || name}-${index}`} className="group bg-white rounded-none border border-gray-100 flex flex-col h-full hover:shadow-2xl hover:-translate-y-1 transition-all duration-500">
+                <Link href={`/product/${getSlugFromUrl(slug)}`} className="relative block aspect-square overflow-hidden bg-white px-2 pt-2">
                   {onSale && (
                     <div className="absolute top-4 left-4 z-10 bg-[#EE7E02] text-white text-[10px] font-black px-2 py-1 rounded-sm shadow-md uppercase tracking-tighter">
                       Limited Time
                     </div>
                   )}
-                  {image ? (
-                    <img
+                  {imageUrl ? (
+                    <Image
                       id="product-image"
-                      className="w-full h-full object-contain object-center transition duration-500 group-hover:scale-110"
+                      className="object-contain object-center transition duration-500 group-hover:scale-110"
                       alt={name}
-                      src={image.sourceUrl}
+                      src={imageUrl}
+                      fill
+                      priority={index === 0}
+                      fetchPriority={index === 0 ? 'high' : 'auto'}
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      sizes="(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 25vw"
                     />
                   ) : (
-                    <img
+                    <div
                       id="product-image"
-                      className="w-full h-full object-contain object-center"
-                      alt={name}
-                      src={process.env.NEXT_PUBLIC_PLACEHOLDER_SMALL_IMAGE_URL}
-                    />
+                      className="w-full h-full flex items-center justify-center text-xs italic text-gray-400"
+                    >
+                      No image
+                    </div>
                   )}
                 </Link>
 
                 <div className="p-4 flex flex-col flex-grow text-left">
-                  <Link href={`/product/${encodeURIComponent(slug)}`}>
+                  <Link href={`/product/${getSlugFromUrl(slug)}`}>
                     <h4 className="text-[#2c3338] font-bold text-[14px] md:text-[15px] mb-2 line-clamp-2 hover:text-[#0C6DC9] transition-colors cursor-pointer min-h-[2.5rem] leading-[1.3]">
                       {name}
                     </h4>
@@ -120,12 +120,10 @@ const DisplayProducts = ({ products }: IDisplayProductsProps) => (
                     {onSale ? (
                       <div className="flex flex-col">
                         <span className="text-gray-400 text-[12px] line-through decoration-gray-300 font-bold mb-0.5">
-                          {variations && filteredVariantPrice(price, 'right')}
-                          {!variations && regularPrice}
+                          {variations?.length ? filteredVariantPrice(price, 'right') : regularPrice}
                         </span>
                         <span className="text-[#0C6DC9] font-black text-[18px]">
-                          {variations && filteredVariantPrice(price, '')}
-                          {!variations && salePrice}
+                          {variations?.length ? filteredVariantPrice(price, '') : salePrice}
                         </span>
                       </div>
                     ) : (

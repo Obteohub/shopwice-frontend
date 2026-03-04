@@ -6,7 +6,7 @@ export const getUniqueProductTypes = (
   const categoryMap = new Map<string, ProductType>();
 
   for (const product of products) {
-    const categories = product?.productCategories?.nodes;
+    const categories = product?.categories;
 
     if (!categories?.length) continue;
 
@@ -26,7 +26,7 @@ export const getUniqueProductTypes = (
   }
 
   return Array.from(categoryMap.values()).sort((a, b) =>
-  String(a?.name ?? '').localeCompare(String(b?.name ?? ''), undefined, { sensitivity: 'base' }),
+    String(a?.name ?? '').localeCompare(String(b?.name ?? ''), undefined, { sensitivity: 'base' }),
   );
 };
 
@@ -37,4 +37,12 @@ export const parsePrice = (price?: string | number | null): number => {
   if (price === null || price === undefined) return 0;
   if (typeof price === 'number') return price;
   return Number(price.replace(/[^\d.]/g, '')) || 0;
+};
+/**
+ * Extract slug from a full URL or path
+ */
+export const getSlugFromUrl = (url?: string | null): string => {
+  if (!url) return '';
+  const parts = String(url).split('/').filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : '';
 };

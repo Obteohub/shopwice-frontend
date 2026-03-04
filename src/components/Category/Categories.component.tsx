@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { v4 as uuidv4 } from 'uuid';
+import { normalizeImageUrl } from '@/utils/image';
 
 interface ICategoriesProps {
   categories: {
@@ -14,18 +14,20 @@ interface ICategoriesProps {
 const Categories = ({ categories }: ICategoriesProps) => (
   <section className="container mx-auto bg-white">
     <div className="grid gap-3 px-2 pt-2 pb-2 lg:px-0 xl:px-0 md:px-0 lg:grid-cols-3 sm:grid-cols-1 md:grid-cols-3 xs:grid-cols-3">
-      {categories.map(({ id, name, slug, image }) => (
+      {categories.map(({ name, slug, image }) => {
+        const imageUrl = normalizeImageUrl(image?.sourceUrl);
+        return (
         <Link
-          key={uuidv4()}
-          href={`/product-category/${encodeURIComponent(slug)}?id=${encodeURIComponent(id)}`}
+          key={slug}
+          href={`/product-category/${encodeURIComponent(slug)}`}
         >
           <div className="p-2 cursor-pointer">
             <div className="group w-full overflow-hidden border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow bg-white">
               <div className="relative w-full aspect-[4/3] bg-gray-100">
-                {image?.sourceUrl ? (
+                {imageUrl ? (
                   <Image
-                    src={image.sourceUrl}
-                    alt={image.altText || name || 'Category image'}
+                    src={imageUrl}
+                    alt={image?.altText || name || 'Category image'}
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover transition-transform duration-300 group-hover:scale-105"
@@ -42,7 +44,7 @@ const Categories = ({ categories }: ICategoriesProps) => (
             </div>
           </div>
         </Link>
-      ))}
+      )})}
     </div>
   </section>
 );

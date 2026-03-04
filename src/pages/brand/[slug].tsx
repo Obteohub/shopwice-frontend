@@ -1,53 +1,75 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
-
-import client from '@/utils/apollo/ApolloClient';
-
-import { GET_BRAND_DATA_BY_SLUG, GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE } from '@/utils/gql/TAXONOMY_QUERIES';
+import SeoHead from '@/components/SeoHead';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
-
 import Link from 'next/link';
-
-
+import {
+    buildArchiveSeoData,
+    getAbsoluteUrlFromRequest,
+    parsePageParam,
+} from '@/utils/seoPage';
+import { buildTaxonomyBreadcrumbs } from '@/utils/taxonomyBreadcrumbs';
+import { decodeHtmlEntities } from '@/utils/text';
 
 /**
- * Display brand page with filtering, sorting, and infinite scroll
+ * Display brand page with filtering, sorting, and pagination.
  */
+const normalizeList = <T,>(payload: any): T[] => {
+    if (Array.isArray(payload)) return payload as T[];
+    if (payload && typeof payload === 'object') {
+        if (Array.isArray(payload.data)) return payload.data as T[];
+        if (Array.isArray(payload.products)) return payload.products as T[];
+        if (Array.isArray(payload.results)) return payload.results as T[];
+    }
+    return [];
+};
+
 const BrandPage = ({
     brandName,
+    brandId,
     products,
-    pageInfo,
     slug,
     subBrands,
-    attr,
-    term,
+    description,
+    breadcrumbs,
+    totalCount,
+    initialHasNextPage,
+    seoData,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-    const attrTax = attr ? attrTaxonomyMap[attr.toLowerCase()] : undefined;
-    const hasAttrFilter = Boolean(attrTax && term);
-
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const handleStart = (url: string) => {
-            if (url !== router.asPath) {
-                setLoading(true);
-            }
+        const isQueryOnlyTransition = (nextUrl: string) => {
+            const currentPath = String(router.asPath || '').split('?')[0];
+            const nextPath = String(nextUrl || '').split('?')[0];
+            return currentPath === nextPath;
         };
-        const handleComplete = () => setLoading(false);
+        const handleStart = (url: string, options?: { shallow?: boolean }) => {
+            if (options?.shallow) return;
+            if (isQueryOnlyTransition(url)) return;
+            setLoading(true);
+        };
+        const handleComplete = (_url?: string, options?: { shallow?: boolean }) => {
+            if (options?.shallow) return;
+            setLoading(false);
+        };
+        const handleError = (_error: unknown, _url?: string, options?: { shallow?: boolean }) => {
+            if (options?.shallow) return;
+            setLoading(false);
+        };
 
         router.events.on('routeChangeStart', handleStart);
         router.events.on('routeChangeComplete', handleComplete);
-        router.events.on('routeChangeError', handleComplete);
+        router.events.on('routeChangeError', handleError);
 
         return () => {
             router.events.off('routeChangeStart', handleStart);
             router.events.off('routeChangeComplete', handleComplete);
-            router.events.off('routeChangeError', handleComplete);
+            router.events.off('routeChangeError', handleError);
         };
     }, [router]);
 
@@ -59,77 +81,122 @@ const BrandPage = ({
                     href={`/brand/${subBrand.slug}`}
                     className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-[#2c3338] text-sm font-medium rounded-full transition-colors border border-gray-200 capitalize"
                 >
-                    {subBrand.name.toLowerCase()}
+                    {decodeHtmlEntities(String(subBrand.name || '')).toLowerCase()}
                 </Link>
             ))}
         </div>
     ) : null;
 
     return (
-        <TaxonomyListingPage
-            title={brandName || 'Brand'}
-            products={products}
-            pageInfo={pageInfo}
-            slug={slug}
-            query={hasAttrFilter ? GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_BRAND_DATA_BY_SLUG}
-            queryVariables={hasAttrFilter
-                ? { id: slug, slug: [slug], attrTax, attrTerm: [term] }
-                : { id: slug, slug: [slug] }}
-            emptyMessage="No products found for this brand"
-            topSlot={subBrandSlot}
-            fetchAllForSort={true}
-            loading={loading}
-        />
+        <>
+            <SeoHead seoData={seoData} />
+            <TaxonomyListingPage
+                title={decodeHtmlEntities(brandName || 'Brand')}
+                products={products}
+                slug={slug}
+                queryParams={{ brand: brandId || slug }}
+                description={decodeHtmlEntities(description || '')}
+                emptyMessage="No products found for this brand"
+                topSlot={subBrandSlot}
+                totalCount={totalCount}
+                initialHasNextPage={initialHasNextPage}
+                loading={loading}
+                breadcrumbs={breadcrumbs}
+            />
+        </>
     );
 };
 
 export default BrandPage;
 
-export const getServerSideProps: GetServerSideProps = async ({ params, query }) => {
+export const getServerSideProps: GetServerSideProps = async ({ params, query, res, req }) => {
     const slug = params?.slug as string;
     const attr = (query?.attr as string | undefined) || '';
     const term = (query?.term as string | undefined) || '';
+    const page = parsePageParam(query?.page);
 
-    const attrTaxonomyMap: Record<string, string> = {
-        pa_condition: 'PA_CONDITION',
-    };
-
-    const attrTax = attrTaxonomyMap[attr.toLowerCase()];
-    const hasAttrFilter = Boolean(attrTax && term);
+    if (!slug) return { notFound: true };
 
     try {
-        const res = await client.query({
-            query: hasAttrFilter ? GET_BRAND_DATA_BY_SLUG_WITH_ATTRIBUTE : GET_BRAND_DATA_BY_SLUG,
-            variables: hasAttrFilter
-                ? { id: slug, slug: [slug], attrTax, attrTerm: [term], after: null }
-                : { id: slug, slug: [slug], after: null },
-            fetchPolicy: 'network-only'
-        });
+        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
 
-        const brandData = res.data.productBrand;
-        const productsData = res.data.products;
+        const productParams: any = {
+            // Use slug directly; API accepts both slug and numeric ID.
+            brand: slug,
+            per_page: 24,
+            page,
+        };
+        if (attr && term) {
+            productParams[`attribute_${attr}`] = term;
+        }
 
-        const products = productsData ? productsData.nodes : [];
-        const pageInfo = productsData ? productsData.pageInfo : { hasNextPage: false, endCursor: null };
-        const brandName = brandData ? brandData.name : slug;
-        const subBrands = brandData?.children?.nodes || [];
+        // Phase 1: fetch all brands + products in parallel.
+        const [allBrandsRaw, productsRaw] = await Promise.all([
+            api.get(ENDPOINTS.BRANDS),
+            api.get(ENDPOINTS.PRODUCTS, { params: productParams }),
+        ]);
 
-        // Check if brand exists or has content, if strictly needed. 
-        // But for now, if data returns, we render.
+        const allBrands: any[] = normalizeList<any>(allBrandsRaw);
+        const normalizedSlug = slug.toLowerCase();
+        const brand = allBrands.find((b: any) => b.slug?.toLowerCase() === normalizedSlug);
+
+        if (!brand) {
+            return { notFound: true };
+        }
+
+        const brandId = Number(brand.databaseId || brand.id || 0);
+        const subBrands = allBrands.filter((b: any) => Number(b.parent) === brandId);
+        const products: any[] = normalizeList<any>(productsRaw);
+        const totalCount = Number(brand?.count || 0);
+        const hasNextPage = totalCount > 0
+            ? page * 24 < totalCount
+            : products.length >= 24;
+
+        const brandQuery = new URLSearchParams();
+        if (page > 1) brandQuery.set('page', String(page));
+        if (attr && term) {
+            brandQuery.set('attr', attr);
+            brandQuery.set('term', term);
+        }
+        const brandPath = `/brand/${slug}${brandQuery.toString() ? `?${brandQuery.toString()}` : ''}`;
+        const pageUrl = getAbsoluteUrlFromRequest(req, brandPath);
+
+        // Phase 2: breadcrumbs + SEO in parallel.
+        const [breadcrumbs, seoData] = await Promise.all([
+            buildTaxonomyBreadcrumbs({
+                current: brand,
+                initialTerms: allBrands,
+                endpoint: ENDPOINTS.BRANDS,
+                basePath: '/brand',
+            }),
+            buildArchiveSeoData({
+                pageUrl,
+                title: decodeHtmlEntities(brand.name || 'Brand'),
+                description: decodeHtmlEntities(brand.description || ''),
+                currentPage: page,
+                hasNextPage,
+                productCount: products.length,
+            }),
+        ]);
 
         return {
             props: {
-                brandName: brandName as string,
-                products,
-                pageInfo,
+                brandName: decodeHtmlEntities(brand.name),
+                brandId,
+                products: products || [],
+                totalCount,
+                initialHasNextPage: hasNextPage,
                 slug,
                 subBrands,
                 attr,
                 term,
+                description: decodeHtmlEntities(brand.description || ''),
+                breadcrumbs,
+                seoData,
             },
         };
     } catch (error) {
-        console.error("Error fetching brand data:", error);
+        console.error('Error fetching brand data:', error);
         return { notFound: true };
     }
 };

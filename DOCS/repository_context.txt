@@ -226,8 +226,6 @@ debug_check.js
 debug_output_2.txt
 debug_output.txt
 debug_reviews.js
-deploy.sh
-ecosystem.config.js
 eslint.config.js
 final_check.html
 final_check.js
@@ -2648,49 +2646,6 @@ async function test() {
     }
 }
 test();
-```
-
-## File: deploy.sh
-```bash
-#!/bin/bash
-set -e # Exit on error
-# Deployment Fix Script for Vultr/CloudPanel
-# Usage: ./deploy.sh
-echo ">>> Stopping shopwice process..."
-# Using || true to prevent script failure if app doesn't exist yet
-pm2 delete shopwice || true
-echo ">>> Stashing any local changes (e.g. generated sitemaps)..."
-git stash
-echo ">>> Pulling latest code..."
-git pull origin main
-echo ">>> Rebuilding project..."
-npm ci --include=dev
-npm run build
-echo ">>> Checking PM2 Config..."
-cat ecosystem.config.js
-echo ">>> Starting Server with PM2..."
-pm2 start ecosystem.config.js
-pm2 save
-echo ">>> Done! Server should be running on Port 3001."
-pm2 list
-```
-
-## File: ecosystem.config.js
-```javascript
-module.exports = {
-    apps: [{
-        name: "shopwice",
-        script: "npm",
-        cwd: ".",
-        args: "start",
-        instances: 1,
-        exec_mode: "fork",
-        env: {
-            PORT: 3001,
-            NODE_ENV: "production"
-        }
-    }]
-}
 ```
 
 ## File: final_check.html

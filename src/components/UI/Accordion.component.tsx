@@ -5,30 +5,38 @@ interface AccordionProps {
     children: React.ReactNode;
     defaultOpen?: boolean;
     className?: string;
+    isOpen?: boolean;
+    onToggle?: () => void;
 }
 
 const Accordion: React.FC<AccordionProps> = ({
     title,
     children,
     defaultOpen = false,
-    className = ''
+    className = '',
+    isOpen: controlledIsOpen,
+    onToggle
 }) => {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
-    const [hasBeenOpened, setHasBeenOpened] = useState(defaultOpen);
+    const [internalIsOpen, setInternalIsOpen] = useState(defaultOpen);
+    const [hasBeenOpened, setHasBeenOpened] = useState(defaultOpen || (controlledIsOpen ?? false));
+
+    const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+
+    const handleToggle = () => {
+        if (onToggle) {
+            onToggle();
+        } else {
+            setInternalIsOpen((prev) => !prev);
+        }
+        setHasBeenOpened(true);
+    };
 
     return (
         <div className={`border-b border-gray-200 ${className}`}>
             <button
+                type="button"
                 className="w-full flex justify-between items-center py-2.5 text-left focus:outline-none focus:text-blue-600 group"
-                onClick={() => {
-                    setIsOpen((prev) => {
-                        const next = !prev;
-                        if (next) {
-                            setHasBeenOpened(true);
-                        }
-                        return next;
-                    });
-                }}
+                onClick={handleToggle}
                 aria-expanded={isOpen}
             >
                 <span className="text-[15px] font-semibold text-gray-900 group-hover:text-gray-700 transition-colors tracking-tight">
@@ -45,9 +53,16 @@ const Accordion: React.FC<AccordionProps> = ({
                     </svg>
                 </span>
             </button>
-            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[1000px]' : 'max-h-0'}`}>
-                <div className="pb-2 text-gray-600 text-sm leading-relaxed prose prose-sm max-w-none">
-                    {hasBeenOpened ? children : null}
+            <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                    isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                }`}
+                aria-hidden={!isOpen}
+            >
+                <div className="overflow-hidden">
+                    <div className="pb-2 text-gray-600 text-sm leading-relaxed prose prose-sm max-w-none">
+                        {hasBeenOpened ? children : null}
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,12 +1,9 @@
 import Link from 'next/link';
 import Layout from '@/components/Layout/Layout.component';
-import client from '@/utils/apollo/ApolloClient';
-import { GET_404_PAGE_PRODUCTS } from '@/utils/gql/GQL_QUERIES';
 import ProductCard from '@/components/Product/ProductCard.component';
 import { Product } from '@/types/product';
-
-
-
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
 
 interface Custom404Props {
     bestSellers: Product[];
@@ -82,15 +79,16 @@ export default function Custom404({ bestSellers, newest, topRated }: Custom404Pr
 
 export async function getStaticProps() {
     try {
-        const { data } = await client.query({
-            query: GET_404_PAGE_PRODUCTS,
+        const products: any = await api.get(ENDPOINTS.PRODUCTS, {
+            params: { per_page: 15 },
+            skipReviewEnrich: true,
         });
 
         return {
             props: {
-                bestSellers: data?.bestSellers?.nodes || [],
-                newest: data?.newest?.nodes || [],
-                topRated: data?.topRated?.nodes || [],
+                bestSellers: products.slice(0, 5) || [],
+                newest: products.slice(5, 10) || [],
+                topRated: products.slice(10, 15) || [],
             },
         };
     } catch (error) {

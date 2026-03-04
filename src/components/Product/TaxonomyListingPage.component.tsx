@@ -3,24 +3,37 @@ import Layout from '@/components/Layout/Layout.component';
 import BackButton from '@/components/UI/BackButton.component';
 import ProductList from '@/components/Product/ProductList.component';
 import { Product } from '@/types/product';
+import type { RestProduct } from '@/hooks/useProductFilters';
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.component';
+import type { ApiFacetGroup, CollectionFilterState, RouteScope } from '@/features/collection/types';
 
 interface TaxonomyListingPageProps {
   title: string;
-  products: Product[];
+  products: Product[] | RestProduct[];
   pageInfo?: {
     hasNextPage: boolean;
     endCursor: string | null;
   };
   slug: string;
-  query: any;
-  queryVariables: Record<string, any>;
+  query?: any;
+  queryParams?: Record<string, any>;
+  queryVariables?: Record<string, any>;
   description?: string | null;
   emptyMessage?: string;
   topSlot?: React.ReactNode;
   totalCount?: number;
+  initialHasNextPage?: boolean;
+  initialFacets?: ApiFacetGroup[];
+  forcedState?: Partial<CollectionFilterState>;
+  omitManagedQueryKeys?: string[];
+  customRouteScope?: RouteScope;
+  brandHierarchy?: {
+    trail: Array<{ label: string; path: string; isCurrent?: boolean }>;
+    children: Array<{ label: string; path: string; count?: number; isCurrent?: boolean }>;
+  };
   fetchAllForSort?: boolean;
   loading?: boolean;
+  breadcrumbs?: Array<{ label?: string; href?: string | null }> | null;
 }
 
 const TaxonomyListingPage = ({
@@ -29,14 +42,30 @@ const TaxonomyListingPage = ({
   pageInfo,
   slug,
   query,
+  queryParams,
   queryVariables,
   description,
   emptyMessage = 'No products found',
   topSlot,
   totalCount,
+  initialHasNextPage,
+  initialFacets,
+  forcedState,
+  omitManagedQueryKeys,
+  customRouteScope,
+  brandHierarchy,
   fetchAllForSort,
   loading = false,
+  breadcrumbs,
 }: TaxonomyListingPageProps) => {
+  void queryParams;
+  void initialHasNextPage;
+  void initialFacets;
+  void forcedState;
+  void omitManagedQueryKeys;
+  void customRouteScope;
+  void brandHierarchy;
+  void breadcrumbs;
   return (
     <Layout title={title || 'Products'} fullWidth={true}>
       <div className="px-2 md:px-4 pt-1 pb-1">
@@ -71,7 +100,7 @@ const TaxonomyListingPage = ({
               pageInfo={pageInfo}
               slug={slug}
               query={query}
-              queryVariables={queryVariables}
+              queryVariables={queryVariables || {}}
               totalCount={totalCount}
               fetchAllForSort={fetchAllForSort}
             />

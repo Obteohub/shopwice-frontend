@@ -1,19 +1,63 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@apollo/client';
-import { FETCH_ALL_LOCATIONS_QUERY } from '@/utils/gql/GQL_QUERIES';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
 import { useLocationStore } from '@/stores/locationStore';
+
+let locationsCache: any[] | null = null;
+let locationsPromise: Promise<any[]> | null = null;
+
+const fetchLocationsOnce = async () => {
+    if (Array.isArray(locationsCache) && locationsCache.length > 0) {
+        return locationsCache;
+    }
+
+    if (!locationsPromise) {
+        locationsPromise = api.get(ENDPOINTS.LOCATIONS)
+            .then((data: any) => {
+                const safe = Array.isArray(data) ? data : [];
+                locationsCache = safe;
+                return safe;
+            })
+            .finally(() => {
+                locationsPromise = null;
+            });
+    }
+
+    return locationsPromise;
+};
 
 const LocationPicker = ({ variant = 'default' }: { variant?: 'default' | 'headless' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [mounted] = useState(() => typeof window !== 'undefined');
     const [isDetecting, setIsDetecting] = useState(false);
     const [geoError, setGeoError] = useState<string | null>(null);
+    const [locations, setLocations] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const { selectedLocation, setSelectedLocation } = useLocationStore();
-    const { data, loading } = useQuery(FETCH_ALL_LOCATIONS_QUERY);
 
-    const locations = useMemo(() => data?.productLocations?.nodes || [], [data]);
+    const loadLocations = useCallback(async () => {
+        if (locations.length > 0) return;
+        setLoading(true);
+        try {
+            const data = await fetchLocationsOnce();
+            setLocations(data);
+            setLoading(false);
+        } catch (error) {
+            console.error('Error loading locations:', error);
+            setLoading(false);
+        }
+    }, [locations.length]);
+
+    // Preload locations only for visible desktop picker.
+    // Headless/modal-only instance should not trigger duplicate API calls.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (variant !== 'default') return;
+        if (!window.matchMedia('(min-width: 768px)').matches) return;
+        void loadLocations();
+    }, [variant, loadLocations]);
 
     // Set default location if none selected and data is loaded
     useEffect(() => {
@@ -25,12 +69,17 @@ const LocationPicker = ({ variant = 'default' }: { variant?: 'default' | 'headle
     // Close dropdown on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as HTMLElement)) {
                 setIsOpen(false);
             }
         };
 
-        const handleOpenEvent = () => setIsOpen(true);
+        const handleOpenEvent = () => {
+            setIsOpen(true);
+            if (locations.length === 0) {
+                void loadLocations();
+            }
+        };
 
         document.addEventListener('mousedown', handleClickOutside);
 
@@ -45,7 +94,7 @@ const LocationPicker = ({ variant = 'default' }: { variant?: 'default' | 'headle
                 window.removeEventListener('open-location-picker', handleOpenEvent);
             }
         };
-    }, [variant]); // Add variant dependency
+    }, [variant, locations.length, loadLocations]);
 
     const handleDetectLocation = () => {
         setIsDetecting(true);
@@ -80,8 +129,6 @@ const LocationPicker = ({ variant = 'default' }: { variant?: 'default' | 'headle
                             setSelectedLocation({ name: match.name, slug: match.slug });
                             setIsOpen(false);
                         } else {
-                            // If no direct match, we could potentially set it as a "custom" location
-                            // block or just inform the user. For now, let's just use the name if it's high quality.
                             setGeoError(`Detected "${detectedCity}" but it's not in our delivery areas yet.`);
                         }
                     } else {
@@ -111,7 +158,7 @@ const LocationPicker = ({ variant = 'default' }: { variant?: 'default' | 'headle
             >
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                     <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Select Delivery Location</h3>
-                    <button type="button" onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-200/50 touch-manipulation">
+                    <button type="button" onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-200/50 touch-manipulation" title="Close" aria-label="Close location picker">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
@@ -186,7 +233,13 @@ const LocationPicker = ({ variant = 'default' }: { variant?: 'default' | 'headle
     return (
         <div className="relative" ref={dropdownRef}>
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    const next = !isOpen;
+                    setIsOpen(next);
+                    if (next && locations.length === 0) {
+                        void loadLocations();
+                    }
+                }}
                 className="flex items-center gap-2.5 group p-1 transition-colors"
                 aria-label="Select Location"
             >

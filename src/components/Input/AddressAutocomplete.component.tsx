@@ -1,190 +1,231 @@
-import React from 'react';
-import usePlacesAutocomplete, {
-    getGeocode,
-} from 'use-places-autocomplete';
+import { useState, useEffect, useRef } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { useJsApiLoader } from '@react-google-maps/api';
-import { useQuery } from '@apollo/client';
-import { GET_ALLOWED_COUNTRIES } from '../../utils/gql/GQL_QUERIES';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
 
-interface IAddressAutocompleteProps {
-    label: string;
-    name: string;
+interface AddressAutocompleteProps {
+    label?: string;
+    name?: string;
+    placeholder?: string;
+    autoLocateOnMount?: boolean;
 }
 
-const libraries: ("places")[] = ["places"];
+export default function AddressAutocomplete({
+    label,
+    name = 'address1',
+    placeholder = 'Enter address',
+    autoLocateOnMount = false,
+}: AddressAutocompleteProps) {
+    const { register, setValue, watch } = useFormContext();
+    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isLocating, setIsLocating] = useState(false);
+    const [geoError, setGeoError] = useState<string | null>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const hasAutoTriggeredLocation = useRef(false);
 
-const AddressAutocompleteInput = ({ label, name }: IAddressAutocompleteProps) => {
-    // Fetch allowed countries for restriction
-    const { data: countriesData } = useQuery(GET_ALLOWED_COUNTRIES);
-    const allowedCountries = countriesData?.wooCommerce?.countries || [];
-    // Default to 'gh' if no countries found, otherwise use the code of the first allowed country or a list if possible
-    // use-places-autocomplete expects a string or array of strings (max 5)
-    const countryRestriction = allowedCountries.length > 0
-        ? allowedCountries.slice(0, 5).map((c: any) => c.code.toLowerCase())
-        : 'gh';
+    const inputValue = watch(name);
 
-    const {
-        ready,
-        value,
-        suggestions: { status, data },
-        setValue,
-        clearSuggestions,
-    } = usePlacesAutocomplete({
-        requestOptions: {
-            componentRestrictions: { country: countryRestriction },
-        },
-        debounce: 300,
-    });
+    // Close suggestions when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
-    const { register, setValue: setFormValue } = useFormContext();
+    // Fetch suggestions as user types
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            if (!inputValue || inputValue.length < 3 || !showSuggestions) {
+                setSuggestions([]);
+                return;
+            }
 
-    const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setValue(e.target.value);
-        setFormValue(name, e.target.value);
+            setIsLoading(true);
+            try {
+                const res: any = await api.get(`${ENDPOINTS.PLACES.AUTOCOMPLETE}?input=${encodeURIComponent(inputValue)}`);
+                if (res?.predictions) {
+                    setSuggestions(res.predictions);
+                }
+            } catch (err) {
+                console.error('[AddressAutocomplete] Error:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        const timeoutId = setTimeout(fetchSuggestions, 300);
+        return () => clearTimeout(timeoutId);
+    }, [inputValue, showSuggestions]);
+
+    const handleSelect = async (suggestion: any) => {
+        setValue(name, suggestion.description);
+        setSuggestions([]);
+        setShowSuggestions(false);
+
+        // Fetch details to auto-fill other fields
+        try {
+            const res: any = await api.get(`${ENDPOINTS.PLACES.DETAILS}?place_id=${suggestion.place_id}`);
+            if (res?.result?.address_components) {
+                const components = res.result.address_components;
+
+                // Extract address components
+                const getComponent = (types: string[]) =>
+                    components.find((c: any) => types.every(t => c.types.includes(t)))?.long_name || '';
+
+                const city = getComponent(['locality']) || getComponent(['administrative_area_level_2']);
+                const state = getComponent(['administrative_area_level_1']);
+                const postcode = getComponent(['postal_code']);
+
+                if (city) setValue('city', city);
+                if (state) {
+                    const { normalizeGhanaRegionName } = await import('@/utils/constants/REGIONS');
+                    setValue('state', normalizeGhanaRegionName(state), { shouldValidate: true });
+                }
+                if (postcode) setValue('postcode', postcode);
+            }
+        } catch (err) {
+            console.error('[AddressAutocomplete] Error fetching details:', err);
+        }
     };
 
-    const handleSelect =
-        ({ description }: { description: string }) =>
-            () => {
-                setValue(description, false);
-                clearSuggestions();
-                setFormValue(name, description);
+    const fillFromAddressComponents = async (formattedAddress: string, components: any[]) => {
+        setValue(name, formattedAddress || '');
 
-                getGeocode({ address: description }).then((results) => {
-                    const cityComponent = results[0]?.address_components.find(
-                        (component) => component.types.includes('locality') || component.types.includes('administrative_area_level_2')
-                    );
+        const getComponent = (types: string[]) =>
+            components.find((c: any) => types.every((t) => c.types.includes(t)))?.long_name || '';
 
-                    if (cityComponent) {
-                        setFormValue('city', cityComponent.long_name);
-                    }
+        const city = getComponent(['locality']) || getComponent(['administrative_area_level_2']);
+        const state = getComponent(['administrative_area_level_1']);
+        const postcode = getComponent(['postal_code']);
 
-                    const stateComponent = results[0]?.address_components.find(
-                        (component) => component.types.includes('administrative_area_level_1')
-                    );
+        if (city) setValue('city', city);
+        if (state) {
+            const { normalizeGhanaRegionName } = await import('@/utils/constants/REGIONS');
+            setValue('state', normalizeGhanaRegionName(state), { shouldValidate: true });
+        }
+        if (postcode) setValue('postcode', postcode);
+    };
 
-                    if (stateComponent) {
-                        setFormValue('state', stateComponent.long_name);
-                    }
-                });
-            };
-
-    const handleUseCurrentLocation = () => {
+    const handleUseCurrentLocation = async () => {
+        setGeoError(null);
         if (!navigator.geolocation) {
-            alert("Geolocation is not supported by your browser");
+            setGeoError('Geolocation is not supported by this browser.');
             return;
         }
 
+        setIsLocating(true);
         navigator.geolocation.getCurrentPosition(
-            (position) => {
+            async (position) => {
                 const { latitude, longitude } = position.coords;
-                // Reverse geocode
-                getGeocode({ location: { lat: latitude, lng: longitude } })
-                    .then((results) => {
-                        if (results[0]) {
-                            const address = results[0].formatted_address;
-                            setValue(address, false);
-                            clearSuggestions();
-                            setFormValue(name, address);
+                try {
+                    const res: any = await api.get(
+                        `${ENDPOINTS.PLACES.REVERSE_GEOCODE}?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`
+                    );
 
-                            // Parse city (similar to handleSelect)
-                            const cityComponent = results[0].address_components.find(
-                                (component) => component.types.includes('locality') || component.types.includes('administrative_area_level_2')
-                            );
+                    const firstResult = res?.results?.[0];
+                    if (!firstResult) {
+                        setGeoError('Could not resolve your current address.');
+                        return;
+                    }
 
-                            if (cityComponent) {
-                                setFormValue('city', cityComponent.long_name);
-                            }
-
-                            const stateComponent = results[0].address_components.find(
-                                (component) => component.types.includes('administrative_area_level_1')
-                            );
-
-                            if (stateComponent) {
-                                setFormValue('state', stateComponent.long_name);
-                            }
-                        }
-                    })
-                    .catch((error) => {
-                        console.error('Error finding address:', error);
-                        alert("Found location but failed to find address: " + error.message);
-                    });
+                    await fillFromAddressComponents(
+                        firstResult.formatted_address || '',
+                        firstResult.address_components || []
+                    );
+                } catch (err) {
+                    console.error('[AddressAutocomplete] Error reverse geocoding:', err);
+                    setGeoError('Failed to fetch your current address.');
+                } finally {
+                    setIsLocating(false);
+                }
             },
             (error) => {
-                console.error('Geolocation error:', error);
-                let msg = "Unable to retrieve your location";
-                if (error.code === 1) msg = "Location permission denied. Please allow access in browser settings.";
-                if (error.code === 2) msg = "Location unavailable. Ensure GPS is on.";
-                if (error.code === 3) msg = "Location request timed out.";
-                alert(msg);
+                if (error.code === error.PERMISSION_DENIED) {
+                    setGeoError('Location permission denied.');
+                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                    setGeoError('Location unavailable.');
+                } else if (error.code === error.TIMEOUT) {
+                    setGeoError('Location request timed out.');
+                } else {
+                    setGeoError('Failed to fetch current location.');
+                }
+                setIsLocating(false);
             },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            {
+                enableHighAccuracy: true,
+                timeout: 12000,
+                maximumAge: 60000,
+            }
         );
     };
 
-    return (
-        <div className="w-full relative">
-            <label htmlFor={name} className="block mb-1 text-xs font-bold text-gray-700">
-                {label}
-            </label>
-            <div className="relative">
-                <input
-                    {...register(name)}
-                    value={value}
-                    onChange={handleInput}
-                    disabled={!ready}
-                    className="bg-white border border-gray-300 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5 pr-8 placeholder-gray-400"
-                    placeholder={label}
-                    autoComplete="off"
-                />
-                <button
-                    type="button"
-                    onClick={handleUseCurrentLocation}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
-                    title="Use my current location"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </button>
-            </div>
+    // Auto-trigger location lookup once on mount for checkout.
+    // Users can still manually retry via the button.
+    useEffect(() => {
+        if (!autoLocateOnMount) return;
+        if (hasAutoTriggeredLocation.current) return;
+        if (name !== 'address1') return;
+        if (inputValue && String(inputValue).trim().length > 0) return;
 
-            {status === 'OK' && (
-                <ul className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-60 overflow-y-auto">
-                    {data.map(({ place_id, description }) => (
-                        <li
-                            key={place_id}
-                            onClick={handleSelect({ description })}
-                            className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm text-gray-700"
-                        >
-                            {description}
-                        </li>
-                    ))}
-                </ul>
+        hasAutoTriggeredLocation.current = true;
+        const timer = setTimeout(() => {
+            handleUseCurrentLocation();
+        }, 50);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoLocateOnMount, name, inputValue]);
+
+    return (
+        <div className="w-full relative" ref={wrapperRef}>
+            {label && (
+                <div className="mb-1 flex items-center justify-between gap-2">
+                    <label htmlFor={name} className="block text-xs font-bold text-gray-700">
+                        {label}
+                    </label>
+                    <button
+                        type="button"
+                        onClick={handleUseCurrentLocation}
+                        disabled={isLocating}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLocating ? 'Locating...' : 'Use current location'}
+                    </button>
+                </div>
             )}
+            <input
+                id={name}
+                {...register(name)}
+                type="text"
+                autoComplete="off"
+                onFocus={() => setShowSuggestions(true)}
+                placeholder={placeholder}
+                className="bg-white border border-gray-300 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5"
+            />
+
+            {showSuggestions && (suggestions.length > 0 || isLoading) && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-60 overflow-y-auto">
+                    {isLoading && (
+                        <div className="p-2 text-xs text-gray-500">Searching...</div>
+                    )}
+                    {suggestions.map((suggestion) => (
+                        <div
+                            key={suggestion.place_id}
+                            onClick={() => handleSelect(suggestion)}
+                            className="p-2 text-sm hover:bg-gray-100 cursor-pointer border-b border-gray-50 last:border-0"
+                        >
+                            <div className="font-semibold text-xs">{suggestion.structured_formatting?.main_text}</div>
+                            <div className="text-[10px] text-gray-500">{suggestion.structured_formatting?.secondary_text}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+            {geoError && <p className="mt-1 text-[10px] text-red-600">{geoError}</p>}
         </div>
     );
-};
-
-const AddressAutocomplete = (props: IAddressAutocompleteProps) => {
-    const { isLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-        libraries,
-    });
-
-    if (!isLoaded) {
-        return (
-            <div className="w-full">
-                <label className="block mb-1 text-xs font-bold text-gray-700">{props.label}</label>
-                <input disabled className="bg-gray-100 border border-gray-300 text-gray-500 text-sm rounded block w-full p-1.5" placeholder="Loading..." />
-            </div>
-        );
-    }
-
-    return <AddressAutocompleteInput {...props} />;
-};
-
-export default AddressAutocomplete;
+}

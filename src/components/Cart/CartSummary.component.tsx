@@ -2,14 +2,16 @@
 import React from 'react';
 import Link from 'next/link';
 import Button from '@/components/UI/Button.component';
+import { formatPriceWithDecimals } from '@/utils/functions/functions';
 
 interface CartSummaryProps {
     subtotal: string;
     total: string;
     totalProductsCount: number;
+    currencyMinorUnit?: number;
 }
 
-const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, total, totalProductsCount }) => {
+const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, total, totalProductsCount, currencyMinorUnit = 2 }) => {
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
             <h2 className="text-lg font-bold text-gray-900 mb-4 pb-4 border-b border-gray-100">Order Summary</h2>
@@ -17,7 +19,7 @@ const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, total, totalProduct
             <div className="space-y-3 mb-6">
                 <div className="flex justify-between items-center text-gray-600">
                     <span>Subtotal ({totalProductsCount} items)</span>
-                    <span className="font-medium text-gray-900">{subtotal}</span>
+                    <span className="font-medium text-gray-900">{formatPriceWithDecimals(subtotal, undefined, currencyMinorUnit)}</span>
                 </div>
 
                 <div className="flex justify-between items-center text-gray-600">
@@ -27,12 +29,12 @@ const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, total, totalProduct
 
                 <div className="flex justify-between items-center text-lg font-bold text-gray-900 border-t border-gray-100 pt-4 mt-4">
                     <span>Total</span>
-                    <span>{total}</span>
+                    <span>{formatPriceWithDecimals(total, undefined, currencyMinorUnit)}</span>
                 </div>
             </div>
 
             <Link href="/checkout" className="block w-full">
-                <Button className="w-full py-4 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all rounded-lg">
+                <Button className="w-full py-4 text-base font-bold bg-[#fa710f] hover:bg-[#fa710f] border-[#fa710f] text-white shadow-md hover:shadow-lg transition-all rounded-lg">
                     Proceed to Checkout
                 </Button>
             </Link>

@@ -1,77 +1,124 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@apollo/client';
-import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
+import { decodeHtmlEntities } from '@/utils/text';
 
 interface Category {
-    id: string;
-    databaseId: number;
+    id: string | number;
     name: string;
     slug: string;
-    parent?: number | null;
-    children?: {
-        nodes: Category[];
-    };
+    parent?: number | string | null;
+    children?: Category[];
 }
 
 const CACHE_KEY = 'shopwice_menu_cache';
+const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
 const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
-    const [cachedData] = useState<any>(() => {
-        if (typeof window === 'undefined') return null;
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (!cached) return null;
-        try {
-            return JSON.parse(cached);
-        } catch (e) {
-            console.error('Error parsing menu cache', e);
-            localStorage.removeItem(CACHE_KEY);
-            return null;
-        }
-    });
+    const [categories, setCategories] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
     const [viewStack, setViewStack] = useState<Category[]>([]);
 
-    const { data: queryData, loading: queryLoading, error: queryError } = useQuery(FETCH_ALL_CATEGORIES_QUERY, {
-        fetchPolicy: 'network-only',
-        skip: !isOpen || !!cachedData,
-        onCompleted: (result) => {
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(CACHE_KEY, JSON.stringify(result));
-            }
-        }
-    });
+    const normalizeCategories = (payload: any): any[] => {
+        const normalizeNames = (rows: any[]) =>
+            rows.map((cat) => ({
+                ...cat,
+                name: decodeHtmlEntities(String(cat?.name ?? '')).trim(),
+            }));
 
-    const data = cachedData || queryData;
-    const loading = queryLoading && !cachedData;
-    const error = queryError;
+        if (Array.isArray(payload)) return normalizeNames(payload);
+        if (payload && typeof payload === 'object') {
+            if (Array.isArray(payload.data)) return normalizeNames(payload.data);
+            if (Array.isArray(payload.categories)) return normalizeNames(payload.categories);
+            if (Array.isArray(payload.results)) return normalizeNames(payload.results);
+        }
+        return [];
+    };
+
+    const loadCategories = useCallback(async () => {
+        setLoading(true);
+        try {
+            // Check cache first
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                try {
+                    const { data, timestamp } = JSON.parse(cached);
+                    const age = Date.now() - timestamp;
+
+                    if (age < CACHE_DURATION) {
+                        setCategories(normalizeCategories(data));
+                        setLoading(false);
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Error parsing menu cache', e);
+                    localStorage.removeItem(CACHE_KEY);
+                }
+            }
+
+            // Fetch from API
+            const data: any = await api.get(ENDPOINTS.CATEGORIES);
+            const normalized = normalizeCategories(data);
+            setCategories(normalized);
+            setLoading(false);
+
+            // Cache the result
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(CACHE_KEY, JSON.stringify({
+                    data: normalized,
+                    timestamp: Date.now()
+                }));
+            }
+        } catch (err: any) {
+            console.error('Error loading categories:', err);
+            setError(err);
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isOpen && categories.length === 0) {
+            const timer = setTimeout(() => {
+                loadCategories();
+            }, 0);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen, categories.length, loadCategories]);
 
     const categoryTree = useMemo(() => {
-        const nodes: Category[] = data?.productCategories?.nodes || [];
-        const byId = new Map<number, Category>();
-        nodes.forEach((node) => {
-            byId.set(node.databaseId, { ...node, children: { nodes: [] } });
+        const byId = new Map<string | number, Category>();
+        categories.forEach((cat) => {
+            const id = cat.id ?? cat.databaseId;
+            byId.set(id, { ...cat, children: [] });
         });
-        byId.forEach((node) => {
-            const parentId = typeof node.parent === 'number' ? node.parent : Number(node.parent || 0);
+        byId.forEach((cat) => {
+            const parentId = cat.parent ?? 0;
             if (parentId && byId.has(parentId)) {
-                byId.get(parentId)?.children?.nodes.push(node);
+                byId.get(parentId)?.children?.push(cat);
             }
         });
-        return Array.from(byId.values()).filter((node) => !node.parent || Number(node.parent) === 0);
-    }, [data]);
+        return Array.from(byId.values()).filter((cat) => !cat.parent || cat.parent === 0 || cat.parent === '0');
+    }, [categories]);
 
     const currentCategory = viewStack.length > 0 ? viewStack[viewStack.length - 1] : null;
     const categoriesToShow = currentCategory
-        ? currentCategory.children?.nodes
+        ? currentCategory.children
         : categoryTree;
+
+    const handleClose = () => {
+        setViewStack([]);
+        onClose();
+    };
 
     if (!isOpen) return null;
 
     const handleCategoryClick = (category: Category) => {
-        if (category.children && category.children.nodes.length > 0) {
+        if (category.children && category.children.length > 0) {
             setViewStack([...viewStack, category]);
         } else {
-            onClose();
+            handleClose();
         }
     };
 
@@ -80,9 +127,9 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-[120] flex">
             {/* Overlay */}
-            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleClose}></div>
 
             {/* Sidebar */}
             <div className="relative w-4/5 max-w-xs h-full bg-white shadow-xl flex flex-col font-sans">
@@ -98,7 +145,7 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                     ) : (
                         <span className="font-bold text-lg text-gray-800">Menu</span>
                     )}
-                    <button onClick={onClose} className="p-1" aria-label="Close menu">
+                    <button onClick={handleClose} className="p-1" aria-label="Close menu">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-gray-500">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -120,10 +167,10 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                             {viewStack.length === 0 && (
                                 <>
                                     <li className="border-b border-gray-100 pb-2">
-                                        <Link href="/" onClick={onClose} className="block py-2 text-[15px] font-bold text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">Home</Link>
+                                        <Link href="/" prefetch={false} onClick={handleClose} className="block py-2 text-[15px] font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">Home</Link>
                                     </li>
                                     <li className="border-b border-gray-100 pb-2">
-                                        <Link href="/my-account" onClick={onClose} className="block py-2 text-[15px] font-bold text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">My Account</Link>
+                                        <Link href="/my-account" prefetch={false} onClick={handleClose} className="block py-2 text-[15px] font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">My Account</Link>
                                     </li>
                                 </>
                             )}
@@ -133,7 +180,8 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                                 <li className="border-b border-gray-100 bg-gray-50 -mx-4 px-4">
                                     <Link
                                         href={`/product-category/${currentCategory.slug}`}
-                                        onClick={onClose}
+                                        prefetch={false}
+                                        onClick={handleClose}
                                         className="block py-3 text-[15px] font-bold text-gray-900 hover:text-blue-600"
                                     >
                                         All {currentCategory.name}
@@ -144,12 +192,12 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                             {/* Dynamic Categories */}
                             {categoriesToShow?.map((cat: Category) => (
                                 <li key={cat.id} className="border-b border-gray-50">
-                                    {cat.children && cat.children.nodes.length > 0 ? (
+                                    {cat.children && cat.children.length > 0 ? (
                                         <button
                                             onClick={() => handleCategoryClick(cat)}
                                             className="w-full flex items-center justify-between py-2.5 text-left group hover:bg-gray-50"
                                         >
-                                            <span className="text-[15px] font-bold text-gray-700 group-hover:text-gray-900 transition-colors">{cat.name}</span>
+                                            <span className="text-[15px] font-semibold text-gray-700 group-hover:text-gray-900 transition-colors">{cat.name}</span>
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 text-gray-400">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                                             </svg>
@@ -157,8 +205,9 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                                     ) : (
                                         <Link
                                             href={`/product-category/${cat.slug}`}
-                                            onClick={onClose}
-                                            className="block py-2.5 text-[15px] text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                                            prefetch={false}
+                                            onClick={handleClose}
+                                            className="block py-2.5 text-[15px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                                         >
                                             {cat.name}
                                         </Link>

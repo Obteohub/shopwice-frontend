@@ -2,22 +2,29 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { IProductRootObject } from '@/utils/functions/functions';
+import { RestCartItem } from '@/utils/cartTransformers';
+import { getSlugFromUrl } from '@/utils/functions/productUtils';
+import { formatPriceWithDecimals } from '@/utils/functions/functions';
 import QuantityControl from './QuantityControl.component';
+import { normalizeImageUrl } from '@/utils/image';
 
 interface CartItemProps {
-    item: IProductRootObject;
+    item: RestCartItem;
     onUpdateQuantity: (newQty: number) => void;
     onRemove: () => void;
     loading: boolean;
 }
 
 const CartItem: React.FC<CartItemProps> = ({ item, onUpdateQuantity, onRemove, loading }) => {
-    const { product, quantity, subtotal } = item;
-    const { node } = product;
+    const { quantity } = item;
+    const lineTotal = item.totals?.line_total || item.totals?.line_subtotal || '0';
+    const currencyMinorUnit = item?.totals?.currency_minor_unit ?? item?.prices?.currency_minor_unit ?? 2;
+    const imageUrl = normalizeImageUrl(item.images?.[0]?.src);
+    const variationLabel = item.variation
+        ? item.variation.map((attr) => `${attr.attribute}: ${attr.value}`).join(', ')
+        : '';
 
-    // Guard clause for missing product node
-    if (!node) {
+    if (!item?.name) {
         return null;
     }
 
@@ -25,30 +32,30 @@ const CartItem: React.FC<CartItemProps> = ({ item, onUpdateQuantity, onRemove, l
         <div className={`flex flex-row items-center p-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-all gap-4 ${loading ? 'opacity-40 pointer-events-none grayscale-[0.5]' : ''}`}>
             {/* Image */}
             <div className="relative w-24 h-24 flex-shrink-0 bg-white border border-gray-200 rounded-md overflow-hidden">
-                <Image
-                    src={node.image?.sourceUrl || '/placeholder.png'}
-                    alt={node.name || 'Product Image'}
-                    fill
-                    className="object-contain p-2"
-                    sizes="96px"
-                />
+                {imageUrl ? (
+                    <Image
+                        src={imageUrl}
+                        alt={item.name || 'Product Image'}
+                        fill
+                        className="object-contain p-2"
+                        sizes="96px"
+                    />
+                ) : null}
             </div>
 
             {/* Info */}
             <div className="flex-grow flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                     <Link
-                        href={`/product/${node.slug}`}
+                        href={`/product/${getSlugFromUrl(item.permalink)}`}
                         className="text-sm md:text-base font-medium text-gray-900 hover:text-blue-600 line-clamp-2 mb-1"
                     >
-                        {node.name}
+                        {item.name}
                     </Link>
                     {/* Optional: Show attributes here if variable product */}
-                    {item.variation && (
+                    {variationLabel && (
                         <div className="text-xs text-gray-500 space-y-1">
-                            {item.variation.node.attributes?.nodes.map(attr => (
-                                <span key={attr.name} className="block">{attr.name}: {attr.value}</span>
-                            ))}
+                            <span className="block">{variationLabel}</span>
                         </div>
                     )}
                     <button
@@ -72,7 +79,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onUpdateQuantity, onRemove, l
                     </div>
 
                     <div className="min-w-[80px] text-right">
-                        <span className="block font-bold text-gray-900">{subtotal}</span>
+                        <span className="block font-bold text-gray-900">{formatPriceWithDecimals(lineTotal, undefined, currencyMinorUnit)}</span>
                     </div>
 
                     <button

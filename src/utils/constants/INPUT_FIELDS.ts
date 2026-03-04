@@ -3,13 +3,13 @@ export const INPUT_FIELDS = [
     id: 0,
     label: 'First Name',
     name: 'firstName',
-    customValidation: { required: true, minLength: 4 },
+    customValidation: { required: true, minLength: 2 },
   },
   {
     id: 1,
     label: 'Last Name',
     name: 'lastName',
-    customValidation: { required: true, minLength: 4 },
+    customValidation: { required: true, minLength: 2 },
   },
   {
     id: 2,
@@ -19,32 +19,41 @@ export const INPUT_FIELDS = [
   },
   {
     id: 3,
-    label: 'Country / Region',
+    label: 'Country',
     name: 'country',
     customValidation: { required: true },
   },
   {
-    id: 7,
-    label: 'Region', // Updated to 'Region' as per user request (was State/County)
+    id: 4,
+    label: 'Region',
     name: 'state',
-    customValidation: { required: false },
+    customValidation: { required: true },
   },
   {
-    id: 4,
+    id: 5,
     label: 'City',
     name: 'city',
     customValidation: { required: true, minLength: 2 },
   },
   {
-    id: 5,
-    label: 'Email',
-    name: 'email',
-    customValidation: { required: true, type: 'email' },
+    id: 6,
+    label: 'Postcode',
+    name: 'postcode',
+    customValidation: { required: false },
   },
   {
-    id: 6,
+    id: 7,
+    label: 'Email',
+    name: 'email',
+    customValidation: {
+      required: true,
+      pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    },
+  },
+  {
+    id: 8,
     label: 'Phone',
     name: 'phone',
-    customValidation: { required: true, minLength: 8, pattern: /^[+0-9]{8,12}$/ },
+    customValidation: { required: true, minLength: 8, pattern: /^\+?[0-9]{8,12}$/ },
   },
 ];

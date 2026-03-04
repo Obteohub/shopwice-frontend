@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from '@/utils/text';
+
 interface IPageTitleProps {
   title: string;
 }
@@ -12,7 +14,7 @@ const PageTitle = ({ title }: IPageTitleProps) => (
   <section className="w-full bg-white border-b border-gray-200">
     <div className="container mx-auto py-12 px-6">
       <h1 className="text-2xl text-center tracking-wider text-gray-900 uppercase">
-        {title}
+        {decodeHtmlEntities(title)}
       </h1>
     </div>
   </section>

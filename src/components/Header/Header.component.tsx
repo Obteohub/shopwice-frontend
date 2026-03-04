@@ -1,5 +1,3 @@
-import Head from 'next/head';
-
 import Navbar from './Navbar.component';
 
 interface IHeaderProps {
@@ -13,22 +11,15 @@ interface IHeaderProps {
  * @returns {JSX.Element} - Rendered component
  */
 
-const Header = ({ title }: IHeaderProps) => (
-  <>
-    <Head>
-      <title>{`Shopwice ${title}`}</title>
-      <meta name="description" content="Online Shopping in Ghana" />
-      <meta name="keywords" content="Online Shopping in Ghana" />
-      <meta
-        property="og:title"
-        content="Shopwice"
-        key="pagetitle"
-      />
-    </Head>
-    <div className="w-full">
-      <Navbar />
-    </div>
-  </>
-);
+const Header = ({ title }: IHeaderProps) => {
+  void title;
+  return (
+    <>
+      <div className="w-full">
+        <Navbar />
+      </div>
+    </>
+  );
+};
 
 export default Header;

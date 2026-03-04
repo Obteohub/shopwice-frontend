@@ -21,25 +21,24 @@ const UserRegistration = () => {
   const [registrationCompleted, setRegistrationCompleted] = useState(false);
 
   const onSubmit = async (data: IRegistrationData) => {
-    try {
-      // Remove confirmPassword from the variables sent to the server
-      const { confirmPassword: removedPassword, ...mutationData } = data;
-      void removedPassword;
+    // Remove confirmPassword from the variables sent to the server
+    const { confirmPassword: removedPassword, ...mutationData } = data;
+    void removedPassword;
 
-      // Use the register function from auth.ts which uses GraphQL
-      const result = await register(mutationData);
+    // Register user via REST API
+    const result = await register(mutationData);
 
-      if (result.success) {
-        setRegistrationCompleted(true);
-      } else {
-        throw new Error('Failed to register customer');
-      }
-    } catch (error: any) {
-      console.error('Registration error:', error);
+    if (result.success) {
+      setRegistrationCompleted(true);
+    } else {
+      console.error('[UserRegistration] Registration failed:', {
+        status: result.status,
+        error: result.error
+      });
       // Manually set form error
       methods.setError('root' as any, {
         type: 'manual',
-        message: error.message || 'An error occurred during registration'
+        message: result.error || 'An error occurred during registration'
       });
     }
   };
@@ -126,9 +125,10 @@ const UserRegistration = () => {
                 customValidation={{
                   required: "Confirm Password is required",
                   validate: (val: string) => {
-                    if (methods.watch('password') != val) {
+                    if (methods.getValues('password') !== val) {
                       return "Your passwords do not match";
                     }
+                    return true;
                   }
                 }}
               />

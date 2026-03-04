@@ -9,8 +9,8 @@
 
 3. **Build Settings**:
    - **Framework Preset**: `Next.js`
-   - **Build Command**: `npx @cloudflare/next-on-pages` (or `npm run pages:build`)
-   - **Output Directory**: `.vercel/output/static` (Important: next-on-pages outputs here)
+   - **Build Command**: `npm run pages:build`
+   - **Output Directory**: `.cf-pages-deploy`
    - **Node Version**: Set an Environment Variable `NODE_VERSION` to `20` (or compatible).
 
 4. **Environment Variables** (CRITICAL):
@@ -29,7 +29,7 @@ You received `[ERROR] Missing entry-point`. This happened because your configura
 
 **Correct Configuration:**
 - **Build command:** `npm run pages:build`
-- **Build output directory:** `.vercel/output/static`
+- **Build output directory:** `.cf-pages-deploy`
 - **Deploy command:** (Leave empty / default)
 
 

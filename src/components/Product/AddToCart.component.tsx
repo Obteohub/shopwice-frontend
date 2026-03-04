@@ -1,266 +1,269 @@
-// Imports
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { useMutation } from '@apollo/client';
-import { v4 as uuidv4 } from 'uuid';
-
-// Components
 import Button from '@/components/UI/Button.component';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-
-// State
 import { useCartStore } from '@/stores/cartStore';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
+import { transformAddToCartResponse } from '@/utils/cartTransformers';
+import { setCartResponseCache } from '@/utils/cartClient';
 
-// Utils
-import { getFormattedCart } from '@/utils/functions/functions';
-import { ADD_TO_CART, UPDATE_CART } from '@/utils/gql/GQL_MUTATIONS';
-
-
-interface IImage {
-  __typename: string;
-  id: string;
-  uri: string;
-  title: string;
-  srcSet: string;
-  sourceUrl: string;
+export interface RestImage {
+  src?: string;
+  url?: string;
+  sourceUrl?: string;
+  alt?: string;
+  altText?: string;
 }
 
-interface IVariationNode {
-  __typename: string;
-  name: string;
-}
-
-interface IAllPaColor {
-  __typename: string;
-  nodes: IVariationNode[];
-}
-
-interface IAllPaSize {
-  __typename: string;
-  nodes: IVariationNode[];
-}
-
-export interface IVariationNodes {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  name: string;
-  stockStatus: string;
-  stockQuantity: number;
-  purchasable: boolean;
-  onSale: boolean;
-  salePrice?: string;
-  regularPrice: string;
-  sku?: string;
-}
-
-interface IVariations {
-  __typename: string;
-  nodes: IVariationNodes[];
-}
-
-export interface IProduct {
-  __typename: string;
-  id: string;
-  databaseId: number;
-  averageRating: number;
-  slug: string;
-  description: string;
-  onSale: boolean;
-  image: IImage;
-  name: string;
-  salePrice?: string;
-  regularPrice: string;
-  price: string;
-  stockQuantity: number;
+export interface RestVariation {
+  id: number | string;
+  name?: string;
   sku?: string;
   stockStatus?: string;
-  totalSales?: number;
-  related?: {
-    nodes: IProduct[];
-  };
-  upsell?: {
-    nodes: IProduct[];
-  };
-  crossSell?: {
-    nodes: IProduct[];
-  };
-  featured?: boolean;
-  shortDescription?: string;
-  reviewCount?: number;
-  allPaColor?: IAllPaColor;
-  allPaSize?: IAllPaSize;
-  variations?: IVariations;
-  productCategories?: {
-    nodes: Array<{ name: string; slug: string }>;
-  };
-  productBrand?: {
-    nodes: Array<{ name: string; slug: string }>;
-  };
-  galleryImages?: {
-    nodes: IImage[];
-  };
-  reviews?: {
-    nodes: Array<{
-      id: string;
-      content: string;
-      date: string;
-      rating: number;
-      author: {
-        node: {
-          name: string;
-        }
-      }
-    }>;
-  };
-  attributes?: {
-    nodes: Array<{ name: string; options: string[] }>;
-  };
+  stockQuantity?: number | null;
+  purchasable?: boolean;
+  onSale?: boolean;
+  salePrice?: string;
+  regularPrice?: string;
+  price?: string;
+  image?: RestImage | null;
 }
 
-export interface IProductRootObject {
-  product: IProduct;
-  variationId?: number;
+export interface RestTaxonomyTerm {
+  name: string;
+  slug: string;
+}
+
+export interface RestProduct {
+  id: number | string;
+  slug?: string;
+  name?: string;
+  description?: string;
+  shortDescription?: string;
+  price?: string;
+  regularPrice?: string;
+  salePrice?: string;
+  onSale?: boolean;
+  sku?: string;
+  stockStatus?: string;
+  stockQuantity?: number | null;
+  averageRating?: number;
+  reviewCount?: number;
+  image?: RestImage | null;
+  images?: RestImage[];
+  categories?: RestTaxonomyTerm[];
+  brands?: RestTaxonomyTerm[];
+  locations?: RestTaxonomyTerm[];
+  variations?: RestVariation[];
+}
+
+export interface AddToCartProps {
+  product: RestProduct;
+  variationId?: number | string;
+  variationSelections?: Array<{ attribute: string; value: string }>;
   fullWidth?: boolean;
   buyNow?: boolean;
   quantity?: number;
   disabled?: boolean;
 }
 
-/**
- * Handles the Add to cart functionality.
- * Uses GraphQL for product data
- * @param {IAddToCartProps} product // Product data
- * @param {number} variationId // Variation ID
- * @param {boolean} fullWidth // Whether the button should be full-width
- */
+// Scoped to module but with a safer cleanup strategy
+const pendingCartMutations = new Set<string>();
 
 const AddToCart = ({
   product,
   variationId,
+  variationSelections,
   fullWidth = false,
   buyNow = false,
   quantity = 1,
   disabled = false,
-}: IProductRootObject) => {
+}: AddToCartProps) => {
   const router = useRouter();
-  const { cart, syncWithWooCommerce, isLoading: isCartLoading } = useCartStore();
-  const [requestError, setRequestError] = useState<boolean>(false);
-  const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const [isAdding, setIsAdding] = useState<boolean>(false);
+  const debugCart = process.env.NEXT_PUBLIC_DEBUG_CART === 'true';
+  const isMounted = useRef(true);
 
-  const productId = product?.databaseId ?? variationId;
+  const { syncWithWooCommerce, optimisticAddItem, rollbackOptimisticAdd } = useCartStore();
 
-  const [addToCart, { loading: mutationLoading }] = useMutation(ADD_TO_CART, {
-    onCompleted: (data) => {
-      if (data?.addToCart) {
-        const formattedCart = getFormattedCart(data.addToCart);
-        syncWithWooCommerce(formattedCart);
-        setIsSuccess(true);
-      }
-      setIsAdding(false);
-    },
-    onError: (error) => {
-      console.error('Add to cart error:', error);
-      setRequestError(true);
-      setIsAdding(false);
-    }
-  });
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
-  const [updateCart] = useMutation(UPDATE_CART, {
-    onCompleted: (data) => {
-      if (data?.updateItemQuantities?.cart) {
-        const formattedCart = getFormattedCart({ cart: data.updateItemQuantities.cart });
-        syncWithWooCommerce(formattedCart);
-      }
-    },
-    onError: (error) => {
-      console.error('Update cart error:', error);
-    }
-  });
+  const parentProductId = product?.id;
 
+  // Track mounted state to prevent state updates after unmount
   useEffect(() => {
-    if (isSuccess) {
-      const timer = setTimeout(() => setIsSuccess(false), 2000);
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
-      if (buyNow) {
-        router.push('/checkout');
-      }
+  // Prefetch checkout page as early as possible when this is a Buy Now button
+  useEffect(() => {
+    if (buyNow) void router.prefetch('/checkout');
+  }, [buyNow, router]);
 
-      return () => clearTimeout(timer);
+  // Reset "ADDED!" label after 2 seconds (only for Add To Cart, not Buy Now)
+  useEffect(() => {
+    if (!isSuccess) return;
+    const timer = setTimeout(() => {
+      if (isMounted.current) setIsSuccess(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [isSuccess]);
+
+  const handleAddToCart = useCallback(async () => {
+    if (isAdding || disabled) return;
+
+    const numericProductId = Number(parentProductId);
+    if (!parentProductId || !Number.isFinite(numericProductId)) {
+      setRequestError('Invalid product.');
+      return;
     }
-  }, [isSuccess, buyNow, router]);
 
-  const handleAddToCart = async () => {
-    if (isAdding || mutationLoading) return;
-    setIsAdding(true);
-    setRequestError(false);
+    const normalizedVariationSelections = Array.isArray(variationSelections)
+      ? variationSelections
+          .map((entry) => ({
+            attribute: String(entry?.attribute ?? '').trim(),
+            value: String(entry?.value ?? '').trim(),
+          }))
+          .filter((entry) => entry.attribute && entry.value)
+      : [];
 
-    // If Buy Now, try to clear cart first to remove "ghosts" and ensure clean checkout
-    // Use global store state to check if cart has items
-    if (buyNow && cart?.products && cart.products.length > 0) {
-      try {
-        const itemsToClear = cart.products.map((item) => ({
-          key: item.cartKey,
-          quantity: 0
-        }));
-        await updateCart({
-          variables: {
-            input: {
-              clientMutationId: uuidv4(),
-              items: itemsToClear
-            }
-          }
-        });
-      } catch (e) {
-        console.error('AddToCart: Failed to clear cart before Buy Now', e);
+    const variationSignature = normalizedVariationSelections
+      .map((entry) => `${entry.attribute}:${entry.value}`)
+      .join('|');
+    const mutationKey = `${buyNow ? 'buy' : 'add'}:${numericProductId}:${String(variationId ?? 0)}:${variationSignature}`;
+    if (pendingCartMutations.has(mutationKey)) return;
+
+    pendingCartMutations.add(mutationKey);
+    if (isMounted.current) {
+      setIsAdding(true);
+      setRequestError(null);
+    }
+
+    const numericVariationId =
+      variationId !== undefined && variationId !== null
+        ? Number(variationId)
+        : undefined;
+    const safeVariationId = Number.isFinite(numericVariationId)
+      ? numericVariationId
+      : undefined;
+
+    // --- Optimistic update: update cart UI immediately ---
+    const optimisticId = optimisticAddItem?.({
+      productId: numericProductId,
+      variationId: safeVariationId,
+      quantity: Number(quantity),
+      product,
+    });
+
+    const payload: Record<string, any> = {
+      id: numericProductId,
+      quantity: Number(quantity),
+    };
+    if (variationId) {
+      if (safeVariationId !== undefined) {
+        payload.variation_id = safeVariationId;
       }
+    }
+    if (normalizedVariationSelections.length > 0) {
+      payload.variation = normalizedVariationSelections;
+      payload.variation_attributes = normalizedVariationSelections;
     }
 
     try {
-      if (!productId) {
-        console.warn('AddToCart: Missing productId');
-        setRequestError(true);
-        setIsAdding(false);
+      if (debugCart) {
+        console.info('[AddToCart] Start', {
+          productId: numericProductId,
+          variationId,
+          variationSelections: normalizedVariationSelections,
+          quantity,
+          buyNow,
+        });
+      }
+
+      const response = await api.post(ENDPOINTS.CART_ADD, payload);
+
+      if (debugCart) console.info('[AddToCart] Response', response);
+
+      setCartResponseCache(response);
+      const transformed = transformAddToCartResponse(response);
+
+      if (!transformed?.cart) throw new Error('Cart update failed.');
+
+      // Confirm optimistic update with real server state
+      syncWithWooCommerce(transformed.cart);
+
+      if (debugCart) {
+        console.info('[AddToCart] Cart synced', { items: transformed.cart?.products?.length ?? 0 });
+      }
+
+      if (buyNow) {
+        // Navigate directly — skip the isSuccess→useEffect render cycle for maximum speed
+        void router.push('/checkout');
         return;
       }
 
-      const input: any = {
-        clientMutationId: uuidv4(),
-        productId: productId,
-        quantity: quantity,
-      };
+      if (isMounted.current) setIsSuccess(true);
+    } catch (error: unknown) {
+      // Rollback optimistic update on failure
+      if (optimisticId) rollbackOptimisticAdd?.(optimisticId);
 
-      if (variationId) {
-        input.variationId = variationId;
+      const err = error as Record<string, any>;
+      const status = err?.status ? ` (${err.status})` : '';
+      const details = err?.data?.message || err?.data?.error || '';
+      console.error('[AddToCart] Error:', error);
+
+      if (isMounted.current) {
+        setRequestError(
+          `${err?.message || 'Add to cart failed.'}${status}${details ? ` - ${details}` : ''}`
+        );
       }
-
-      await addToCart({ variables: { input } });
-      
-    } catch (e) {
-      // Error handled in onError
-      console.log('Add to cart execution error:', e);
+    } finally {
+      pendingCartMutations.delete(mutationKey);
+      if (isMounted.current) setIsAdding(false);
     }
-  };
+  }, [
+    isAdding, disabled, parentProductId, variationId, variationSelections, quantity,
+    buyNow, product, optimisticAddItem, rollbackOptimisticAdd,
+    syncWithWooCommerce, debugCart,
+  ]);
 
-  const isButtonDisabled = isAdding || mutationLoading || requestError || isCartLoading || isSuccess || disabled;
+  // Only block on isAdding, not global cart loading
+  const isButtonDisabled = disabled || isAdding || isSuccess;
+
+  const handlePointerEnter = useCallback(() => {
+    if (buyNow) void router.prefetch('/checkout');
+  }, [buyNow, router]);
 
   return (
     <>
       <Button
-        handleButtonClick={() => handleAddToCart()}
-        buttonDisabled={isButtonDisabled}
+        handleButtonClick={handleAddToCart}
         fullWidth={fullWidth}
-        className={
-          isSuccess
-            ? 'bg-green-600 hover:bg-green-700'
-            : buyNow
-              ? 'bg-orange-600 hover:bg-orange-700'
-              : ''
-        }
+        buttonDisabled={isButtonDisabled}
+        className={buyNow ? 'bg-[#fa710f] hover:bg-[#fa710f] border-[#fa710f]' : ''}
+        onPointerEnter={handlePointerEnter}
       >
-        {isCartLoading ? <LoadingSpinner color="white" size="sm" /> : isSuccess ? 'ADDED!' : (buyNow ? 'BUY NOW' : 'ADD TO CART')}
+        {isAdding ? (
+          <LoadingSpinner />
+        ) : isSuccess ? (
+          'Added!'
+        ) : buyNow ? (
+          'BUY NOW'
+        ) : (
+          'ADD TO CART'
+        )}
       </Button>
+
+      {requestError && (
+        <div className="mt-1 text-sm text-red-500" role="alert">
+          {requestError}
+        </div>
+      )}
     </>
   );
 };

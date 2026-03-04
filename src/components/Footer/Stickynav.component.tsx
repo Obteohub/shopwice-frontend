@@ -1,9 +1,14 @@
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
 import Cart from '@/components/Header/Cart.component';
-import MobileNativeSearch from '@/components/Search/MobileNativeSearch.component';
 
 import Hamburger from './Hamburger.component';
+
+const MobileNativeSearch = dynamic(
+  () => import('@/components/Search/MobileNativeSearch.component'),
+  { ssr: false },
+);
 
 /**
  * Navigation for the application.
@@ -19,14 +24,14 @@ const Stickynav = () => (
       >
         <ul className="items-center justify-between pt-4 text-base text-gray-700 md:flex md:pt-0">
           <li>
-            <Link href="/products">
+            <Link href="/products" prefetch={false}>
               <span className="inline-block py-2 pr-4 text-xl font-bold no-underline hover:underline">
                 Products
               </span>
             </Link>
           </li>
           <li>
-            <Link href="/categories">
+            <Link href="/categories" prefetch={false}>
               <span className="inline-block py-2 pr-4 text-xl font-bold no-underline hover:underline">
                 Categories
               </span>

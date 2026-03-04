@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
 const Hero = () => {
+  const desktopSlidesPerView = 3.7;
   // Configurable Card Data
   const slides = [
     {
@@ -14,7 +15,7 @@ const Hero = () => {
       id: 7
     },
     {
-      text: "Lightining Fast Express Delivery in Just 2 Hours.",
+      text: "Lightning Fast Express Delivery in Just 2 Hours.",
       src: "/hero-express.png",
       link: "/products",
       color: "bg-green-50",
@@ -66,24 +67,6 @@ const Hero = () => {
   // Carousel State (Desktop/Tablet)
   const allSlides = slides;
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [slidesPerView, setSlidesPerView] = useState(2.5);
-
-  useEffect(() => {
-    const updateSlidesPerView = () => {
-      if (window.innerWidth >= 1024) {
-        setSlidesPerView(3.7);
-      } else if (window.innerWidth >= 768) {
-        setSlidesPerView(2.5);
-      } else {
-        setSlidesPerView(1);
-      }
-    };
-
-    updateSlidesPerView();
-    window.addEventListener('resize', updateSlidesPerView);
-
-    return () => window.removeEventListener('resize', updateSlidesPerView);
-  }, []);
 
   const prevSlide = () => {
     setCurrentIndex((prev) => (prev - 1 + allSlides.length) % allSlides.length);
@@ -114,7 +97,9 @@ const Hero = () => {
                     className="object-cover object-center"
                     sizes="85vw"
                     quality={90}
-                    unoptimized
+                    priority={index === 0}
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    fetchPriority={index === 0 ? 'high' : undefined}
                   />
                 )}
 
@@ -140,7 +125,7 @@ const Hero = () => {
           style={{
             display: 'flex',
             transform: `translateX(-${(currentIndex * (100 / allSlides.length)).toFixed(4)}%)`,
-            width: `${(allSlides.length / slidesPerView) * 100}%`
+            width: `${(allSlides.length / desktopSlidesPerView) * 100}%`
           }}
         >
           {allSlides.map((slide, index) => (
@@ -160,7 +145,9 @@ const Hero = () => {
                     className="object-cover object-center"
                     sizes="(max-width: 1200px) 33vw, 25vw"
                     quality={90}
-                    unoptimized
+                    priority={index === 0}
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    fetchPriority={index === 0 ? 'high' : undefined}
                   />
                 )}
 

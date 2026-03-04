@@ -1,119 +1,118 @@
 
+![Shopwice Banner](https://github.com/user-attachments/assets/08047025-0950-472a-ae7d-932c7faee1db)
 
-![bilde](https://github.com/user-attachments/assets/08047025-0950-472a-ae7d-932c7faee1db)
+# Shopwice - Next.js Ecommerce (WooCommerce REST Backend)
 
+A high-performance, modern eCommerce frontend for **Shopwice**, built with **Next.js 16**, **React 19**, and the **WooCommerce Store API**.
 
+---
 
-# Next.js Ecommerce site with WooCommerce backend
+## 🚀 Overview
 
+This project is a Progressive Web App (PWA) optimized for speed, reliability, and visual excellence. It has been migrated from a GraphQL architecture to a more stable and high-performance **REST-based architecture** using the WooCommerce Store API for cart/session management and a custom normalization layer for product data.
 
+## 🛠️ Tech Stack
 
-## Table Of Contents (TOC)
+- **Framework**: Next.js 16.1 (Pages Router)
+- **Library**: React 19.2
+- **State Management**: Zustand 5.0 (with persistent localStorage hydration)
+- **Styling**: Tailwind CSS 3.4
+- **API**: WooCommerce Store API (REST) + custom REST endpoints
+- **Icons & Animations**: Framer Motion, Lucide-like icons
+- **Testing**: Playwright (E2E), LHCI (Performance)
+- **Deployment**: Optimized for Cloudflare Pages
 
-- [Installation](#Installation)
-- [Features](#Features)
-- [Lighthouse Performance Monitoring](#lighthouse-performance-monitoring)
-- [Issues](#Issues)
-- [Troubleshooting](#Troubleshooting)
-- [TODO](#TODO)
-- [Future Improvements](SUGGESTIONS.md)
+## ✨ Key Features
 
-## Installation
+- **Store API Migration**: Fully migrated from GraphQL to REST for superior session isolation and reduced latency.
+- **Progressive Web App (PWA)**: Offline support, manifest integration, and an custom installation prompt.
+- **Robust Data Normalization**: A dedicated `normalizeProduct` layer ensures that varying REST API responses are mapped to a consistent structure for frontend components.
+- **Hydration Stabilization**: Custom hooks (`useIsMounted`) prevent hydration mismatches caused by server-side rendering of dynamic elements.
+- **Advanced Cart Flow**: Nonce-based authentication for secure, isolated user sessions.
+- **Dynamic Product Pages**: Multi-endpoint data aggregation for reviews, related products, and variations.
+- **Performance Optimized**: Automated Lighthouse monitoring on every PR.
 
-1.  Install and activate the following required plugins, in your WordPress plugin directory:
+## 📂 Internal Documentation
 
-- [woocommerce](https://wordpress.org/plugins/woocommerce) Ecommerce for WordPress.
-- [wp-graphql](https://wordpress.org/plugins/wp-graphql) Exposes GraphQL for WordPress.
-- [wp-graphql-woocommerce](https://github.com/wp-graphql/wp-graphql-woocommerce) Adds WooCommerce functionality to a WPGraphQL schema.
-- [wp-algolia-woo-indexer](https://github.com/w3bdesign/wp-algolia-woo-indexer) WordPress plugin coded by me. Sends WooCommerce products to Algolia. Required for search to work.
+For detailed technical guides, refer to:
+- [Store API Migration Guide](STORE_API_MIGRATION.md)
+- [Cart Flow & Session Management](CART_FLOW_EXPLAINED.md)
+- [WC Store API Deep Dive](WC_STORE_API_GUIDE.md)
+- [PWA Status & Implementation](CART_FINAL_STATUS.md)
 
-Optional plugin:
+## 🛠️ Installation & Setup
 
-- [headless-wordpress](https://github.com/w3bdesign/headless-wp) Disables the frontend so only the backend is accessible. (optional)
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Obteohub/shopwice-frontend.git
+   ```
 
-The current release has been tested and is confirmed working with the following versions:
+2. **Configure Environment**:
+   Copy `.env.example` to `.env.local` and set your API base URLs:
+   ```env
+   NEXT_PUBLIC_REST_API_URL=https://api.shopwice.com/api
+   NEXT_PUBLIC_STORE_API_URL=https://api.shopwice.com/api
+   NEXT_PUBLIC_WP_API_URL=https://admin.shopwice.com
+   NEXT_PUBLIC_SITE_URL=https://shopwice.com
+   ```
 
-- WordPress version 6.8.1
-- WooCommerce version 9.9.5
-- WP GraphQL version 2.3.3
-- WooGraphQL version 0.19.0
-- WPGraphQL CORS version 2.1
+## SEO (RankMath, Headless)
 
-2.  For debugging and testing, install either:
+- SEO metadata for product and archive pages is fetched from the WordPress RankMath endpoint:
+  - `GET /wp-json/rankmath/v1/getHead?url=<full-frontend-url>`
+- Frontend exposes:
+  - `/sitemap.xml` (proxied from RankMath sitemap index)
+  - `/robots.txt` (frontend robots + sitemap pointer)
+- WordPress backend must be set to **noindex**:
+  - WordPress Admin -> `Settings` -> `Reading` -> enable `Discourage search engines from indexing this site`.
+  - This avoids backend URLs competing with frontend canonicals in search.
 
-    <https://addons.mozilla.org/en-US/firefox/addon/apollo-developer-tools/> (Firefox)
+3. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-    <https://chrome.google.com/webstore/detail/apollo-client-developer-t/jdkknkkbebbapilgoeccciglkfbmbnfm> (Chrome)
+4. **Run Development Server**:
+   ```bash
+   npm run dev
+   ```
 
-3.  Make sure WooCommerce has some products already
+## 🧪 Testing
 
-4.  Clone or fork the repo and modify `.env.example` and rename it to `.env`
+Run E2E tests with Playwright:
+```bash
+npx playwright test
+```
 
-    Then set the environment variables accordingly in Vercel or your preferred hosting solution.
+Generate Lighthouse performance reports:
+```bash
+npm run lhci
+```
 
-    See <https://vercel.com/docs/environment-variables>
+## ⚠️ Known Issues & Troubleshooting
 
-5.  Modify the values according to your setup
+### **Build Cache Issues**
+If you encounter "Apollo Runtime Invariant" errors (remnants of legacy GraphQL), clear the build cache:
+```powershell
+Remove-Item -Recurse -Force .next
+```
 
-6.  Start the server with `npm run dev`
+### **Image Domain Authorization**
+Ensure `api.shopwice.com` and `cdn.shopwice.com` are whitelisted in `next.config.js`.
 
-7.  Enable COD (Cash On Demand) payment method in WooCommerce
+---
 
-8.  Add a product to the cart
+## 📝 License
+This project is licensed under the ISC License.
+Implement UserRegistration.component.tsx in a registration page
+- Add user dashboard with order history
+- Add Cloudflare Turnstile on registration page
+- Ensure email is real on registration page
+- Add total to cart/checkout page
+- Copy billing address to shipping address
+- Hide products not in stock
 
-9.  Proceed to checkout (Gå til kasse)
-
-10. Fill in your details and place the order
-
-## Features
-
-- Next.js version 15.1.7
-- React version 18.3.1
-- Typescript
-- Tests with Playwright
-- Connect to Woocommerce GraphQL API and list name, price and display image for products
-- Support for simple products and variable products
-- Cart handling and checkout with WooCommerce using Zustand for state management
-  - Persistent cart state with localStorage sync
-  - Efficient updates through selective subscriptions
-  - Type-safe cart operations
-  - Cash On Delivery payment method
-- Algolia search (requires [algolia-woo-indexer](https://github.com/w3bdesign/algolia-woo-indexer))
-- Meets WCAG accessibility standards where possible
-- Placeholder for products without images
-- State Management:
-  - Zustand for global state management
-  - Apollo Client with GraphQL
-- React Hook Form
-- Native HTML5 form validation
-- Animations with Framer motion, Styled components and Animate.css
-- Loading spinner created with Styled Components
-- Shows page load progress with Nprogress during navigation
-- Fully responsive design
-- Category and product listings
-- Show stock status
-- Pretty URLs with builtin Nextjs functionality
-- Tailwind 3 for styling
-- JSDoc comments
-- Automated Lighthouse performance monitoring
-  - Continuous performance, accessibility, and best practices checks
-  - Automated reports on every pull request
-  - Performance metrics tracking for:
-    - Performance score
-    - Accessibility compliance
-    - Best practices adherence
-    - SEO optimization
-    - Progressive Web App readiness
-- Product filtering:
-  - Dynamic color filtering using Tailwind's color system
-  - Mobile-optimized filter layout
-  - Accessible form controls with ARIA labels
-  - Price range slider
-  - Size and color filters
-  - Product type categorization
-  - Sorting options (popularity, price, newest)
-
-## Lighthouse Performance Monitoring
+# Lighthouse Performance Monitoring
 
 This project uses automated Lighthouse testing through GitHub Actions to ensure high-quality web performance. On every pull request:
 
@@ -125,37 +124,3 @@ This project uses automated Lighthouse testing through GitHub Actions to ensure 
   - Best Practices: Validating modern web development standards
   - SEO: Checking search engine optimization fundamentals
   - PWA: Assessing Progressive Web App capabilities
-
-View the latest Lighthouse results in the GitHub Actions tab under the "Lighthouse Check" workflow.
-
-## Troubleshooting
-
-### I am getting a cart undefined error or other GraphQL errors
-
-Check that you are using the 0.12.0 version of the [wp-graphql-woocommerce](https://github.com/wp-graphql/wp-graphql-woocommerce) plugin
-
-### The products page isn't loading
-
-Check the attributes of the products. Right now the application requires Size and Color.
-
-## Issues
-
-Overall the application is working as intended, but it has not been tested extensively in a production environment.
-More testing and debugging is required before deploying it in a production environment.
-
-With that said, keep the following in mind:
-
-- Currently only simple products and variable products work without any issues. Other product types are not known to work.
-- Only Cash On Delivery (COD) is currently supported. More payment methods may be added later.
-
-This project is tested with BrowserStack.
-
-## TODO
-
-- Implement UserRegistration.component.tsx in a registration page
-- Add user dashboard with order history
-- Add Cloudflare Turnstile on registration page
-- Ensure email is real on registration page
-- Add total to cart/checkout page
-- Copy billing address to shipping address
-- Hide products not in stock

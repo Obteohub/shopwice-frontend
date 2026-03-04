@@ -1,0 +1,17 @@
+<!DOCTYPE html><html lang="en"><head><meta charSet="utf-8" data-next-head=""/><meta name="viewport" content="width=device-width" data-next-head=""/><link rel="icon" href="/favicon.ico"/><link rel="icon" type="image/png" href="/favicon.png"/><link rel="preload" href="/_next/static/media/e4af272ccee01ff0-s.p.woff2" as="font" type="font/woff2" crossorigin="anonymous" data-next-font="size-adjust"/><link rel="preload" href="/_next/static/css/a8421572e2e71072.css" as="style"/><script>
+                (function () {
+                  if (!('serviceWorker' in navigator)) return;
+                  navigator.serviceWorker.getRegistrations().then(function (registrations) {
+                    registrations.forEach(function (registration) { registration.unregister(); });
+                  });
+                  if ('caches' in window) {
+                    caches.keys().then(function (keys) {
+                      return Promise.all(
+                        keys
+                          .filter(function (key) { return key.indexOf('shopwice-cache') === 0; })
+                          .map(function (key) { return caches.delete(key); })
+                      );
+                    });
+                  }
+                })();
+              </script><link rel="stylesheet" href="/_next/static/css/a8421572e2e71072.css" data-n-g=""/><noscript data-n-css=""></noscript><script defer="" noModule="" src="/_next/static/chunks/polyfills-42372ed130431b0a.js"></script><script src="/_next/static/chunks/webpack-5d26c7a3ff52e429.js" defer=""></script><script src="/_next/static/chunks/framework-a7f7b4d2dfa5296c.js" defer=""></script><script src="/_next/static/chunks/main-bba5a6c014863c5b.js" defer=""></script><script src="/_next/static/chunks/pages/_app-0dd8142f1abe0693.js" defer=""></script><script src="/_next/static/chunks/7682-282320fe0277e4f2.js" defer=""></script><script src="/_next/static/chunks/5912-9e5945234961f259.js" defer=""></script><script src="/_next/static/chunks/pages/my-account-5cf73bdd715fb65e.js" defer=""></script><script src="/_next/static/aEOdjguobaQG8LWh3LxWU/_buildManifest.js" defer=""></script><script src="/_next/static/aEOdjguobaQG8LWh3LxWU/_ssgManifest.js" defer=""></script></head><body><div id="__next"><main class="__variable_f367f3 __className_f367f3"><div class="flex items-center justify-center min-h-screen">Loading...</div></main></div><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{}},"page":"/my-account","query":{},"buildId":"aEOdjguobaQG8LWh3LxWU","nextExport":true,"autoExport":true,"isFallback":false,"scriptLoader":[]}</script></body></html>

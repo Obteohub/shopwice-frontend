@@ -1,12 +1,20 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import Cart from './Cart.component';
-import NativeSearchBox from '../Search/NativeSearchBox.component';
-import MobileNativeSearch from '../Search/MobileNativeSearch.component';
 import MegaMenu from './MegaMenu.component';
 import CategorySidebar from './CategorySidebar.component';
 import LocationPicker from './LocationPicker.component';
+
+const NativeSearchBox = dynamic(
+  () => import('../Search/NativeSearchBox.component'),
+  { ssr: false },
+);
+const MobileNativeSearch = dynamic(
+  () => import('../Search/MobileNativeSearch.component'),
+  { ssr: false },
+);
 
 /**
  * Navigation for the application.
@@ -21,13 +29,24 @@ const Navbar = () => {
     if (typeof window === 'undefined') return;
 
     const readValues = () => {
-      try {
-        const sessionData = JSON.parse(localStorage.getItem('woo-session') || 'null');
-        setWooSession(sessionData?.token || null);
-      } catch {
-        setWooSession(null);
-      }
-      setStoreNonce(localStorage.getItem('wc_store_api_nonce'));
+      const cartToken =
+        localStorage.getItem('wc-cart-token') ||
+        localStorage.getItem('wc-session') ||
+        (() => {
+          try {
+            const sessionData = JSON.parse(localStorage.getItem('woo-session') || 'null');
+            return sessionData?.token || null;
+          } catch {
+            return null;
+          }
+        })();
+
+      const nonce =
+        localStorage.getItem('wc-store-api-nonce') ||
+        localStorage.getItem('wc_store_api_nonce');
+
+      setWooSession(cartToken);
+      setStoreNonce(nonce);
     };
 
     readValues();
@@ -36,7 +55,7 @@ const Navbar = () => {
   }, []);
   return (
     <header className="w-full">
-      <nav id="header" className="z-50 w-full bg-white">
+      <nav id="header" className="relative z-[60] w-full bg-white">
         <LocationPicker variant="headless" />
         {/* Mobile Navbar */}
         <div className="flex flex-col md:hidden w-full border-b border-gray-100">
@@ -62,7 +81,7 @@ const Navbar = () => {
               </svg>
             </button>
 
-            <Link href="/" className="ml-2">
+            <Link href="/" prefetch={false} className="ml-2">
               <Image
                 src="/logo.png"
                 alt="Shopwice"
@@ -83,7 +102,7 @@ const Navbar = () => {
                   {storeNonce && <span>NS: {storeNonce.slice(0, 6)}…</span>}
                 </div>
               )}
-              <Link href="/my-account" aria-label="Account">
+              <Link href="/my-account" prefetch={false} aria-label="Account">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#2c3338]">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                 </svg>
@@ -102,7 +121,7 @@ const Navbar = () => {
           <div className="w-full px-8 flex items-center justify-between gap-12">
             {/* Logo */}
             <div className="flex-shrink-0">
-              <Link href="/">
+              <Link href="/" prefetch={false}>
                 <Image
                   src="/logo.png"
                   alt="Shopwice"
@@ -127,7 +146,7 @@ const Navbar = () => {
             {/* Icons */}
             <div className="flex items-center space-x-6">
               {/* Account */}
-              <Link href="/my-account" className="flex items-center gap-2.5 group transition-colors">
+              <Link href="/my-account" prefetch={false} className="flex items-center gap-2.5 group transition-colors">
                 <div className="transition-colors">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-[#0C6DC9] group-hover:text-[#0a59a4]">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />

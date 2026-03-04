@@ -5,17 +5,24 @@ import StarRating from '../UI/StarRating.component';
 import { ProductCategory } from '@/types/product';
 
 interface ProductCardProps {
-  databaseId: number;
+  databaseId?: number;
+  id?: number;
   name: string;
   price?: string | number | null;
   regularPrice?: string | number | null;
   salePrice?: string | number | null;
   onSale?: boolean;
   slug?: string;
+  url?: string;
+  type?: string;
+  variantLabel?: string;
   image?: { sourceUrl?: string | null } | null;
   averageRating?: number;
   productCategories?: { nodes?: ProductCategory[] | null };
-  attributes?: { nodes?: Array<{ name: string; options?: string[] | null }> | null };
+  attributes?:
+    | { nodes?: Array<{ name: string; options?: string[] | null }> | null }
+    | Array<{ name: string; options?: string[] | null }>
+    | null;
   stockQuantity?: number | null;
   reviewCount?: number;
 }
@@ -70,6 +77,9 @@ const ProductCard = (props: ProductCardProps) => {
     salePrice,
     onSale,
     slug,
+    url,
+    type,
+    variantLabel,
     image,
     averageRating = 0,
     attributes,
@@ -78,6 +88,8 @@ const ProductCard = (props: ProductCardProps) => {
   } = props;
 
   const safeSlug = slug ? String(slug).split('/').filter(Boolean).pop() : '';
+  const href = url || (safeSlug ? `/product/${safeSlug}` : '');
+  void type;
 
   /* ---------- Price Formatting ---------- */
 
@@ -98,11 +110,17 @@ const ProductCard = (props: ProductCardProps) => {
 
   /* ---------- Category + Attribute Checks ---------- */
 
-  const isRefurbished = useMemo(() => {
-    return attributes?.nodes?.some(attr =>
-      attr.options?.some(opt => hasRefurbishKeyword(opt))
-    );
+  const attributeList = useMemo(() => {
+    if (!attributes) return [];
+    if (Array.isArray(attributes)) return attributes;
+    return attributes.nodes ?? [];
   }, [attributes]);
+
+  const isRefurbished = useMemo(() => {
+    return attributeList.some((attr) =>
+      attr.options?.some((opt) => hasRefurbishKeyword(opt))
+    );
+  }, [attributeList]);
 
   /* ---------- Savings ---------- */
 
@@ -157,9 +175,9 @@ const ProductCard = (props: ProductCardProps) => {
       {/* IMAGE */}
       <div className="aspect-square relative bg-gray-100 overflow-hidden rounded-sm">
 
-        {safeSlug ? (
+        {href ? (
           <Link
-            href={`/product/${safeSlug}`}
+            href={href}
             aria-label={`View product ${name}`}
             className="block w-full h-full"
           >
@@ -192,12 +210,16 @@ const ProductCard = (props: ProductCardProps) => {
       {/* BODY */}
       <div className="flex flex-col flex-grow mt-2 px-1 pb-2">
 
-        {safeSlug ? (
-          <Link href={`/product/${safeSlug}`}>
+        {href ? (
+          <Link href={href}>
             {renderInfo()}
           </Link>
         ) : (
           renderInfo()
+        )}
+
+        {variantLabel && (
+          <p className="mt-1 text-[11px] text-gray-500 line-clamp-1">{variantLabel}</p>
         )}
 
         {/* PRICE */}

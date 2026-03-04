@@ -1,28 +1,22 @@
-import Head from 'next/head';
 import Layout from '@/components/Layout/Layout.component';
 import ProductList from '@/components/Product/ProductList.component';
-import client from '@/utils/apollo/ApolloClient';
-import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-import { FETCH_ALL_PRODUCTS_QUERY } from '@/utils/gql/GQL_QUERIES';
-import type { NextPage, GetStaticProps, InferGetStaticPropsType } from 'next';
-
+import SeoHead from '@/components/SeoHead';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
+import type { NextPage, GetServerSideProps, InferGetServerSidePropsType } from 'next';
+import {
+  buildArchiveSeoData,
+  getAbsoluteUrlFromRequest,
+  parsePageParam,
+} from '@/utils/seoPage';
 
 
 const Products: NextPage = ({
   products,
   pageInfo,
-  loading,
-}: InferGetStaticPropsType<typeof getStaticProps>) => {
-  if (loading)
-    return (
-      <Layout title="Products">
-        <div className="flex justify-center items-center min-h-screen">
-          <LoadingSpinner />
-        </div>
-      </Layout>
-    );
-
-  if (!products)
+  seoData,
+}: InferGetServerSidePropsType<typeof getServerSideProps>) => {
+  if (!products || products.length === 0)
     return (
       <Layout title="Products">
         <div className="flex justify-center items-center min-h-screen">
@@ -33,15 +27,12 @@ const Products: NextPage = ({
 
   return (
     <Layout title="Products" fullWidth={true}>
-      <Head>
-        <title>Products | WooCommerce Next.js</title>
-      </Head>
+      <SeoHead seoData={seoData} />
 
       <div className="pt-1 pb-1">
         <ProductList
           products={products}
           pageInfo={pageInfo}
-          query={FETCH_ALL_PRODUCTS_QUERY}
         />
       </div>
     </Layout>
@@ -51,31 +42,57 @@ const Products: NextPage = ({
 
 export default Products;
 
-export const getStaticProps: GetStaticProps = async () => {
+export const getServerSideProps: GetServerSideProps = async ({ res, req, query, resolvedUrl }) => {
+  const page = parsePageParam(query?.page);
   try {
-    const { data, loading, networkStatus } = await client.query({
-      query: FETCH_ALL_PRODUCTS_QUERY,
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    const data = await api.get(ENDPOINTS.PRODUCTS, {
+      params: { per_page: 24, page },
+    });
+
+    // REST API returns array directly
+    const products = Array.isArray(data) ? data : [];
+    const hasNextPage = products.length >= 24;
+    const urlPath = resolvedUrl || `/products${page > 1 ? `?page=${page}` : ''}`;
+    const pageUrl = getAbsoluteUrlFromRequest(req, urlPath);
+    const seoData = await buildArchiveSeoData({
+      pageUrl,
+      title: 'Shop',
+      description: 'Browse all products on Shopwice.',
+      currentPage: page,
+      hasNextPage,
+      productCount: products.length,
     });
 
     return {
       props: {
-        products: data?.products?.nodes || [],
-        pageInfo: data?.products?.pageInfo || {},
-        loading,
-        networkStatus,
+        products,
+        pageInfo: {
+          hasNextPage,
+          endCursor: null,
+        },
+        seoData,
       },
-      revalidate: 60,
     };
   } catch (error) {
     console.warn('Failed to fetch products during build:', error);
+    const urlPath = resolvedUrl || `/products${page > 1 ? `?page=${page}` : ''}`;
+    const pageUrl = getAbsoluteUrlFromRequest(req, urlPath);
+    const seoData = await buildArchiveSeoData({
+      pageUrl,
+      title: 'Shop',
+      description: 'Browse all products on Shopwice.',
+      currentPage: page,
+      hasNextPage: false,
+      productCount: 0,
+    });
+
     return {
       props: {
         products: [],
         pageInfo: {},
-        loading: false,
-        networkStatus: 8, // Error status
+        seoData,
       },
-      revalidate: 60,
     };
   }
 };

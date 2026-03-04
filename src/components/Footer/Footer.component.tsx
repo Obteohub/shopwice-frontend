@@ -51,7 +51,7 @@ const Footer = () => {
               {['My Account', 'Shop', 'Shipping', 'Size Guide', 'Refund', 'Payments', 'Contact Us'].map((item) => (
                 <li key={item} className="flex items-center justify-start gap-2 group">
                   <span className="w-1.5 h-1.5 bg-[#1e73be] rounded-full group-hover:scale-125 transition-transform"></span>
-                  <Link href={`/${item.toLowerCase().replace(/ /g, '-')}`} className="text-sm hover:text-[#1e73be] transition-colors">
+                  <Link prefetch={false} href={`/${item.toLowerCase().replace(/ /g, '-')}`} className="text-sm hover:text-[#1e73be] transition-colors">
                     {item}
                   </Link>
                 </li>
@@ -69,7 +69,7 @@ const Footer = () => {
               {['About Us', 'Terms', 'Privacy', 'Cookies', 'Sitemap', 'Blog', 'Feedback'].map((item) => (
                 <li key={item} className="flex items-center justify-start gap-2 group">
                   <span className="w-1.5 h-1.5 bg-[#1e73be] rounded-full group-hover:scale-125 transition-transform"></span>
-                  <Link href={`/${item.toLowerCase().replace(/ /g, '-')}`} className="text-sm hover:text-[#1e73be] transition-colors">
+                  <Link prefetch={false} href={`/${item.toLowerCase().replace(/ /g, '-')}`} className="text-sm hover:text-[#1e73be] transition-colors">
                     {item}
                   </Link>
                 </li>
@@ -84,11 +84,19 @@ const Footer = () => {
               <span className="absolute bottom-0 left-0 w-12 h-1 bg-[#1e73be]"></span>
             </h4>
             <ul className="space-y-3 text-[#2c3338]">
-              {['Brands', 'New Arrivals', 'Sale', 'Best Selling', 'Featured', 'Top Rated', 'Sell On Shopwice'].map((item) => (
-                <li key={item} className="flex items-center justify-start gap-2 group">
+              {[
+                { label: 'Brands', href: '/brands' },
+                { label: 'New Arrivals', href: '/new-arrivals' },
+                { label: 'Sale', href: '/sale' },
+                { label: 'Best Selling', href: '/best-selling' },
+                { label: 'Featured', href: '/featured' },
+                { label: 'Top Rated', href: '/top-rated' },
+                { label: 'Sell On Shopwice', href: '/sell-online-in-ghana/' },
+              ].map((item) => (
+                <li key={item.label} className="flex items-center justify-start gap-2 group">
                   <span className="w-1.5 h-1.5 bg-[#1e73be] rounded-full group-hover:scale-125 transition-transform"></span>
-                  <Link href={`/${item.toLowerCase().replace(/ /g, '-')}`} className="text-sm hover:text-[#1e73be] transition-colors">
-                    {item}
+                  <Link prefetch={false} href={item.href} className="text-sm hover:text-[#1e73be] transition-colors">
+                    {item.label}
                   </Link>
                 </li>
               ))}
@@ -150,9 +158,9 @@ const Footer = () => {
       <div className="bg-[#2c3338] py-3 px-6 relative">
         <div className="container mx-auto flex flex-col md:flex-row items-start justify-start gap-4 text-xs text-white opacity-70">
           <div className="flex gap-4">
-            <Link href="/home-appliances" className="hover:text-white transition-colors">Home Appliances</Link>
-            <Link href="/health-beauty" className="hover:text-white transition-colors">Health & Beauty</Link>
-            <Link href="/refurbished-policy" className="hover:text-white transition-colors font-semibold">Refurbished Policy</Link>
+            <Link prefetch={false} href="/home-appliances" className="hover:text-white transition-colors">Home Appliances</Link>
+            <Link prefetch={false} href="/health-beauty" className="hover:text-white transition-colors">Health & Beauty</Link>
+            <Link prefetch={false} href="/refurbished-policy" className="hover:text-white transition-colors font-semibold">Refurbished Policy</Link>
           </div>
         </div>
 
@@ -174,3 +182,4 @@ const Footer = () => {
 };
 
 export default Footer;
+

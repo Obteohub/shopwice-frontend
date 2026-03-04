@@ -5,6 +5,7 @@ import { ReactNode } from 'react';
 import Header from '@/components/Header/Header.component';
 import PageTitle from './PageTitle.component';
 import Footer from '@/components/Footer/Footer.component';
+import MobileBottomNav from './MobileBottomNav.component';
 
 interface ILayoutProps {
   children?: ReactNode;
@@ -23,18 +24,19 @@ interface ILayoutProps {
 
 const Layout = ({ children, title, fullWidth = false }: ILayoutProps) => {
   return (
-    <div className="flex flex-col min-h-screen w-full mx-auto">
+    <div className="flex flex-col min-h-screen w-full mx-auto bg-slate-50 text-gray-900">
       <Header title={title} />
       {title === 'Home' ? (
-        <main className="flex-1 px-4 md:px-0">{children}</main>
+        <main className="flex-1 px-4 md:px-0 pb-20 md:pb-0">{children}</main>
       ) : fullWidth ? (
-        <main className="flex-1 w-full">{children}</main>
+        <main className="flex-1 w-full pb-20 md:pb-0">{children}</main>
       ) : (
-        <div className="container mx-auto px-6 flex-1">
+        <div className="container mx-auto px-6 flex-1 pb-20 md:pb-0">
           <PageTitle title={title} />
           <main>{children}</main>
         </div>
       )}
+      <MobileBottomNav />
       <div className="mt-auto">
         <Footer />
       </div>

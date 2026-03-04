@@ -1,0 +1,5 @@
+{
+    "claudeCode.useTerminal": false,
+    "snyk.securityAtInception.autoConfigureSnykMcpServer": true,
+    "snyk.advanced.organization": "c7231b1e-df59-48c5-a1f8-9a4f9e7633e8"
+}

@@ -1,15 +1,5 @@
 /**
  * ============================================
- * WPGraphQL Connection Helper
- * ============================================
- */
-
-export interface Connection<T> {
-  nodes?: T[] | null;
-}
-
-/**
- * ============================================
  * Shared Domain Interfaces
  * ============================================
  */
@@ -43,7 +33,6 @@ export interface StockInfo {
  */
 
 export interface Image {
-  __typename?: string;
   sourceUrl?: string | null;
   altText?: string | null;
 }
@@ -59,12 +48,12 @@ export interface ProductCategory {
   slug: string;
 }
 
-export interface BrandNode {
+export interface Brand {
   name: string;
   slug: string;
 }
 
-export interface LocationNode {
+export interface Location {
   name: string;
   slug: string;
 }
@@ -91,15 +80,6 @@ export interface VariationAttribute {
   value: string;
 }
 
-export interface ColorNode {
-  name: string;
-  slug: string;
-}
-
-export interface SizeNode {
-  name: string;
-}
-
 /**
  * ============================================
  * Reviews
@@ -111,12 +91,7 @@ export interface Review {
   content?: string | null;
   date?: string | null;
   rating?: number | null;
-
-  author?: {
-    node?: {
-      name?: string | null;
-    } | null;
-  } | null;
+  reviewer?: string | null;
 }
 
 /**
@@ -126,7 +101,7 @@ export interface Review {
  */
 
 export interface Variation extends Pricing, StockInfo {
-  attributes?: Connection<VariationAttribute>;
+  attributes?: VariationAttribute[] | null;
 }
 
 /**
@@ -136,8 +111,6 @@ export interface Variation extends Pricing, StockInfo {
  */
 
 export interface Product extends Pricing, StockInfo {
-  __typename?: string;
-
   databaseId: number;
   slug: string;
   name: string;
@@ -150,20 +123,16 @@ export interface Product extends Pricing, StockInfo {
   shortDescription?: string | null;
 
   image?: Image | null;
-  galleryImages?: Connection<Image>;
 
-  productCategories?: Connection<ProductCategory>;
-  productBrand?: Connection<BrandNode>;
-  productLocation?: Connection<LocationNode>;
+  categories?: ProductCategory[] | null;
+  brands?: Brand[] | null;
+  locations?: Location[] | null;
 
-  attributes?: Connection<ProductAttribute>;
+  attributes?: ProductAttribute[] | null;
 
-  allPaColor?: Connection<ColorNode>;
-  allPaSize?: Connection<SizeNode>;
+  reviews?: Review[] | null;
 
-  reviews?: Connection<Review>;
-
-  variations?: Connection<Variation>;
+  variations?: Variation[] | null;
 }
 
 /**

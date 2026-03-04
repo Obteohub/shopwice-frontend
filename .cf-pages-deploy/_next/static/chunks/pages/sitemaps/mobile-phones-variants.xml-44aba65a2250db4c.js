@@ -1,0 +1,1 @@
+(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[9753],{1172:(_,e,s)=>{(window.__NEXT_P=window.__NEXT_P||[]).push(["/sitemaps/mobile-phones-variants.xml",function(){return s(9116)}])},9116:(_,e,s)=>{"use strict";s.r(e),s.d(e,{__N_SSP:()=>n,default:()=>u});var n=!0;let u=()=>null}},_=>{_.O(0,[636,6593,8792],()=>_(_.s=1172)),_N_E=_.O()}]);

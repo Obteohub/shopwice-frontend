@@ -1,15 +1,11 @@
-name = "shopwice-pages"
+name = "shopwice-frontend"
 compatibility_date = "2026-02-05"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
-pages_build_output_dir = ".vercel/output/static"
+pages_build_output_dir = ".cf-pages-deploy"
 
 [vars]
 NEXT_PUBLIC_SITE_URL = "https://shopwice.com"
 NEXT_PUBLIC_GRAPHQL_URL = "https://api.shopwice.com/graphql"
-
-[[services]]
-binding = "WORKER_SELF_REFERENCE"
-service = "shopwice"
 
 [[r2_buckets]]
 binding = "NEXT_INC_CACHE_R2_BUCKET"

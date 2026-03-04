@@ -1,99 +1,276 @@
 import Link from 'next/link';
-import { useQuery } from '@apollo/client';
-import { FETCH_ALL_CATEGORIES_QUERY } from '@/utils/gql/GQL_QUERIES';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '@/utils/api';
+import { ENDPOINTS } from '@/utils/endpoints';
+import { decodeHtmlEntities } from '@/utils/text';
+import DesktopSideMenu from './DesktopSideMenu';
 
-/**
- * MegaMenu component for desktop navigation
- * Displays top-level categories with hover dropdowns for subcategories
- */
-import DesktopSideMenu from './DesktopSideMenu.component';
+type Category = {
+    id: number | string;
+    name: string;
+    slug: string;
+    parent?: number | string | null;
+};
+
+type CacheShape = {
+    data: Category[];
+    timestamp: number;
+};
 
 const CACHE_KEY = 'shopwice_menu_cache';
+const CACHE_DURATION_MS = 1000 * 60 * 60; // 1 hour
 
-const MegaMenu = () => {
-    const [cachedData] = useState<any>(() => {
-        if (typeof window === 'undefined') return null;
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (!cached) return null;
-        try {
-            return JSON.parse(cached);
-        } catch (e) {
-            console.error('Error parsing menu cache', e);
-            localStorage.removeItem(CACHE_KEY);
+// Set true only if you want logs (keeps lint happy in production)
+const DEBUG = false;
+const log = (...args: unknown[]) => {
+    if (DEBUG) {
+        console.log(...args);
+    }
+};
+
+function isBrowser(): boolean {
+    return typeof window !== 'undefined';
+}
+
+function normalizeCategories(payload: unknown): Category[] {
+    // Accept: Category[]
+    if (Array.isArray(payload)) return payload as Category[];
+
+    // Accept: { data: Category[] }
+    if (typeof payload === 'object' && payload !== null) {
+        const obj = payload as Record<string, unknown>;
+
+        if (Array.isArray(obj.data)) return obj.data as Category[];
+        if (Array.isArray(obj.categories)) return obj.categories as Category[];
+        if (Array.isArray(obj.results)) return obj.results as Category[];
+    }
+
+    return [];
+}
+
+function filterCategories(list: Category[]): Category[] {
+    const filtered = list
+    .map((cat) => ({
+        ...cat,
+        name: decodeHtmlEntities(cat?.name ?? '').trim(),
+    }))
+    .filter((cat) => {
+        const name = (cat?.name ?? '').toLowerCase();
+        const slug = (cat?.slug ?? '').toLowerCase();
+        return !!cat?.name && !!cat?.slug && name !== 'uncategorized' && slug !== 'uncategorized';
+    });
+
+    const deduped: Category[] = [];
+    const seen = new Set<string>();
+    for (const cat of filtered) {
+        const slugKey = String(cat.slug || '').trim().toLowerCase();
+        const idKey = String(cat.id ?? '').trim();
+        const key = slugKey || idKey;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(cat);
+    }
+    return deduped;
+}
+
+function toParentId(value: unknown): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function readCache(): Category[] | null {
+    if (!isBrowser()) return null;
+
+    try {
+        const raw = window.localStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw) as CacheShape;
+        const age = Date.now() - (parsed?.timestamp ?? 0);
+
+        if (!Array.isArray(parsed?.data)) return null;
+        if (age > CACHE_DURATION_MS) {
+            window.localStorage.removeItem(CACHE_KEY);
             return null;
         }
-    });
-    const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
 
-    const { data: queryData, loading: queryLoading, error: queryError } = useQuery(FETCH_ALL_CATEGORIES_QUERY, {
-        fetchPolicy: 'network-only',
-        skip: !!cachedData,
-        onCompleted: (result) => {
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(CACHE_KEY, JSON.stringify(result));
+        return parsed.data;
+    } catch {
+        // if JSON corrupted
+        try {
+            window.localStorage.removeItem(CACHE_KEY);
+        } catch {
+            // ignore
+        }
+        return null;
+    }
+}
+
+function writeCache(data: Category[]): void {
+    if (!isBrowser()) return;
+
+    try {
+        const payload: CacheShape = { data, timestamp: Date.now() };
+        window.localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    } catch {
+        // localStorage can fail in private mode/quota — ignore safely
+    }
+}
+
+const MegaMenu = () => {
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
+    const [mounted, setMounted] = useState<boolean>(false);
+
+    const abortRef = useRef<AbortController | null>(null);
+    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const loadCategories = useCallback(async () => {
+        // 1) cache
+        const cached = readCache();
+        if (cached) {
+            setCategories(cached);
+            setLoading(false);
+            return;
+        }
+
+        // 2) fetch (REST)
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        try {
+            setLoading(true);
+
+            /**
+             * IMPORTANT:
+             * Your api.get might return:
+             * - Category[]
+             * - { data: Category[] }
+             * - { categories: Category[] }
+             *
+             * Also some clients use: api.get(url, { signal })
+             * If yours doesn’t support signal, remove the second arg.
+             */
+            const res = await api.get(ENDPOINTS.CATEGORIES, { signal: controller.signal });
+
+            const normalized = normalizeCategories(res);
+            const filtered = filterCategories(normalized);
+
+            if (!controller.signal.aborted) {
+                setCategories(filtered);
+                writeCache(filtered);
+                log('Loaded categories:', filtered.length);
+            }
+        } catch (err: unknown) {
+            // Ignore abort errors
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+
+            if (!controller.signal.aborted) {
+                // If api.get throws custom error shapes, don’t crash UI
+                setCategories([]);
+                log('Error loading categories:', err);
+            }
+        } finally {
+            if (!controller.signal.aborted) {
+                setLoading(false);
             }
         }
-    });
+    }, []);
 
-    const data = cachedData || queryData;
-    const loading = queryLoading && !cachedData;
-    const error = queryError;
+    useEffect(() => {
+        setMounted(true);
 
-    if (loading) return <div className="h-12 bg-[#0C6DC9]"></div>;
-    if (error) return null;
+        void loadCategories();
 
-    const categories = (data?.productCategories?.nodes || []).filter(
-        (cat: any) => cat.name.toLowerCase() !== 'uncategorized' && cat.slug !== 'uncategorized'
-    );
+        return () => {
+            abortRef.current?.abort();
+            if (closeTimerRef.current) {
+                clearTimeout(closeTimerRef.current);
+                closeTimerRef.current = null;
+            }
+        };
+    }, [loadCategories]);
 
-    // Get first 5 categories for the quick bar
-    const quickLinks = categories.slice(0, 5);
+    const quickLinks = useMemo(() => {
+        const topLevel = categories.filter((cat) => toParentId(cat.parent) === 0);
+        const source = topLevel.length > 0 ? topLevel : categories;
+        return source.slice(0, 7);
+    }, [categories]);
+
+    const clearCloseTimer = () => {
+        if (closeTimerRef.current) {
+            clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+        }
+    };
+
+    const openSideMenu = () => {
+        clearCloseTimer();
+        setIsSideMenuOpen(true);
+    };
+
+    const scheduleCloseSideMenu = () => {
+        clearCloseTimer();
+        closeTimerRef.current = setTimeout(() => {
+            setIsSideMenuOpen(false);
+            closeTimerRef.current = null;
+        }, 180);
+    };
+
+    if (!mounted || loading) return <div className="h-12 bg-[#0C6DC9]" />;
 
     return (
-        <div className="bg-[#0C6DC9] hidden lg:block relative">
+        <div
+            className="bg-[#304bba] hidden lg:block relative z-[70]"
+            onMouseLeave={scheduleCloseSideMenu}
+        >
             <div className="w-full px-8">
                 <ul className="flex items-center h-12">
-                    {/* "All" button for sidebar */}
                     <li className="h-full flex items-center pr-6 mr-6 border-r border-white/20">
                         <button
-                            onClick={() => setIsSideMenuOpen(true)}
-                            className="flex items-center gap-2 text-white hover:text-white/80 transition-all group py-1.5 px-3 rounded-sm hover:bg-white/5"
+                            type="button"
+                            onClick={isSideMenuOpen ? () => setIsSideMenuOpen(false) : openSideMenu}
+                            onMouseEnter={openSideMenu}
+                            className="flex items-center gap-2 text-white hover:text-white transition-all group py-1.5 px-3 rounded-sm hover:bg-white/10"
+                            aria-haspopup="dialog"
+                            aria-expanded={isSideMenuOpen}
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5 group-hover:scale-110 transition-transform">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                strokeWidth={2.5}
+                                stroke="currentColor"
+                                className="w-5 h-5 group-hover:scale-110 transition-transform"
+                            >
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                             </svg>
-                            <span className="text-sm font-bold uppercase tracking-tight">All</span>
+                            <span className="text-sm font-bold tracking-tight">All Departments</span>
                         </button>
                     </li>
 
-                    {/* Quick Category Links */}
-                    {quickLinks.map((category: any) => (
-                        <li key={category.id} className="h-full flex items-center mr-8 last:mr-0">
+                    {quickLinks.map((category) => (
+                        <li key={String(category.id ?? category.slug)} className="h-full flex items-center mr-8 last:mr-0">
                             <Link
                                 href={`/product-category/${category.slug}`}
-                                className="text-[13px] font-bold text-white hover:text-white/80 transition-colors whitespace-nowrap"
+                                prefetch={false}
+                                className="text-white hover:text-white transition-colors text-sm font-medium tracking-tight py-1.5 px-3 rounded-sm hover:bg-white/10"
                             >
                                 {category.name}
                             </Link>
                         </li>
                     ))}
-
-                    <li className="h-full flex items-center ml-8">
-                        <Link
-                            href="/products"
-                            className="text-[13px] font-bold text-white hover:text-white/80 transition-colors whitespace-nowrap border-b border-transparent hover:border-white/40"
-                        >
-                            Shop All
-                        </Link>
-                    </li>
                 </ul>
             </div>
 
-            {/* Desktop Sidebar Menu */}
             <DesktopSideMenu
                 isOpen={isSideMenuOpen}
                 onClose={() => setIsSideMenuOpen(false)}
+                onPanelEnter={openSideMenu}
+                onPanelLeave={scheduleCloseSideMenu}
+                categories={categories}
             />
         </div>
     );
