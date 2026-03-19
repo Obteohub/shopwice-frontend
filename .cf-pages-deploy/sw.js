@@ -1,16 +1,26 @@
-const CACHE_NAME = 'shopwice-cache-v4';
+const CACHE_NAME = 'shopwice-cache-v7';
 const ASSETS_TO_CACHE = [
   '/',
+  '/pwa-offline',
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
-  '/favicon.ico',
+  '/favicon.png',
+  '/logo.png',
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await Promise.allSettled(
+        ASSETS_TO_CACHE.map(async (asset) => {
+          const response = await fetch(asset, { cache: 'no-cache' });
+          if (!response || response.status !== 200) {
+            throw new Error(`Failed to precache ${asset}`);
+          }
+          await cache.put(asset, response);
+        }),
+      );
     }),
   );
   self.skipWaiting();
@@ -49,7 +59,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
-        return caches.match('/');
+        return caches.match('/pwa-offline') || caches.match('/');
       }),
     );
     return;

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { toSizedImageUrl } from '@/utils/image';
 
 const InfoBanner = () => {
     return (
@@ -7,9 +8,12 @@ const InfoBanner = () => {
             {/* Background Image with Overlay */}
             <div className="absolute inset-0 z-0 text-white">
                 <img
-                    src="https://cdn.shopwice.com/2023/04/banner-homepage-scaled.webp"
+                    src={toSizedImageUrl('https://cdn.shopwice.com/2023/04/banner-homepage-scaled.webp', 1600)}
                     alt="Banner background"
                     className="w-full h-full object-cover"
+                    width="1600"
+                    height="900"
+                    decoding="async"
                 />
             </div>
 

@@ -1,10 +1,73 @@
 {
   "version": 4,
   "routes": {
+    "/_not-found": {
+      "initialStatus": 404,
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/_not-found",
+      "dataRoute": "/_not-found.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
+    "/sentry-example-page": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/sentry-example-page",
+      "dataRoute": "/sentry-example-page.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
     "/404": {
       "initialRevalidateSeconds": false,
       "srcRoute": null,
-      "dataRoute": "/_next/data/aEOdjguobaQG8LWh3LxWU/404.json",
+      "dataRoute": "/_next/data/oQ9NzK2DmzQ9vfBR7CbTg/404.json",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
+    "/brands": {
+      "initialRevalidateSeconds": 3600,
+      "initialExpireSeconds": 31536000,
+      "srcRoute": null,
+      "dataRoute": "/_next/data/oQ9NzK2DmzQ9vfBR7CbTg/brands.json",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -18,7 +81,7 @@
       "initialRevalidateSeconds": 60,
       "initialExpireSeconds": 31536000,
       "srcRoute": null,
-      "dataRoute": "/_next/data/aEOdjguobaQG8LWh3LxWU/categories.json",
+      "dataRoute": "/_next/data/oQ9NzK2DmzQ9vfBR7CbTg/categories.json",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -32,7 +95,7 @@
       "initialRevalidateSeconds": 60,
       "initialExpireSeconds": 31536000,
       "srcRoute": null,
-      "dataRoute": "/_next/data/aEOdjguobaQG8LWh3LxWU/index.json",
+      "dataRoute": "/_next/data/oQ9NzK2DmzQ9vfBR7CbTg/index.json",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -46,7 +109,7 @@
       "initialRevalidateSeconds": 60,
       "initialExpireSeconds": 31536000,
       "srcRoute": null,
-      "dataRoute": "/_next/data/aEOdjguobaQG8LWh3LxWU/shoes.json",
+      "dataRoute": "/_next/data/oQ9NzK2DmzQ9vfBR7CbTg/shoes.json",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -60,8 +123,8 @@
   "dynamicRoutes": {},
   "notFoundRoutes": [],
   "preview": {
-    "previewModeId": "2b0c8c63fa98bcf5519985e907d58e85",
-    "previewModeSigningKey": "78dad66fff4cf3ad71ff21b34b713ab7deaa615d7e52d22c9cf025522cefba9d",
-    "previewModeEncryptionKey": "586c0fcd14126eccafbe6eee2af3ff865101a1dc5f027ee3859e10c24fb62976"
+    "previewModeId": "4173c9872502cb8a4a815d78e29e8516",
+    "previewModeSigningKey": "7b557979c72115ac18755562dea484cabc4c1124e0a6c009d12ddf836fcfd7a7",
+    "previewModeEncryptionKey": "a49956f15b7518daaf54e55311d36f003ca5dbb8310672d87fe7b9e3531af6f9"
   }
 }

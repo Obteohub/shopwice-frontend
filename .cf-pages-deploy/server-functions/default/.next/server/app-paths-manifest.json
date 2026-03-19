@@ -1,1 +1,5 @@
-{}
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/sentry-example-api/route": "app/api/sentry-example-api/route.js",
+  "/sentry-example-page/page": "app/sentry-example-page/page.js"
+}

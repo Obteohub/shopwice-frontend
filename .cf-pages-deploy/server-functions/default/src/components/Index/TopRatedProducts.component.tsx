@@ -19,7 +19,7 @@ const TopRatedProducts = ({ products }: TopRatedProductsProps) => {
     // Determine slidesPerView based on window width
     const handleResize = () => {
       if (window.innerWidth >= 1024) {
-        setSlidesPerView(8);
+        setSlidesPerView(6);
       } else if (window.innerWidth >= 768) {
         setSlidesPerView(5);
       } else {
@@ -47,7 +47,7 @@ const TopRatedProducts = ({ products }: TopRatedProductsProps) => {
   return (
     <div className="bg-white py-1 border-t border-gray-100">
       <div className="w-full px-2 sm:px-6 relative group">
-        <div className="flex items-center justify-between mb-2 pb-2">
+        <div className="flex items-center justify-between mb-1 pb-1">
           <h2 className="text-xl text-gray-900 tracking-tight">Top Rated Products</h2>
           <Link href="/products?orderby=rating" className="text-blue-600 text-md font-bold hover:underline">
             View All
@@ -77,7 +77,7 @@ const TopRatedProducts = ({ products }: TopRatedProductsProps) => {
         </div>
 
         {/* Desktop View: Carousel */}
-        <div className="hidden md:block overflow-hidden relative min-h-[400px]">
+        <div className="hidden md:block overflow-hidden relative min-h-[360px]">
           {isMounted && (
             <>
               <div
@@ -90,7 +90,7 @@ const TopRatedProducts = ({ products }: TopRatedProductsProps) => {
                 {products.map((product, index) => (
                   <div
                     key={`desk-top-${product.databaseId || index}`}
-                    className="px-2 [width:var(--item-width)]"
+                    className="px-1 [width:var(--item-width)]"
                     style={{
                       '--item-width': `${100 / products.length}%`,
                     } as React.CSSProperties}

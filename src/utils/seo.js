@@ -1,5 +1,5 @@
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_RANKMATH_TIMEOUT_MS = 8000;
+const DEFAULT_RANKMATH_TIMEOUT_MS = 2000;
 const RANKMATH_FAILURE_CACHE_TTL_MS = 5 * 60 * 1000;
 // Image probe runs in the background (non-blocking), so a longer timeout is acceptable.
 const IMAGE_PROBE_TIMEOUT_MS = 15000;
@@ -25,8 +25,26 @@ const TRACKING_QUERY_KEYS = new Set([
 const toStringValue = (value) => (typeof value === 'string' ? value.trim() : '');
 
 const trimTrailingSlash = (value) => value.replace(/\/+$/, '');
+const hasFileExtensionPath = (pathname) => /\.[a-z0-9]+$/i.test(String(pathname || ''));
 
-const getWpBaseUrl = () => trimTrailingSlash(toStringValue(process.env.NEXT_PUBLIC_WP_API_URL));
+const resolveSeoBackendBaseUrl = (configuredUrl) => {
+  const normalized = trimTrailingSlash(toStringValue(configuredUrl));
+  if (!normalized) return '';
+
+  try {
+    const parsed = new URL(normalized);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === 'shopwice.com' || hostname === 'www.shopwice.com') {
+      return 'https://cms.shopwice.com';
+    }
+    return trimTrailingSlash(parsed.origin);
+  } catch {
+    return normalized;
+  }
+};
+
+const getWpBaseUrl = () => resolveSeoBackendBaseUrl(process.env.NEXT_PUBLIC_WP_API_URL);
+export const getSeoBackendBaseUrl = () => getWpBaseUrl();
 
 export const getSiteUrl = () => trimTrailingSlash(toStringValue(process.env.NEXT_PUBLIC_SITE_URL));
 
@@ -50,10 +68,10 @@ const getRankMathTimeoutMs = () => {
 const isCacheableSeoPath = (pathname) => {
   if (!pathname) return false;
   return (
+    pathname === '/' ||
     pathname.startsWith('/product/') ||
     pathname.startsWith('/product-category/') ||
     pathname.startsWith('/brand/') ||
-    pathname.startsWith('/tag/') ||
     pathname.startsWith('/location/') ||
     pathname === '/shop' ||
     pathname === '/products'
@@ -197,7 +215,7 @@ const scoreHeadQuality = (head) => {
   return score;
 };
 
-const shouldTryBackendMirror = (pathname, head) => {
+const shouldTryAlternativeHead = (pathname, head) => {
   if (!pathname) return false;
   if (!head) return true;
 
@@ -206,7 +224,7 @@ const shouldTryBackendMirror = (pathname, head) => {
   const isArchivePath =
     pathname.startsWith('/product-category/') ||
     pathname.startsWith('/brand/') ||
-    pathname.startsWith('/tag/') ||
+    pathname.startsWith('/collection/') ||
     pathname.startsWith('/location/') ||
     pathname === '/products' ||
     pathname === '/shop';
@@ -218,12 +236,47 @@ const shouldTryBackendMirror = (pathname, head) => {
   return false;
 };
 
+const normalizeRankMathPageUrl = (inputUrl) => {
+  const raw = toStringValue(inputUrl);
+  if (!raw) return '';
+
+  try {
+    const parsed = new URL(raw);
+    parsed.hash = '';
+
+    const pathname = parsed.pathname || '/';
+    if (!pathname || pathname === '') {
+      parsed.pathname = '/';
+    } else if (!pathname.endsWith('/') && !hasFileExtensionPath(pathname)) {
+      parsed.pathname = `${pathname}/`;
+    }
+
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+};
+
+const prefersBackendMirrorFirst = (pathname) => {
+  if (!pathname) return false;
+  return (
+    pathname === '/' ||
+    pathname.startsWith('/product/') ||
+    pathname.startsWith('/product-category/') ||
+    pathname.startsWith('/brand/') ||
+    pathname.startsWith('/collection/') ||
+    pathname.startsWith('/location/') ||
+    pathname === '/products' ||
+    pathname === '/shop'
+  );
+};
+
 const buildBackendMirrorUrl = (frontendUrl, wpBaseUrl) => {
   try {
     const frontend = new URL(frontendUrl);
     const wp = new URL(wpBaseUrl);
     const mirrored = new URL(`${frontend.pathname}${frontend.search}`, wp.origin);
-    return mirrored.toString();
+    return normalizeRankMathPageUrl(mirrored.toString());
   } catch {
     return '';
   }
@@ -240,12 +293,12 @@ const normalizeRankMathTargetUrl = (frontendUrl) => {
     const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
 
     if (!isLocalhost) {
-      return frontendUrl;
+      return normalizeRankMathPageUrl(frontendUrl);
     }
 
-    return new URL(`${input.pathname}${input.search}`, site.origin).toString();
+    return normalizeRankMathPageUrl(new URL(`${input.pathname}${input.search}`, site.origin).toString());
   } catch {
-    return frontendUrl;
+    return normalizeRankMathPageUrl(frontendUrl);
   }
 };
 
@@ -290,14 +343,14 @@ export const buildFrontendUrl = (inputUrl) => {
 
   try {
     if (/^https?:\/\//i.test(raw)) {
-      return new URL(raw).toString();
+      return normalizeRankMathPageUrl(new URL(raw).toString());
     }
 
     if (!siteUrl) return '';
 
     const base = siteUrl.endsWith('/') ? siteUrl : `${siteUrl}/`;
     const relative = raw.startsWith('/') ? raw.slice(1) : raw;
-    return new URL(relative, base).toString();
+    return normalizeRankMathPageUrl(new URL(relative, base).toString());
   } catch {
     return '';
   }
@@ -336,26 +389,27 @@ export async function getRankMathSEO(frontendPageUrl) {
     if (hasRecentRankMathFailure(cacheKey)) return null;
   }
 
-  const frontendHead = await fetchRankMathHead({
-    wpBaseUrl,
-    targetUrl: rankMathTargetUrl,
-    shouldCache,
-  });
-
-  let selectedHead = frontendHead;
   const backendMirrorUrl = buildBackendMirrorUrl(rankMathTargetUrl, wpBaseUrl);
   const canTryBackendMirror = backendMirrorUrl && backendMirrorUrl !== rankMathTargetUrl;
+  const backendFirst = canTryBackendMirror && prefersBackendMirrorFirst(pathname);
 
-  if (canTryBackendMirror && shouldTryBackendMirror(pathname, frontendHead)) {
-    const backendHead = await fetchRankMathHead({
+  let selectedHead = null;
+
+  if (canTryBackendMirror) {
+    // Fire both endpoints in parallel and pick the higher-quality result.
+    const [frontendHead, backendHead] = await Promise.all([
+      fetchRankMathHead({ wpBaseUrl, targetUrl: rankMathTargetUrl, shouldCache }),
+      fetchRankMathHead({ wpBaseUrl, targetUrl: backendMirrorUrl, shouldCache }),
+    ]);
+    selectedHead = scoreHeadQuality(backendHead) > scoreHeadQuality(frontendHead)
+      ? backendHead
+      : (frontendHead ?? backendHead);
+  } else {
+    selectedHead = await fetchRankMathHead({
       wpBaseUrl,
-      targetUrl: backendMirrorUrl,
+      targetUrl: rankMathTargetUrl,
       shouldCache,
     });
-
-    if (scoreHeadQuality(backendHead) > scoreHeadQuality(frontendHead)) {
-      selectedHead = backendHead;
-    }
   }
 
   if (shouldCache && selectedHead) {

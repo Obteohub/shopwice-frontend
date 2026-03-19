@@ -18,7 +18,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
         if (!isMounted) return;
 
         const updateSlides = () => {
-            if (window.innerWidth >= 1024) setSlidesPerView(8);
+            if (window.innerWidth >= 1024) setSlidesPerView(6);
             else if (window.innerWidth >= 768) setSlidesPerView(5);
             else setSlidesPerView(2);
         };
@@ -59,7 +59,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
             <div className="w-full px-4 sm:px-6 relative group">
 
                 {/* Header */}
-                <div className="flex items-center justify-between mb-2 pb-2">
+                <div className="flex items-center justify-between mb-1 pb-1">
                     <h2 className="text-xl font-medium text-gray-900">
                         Best Selling Products
                     </h2>
@@ -85,7 +85,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
                 </div>
 
                 {/* ---------- DESKTOP SLIDER ---------- */}
-                <div className="hidden md:block overflow-hidden relative min-h-[400px]">
+                <div className="hidden md:block overflow-hidden relative min-h-[360px]">
                     {isMounted && (
                         <>
                             <div
@@ -97,7 +97,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
                                 {safeProducts.map((product, index) => (
                                     <div
                                         key={product.databaseId ?? index}
-                                        className="px-2 shrink-0 w-1/2 md:w-1/5 lg:w-[12.5%]"
+                                        className="px-1 shrink-0 w-1/2 md:w-1/5 lg:w-1/6"
                                     >
                                         <ProductCard {...product} />
                                     </div>
@@ -112,7 +112,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
                                         aria-label="Previous Products"
                                         className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white shadow-lg opacity-0 group-hover:opacity-100 transition"
                                     >
-                                        ◀
+                                        {'<'}
                                     </button>
 
                                     <button
@@ -120,7 +120,7 @@ const BestSellingSlider = ({ products }: BestSellingSliderProps) => {
                                         aria-label="Next Products"
                                         className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-white shadow-lg opacity-0 group-hover:opacity-100 transition"
                                     >
-                                        ▶
+                                        {'>'}
                                     </button>
                                 </>
                             )}

@@ -1,11 +1,11 @@
 // <define:__IMAGES_DEVICE_SIZES__>
-var define_IMAGES_DEVICE_SIZES_default = [640, 750, 828, 1080, 1200, 1920, 2048, 3840];
+var define_IMAGES_DEVICE_SIZES_default = [640, 693, 750, 828, 960, 1080, 1200, 1440, 1920, 2048, 3840];
 
 // <define:__IMAGES_FORMATS__>
 var define_IMAGES_FORMATS_default = ["image/avif", "image/webp"];
 
 // <define:__IMAGES_IMAGE_SIZES__>
-var define_IMAGES_IMAGE_SIZES_default = [16, 32, 48, 64, 96, 128, 256, 384];
+var define_IMAGES_IMAGE_SIZES_default = [16, 32, 48, 64, 80, 96, 112, 128, 160, 192, 240, 256, 277, 320, 384, 420, 540, 600];
 
 // <define:__IMAGES_LOCAL_PATTERNS__>
 var define_IMAGES_LOCAL_PATTERNS_default = [{ pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$", search: "" }];
@@ -14,7 +14,7 @@ var define_IMAGES_LOCAL_PATTERNS_default = [{ pathname: "^(?:(?!(?:^|\\/)\\.{1,2
 var define_IMAGES_QUALITIES_default = [75, 90];
 
 // <define:__IMAGES_REMOTE_PATTERNS__>
-var define_IMAGES_REMOTE_PATTERNS_default = [{ protocol: "https", hostname: "^(?:^(?:shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:api\\.shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:www\\.shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:web\\.shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:cdn\\.shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:res\\.cloudinary\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:via\\.placeholder\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:images\\.unsplash\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }];
+var define_IMAGES_REMOTE_PATTERNS_default = [{ protocol: "https", hostname: "^(?:^(?:shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:api\\.shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:www\\.shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:staging\\.shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:cdn\\.shopwice\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:res\\.cloudinary\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:via\\.placeholder\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }, { protocol: "https", hostname: "^(?:^(?:images\\.unsplash\\.com)$)$", pathname: "^(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)\\/?)$" }];
 
 // node_modules/@opennextjs/aws/dist/utils/error.js
 function isOpenNextError(e) {

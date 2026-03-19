@@ -1,4 +1,4 @@
-interface ComparePriceModalProps {
+﻿interface ComparePriceModalProps {
     isOpen: boolean;
     onClose: () => void;
     newPrice: string;
@@ -30,7 +30,7 @@ const ComparePriceModal = ({ isOpen, onClose, newPrice, refurbPrice, productName
                     <div className="text-center mb-6">
                         <h3 className="text-xl font-bold text-gray-900">Why Pay More?</h3>
                         <p className="text-sm text-gray-600 mt-1 px-4">
-                            Save <span className="font-bold text-green-600">GH₵{savings}</span> on {productName}
+                            Save <span className="font-bold text-green-600">GHâ‚µ{savings}</span> on {productName}
                         </p>
                     </div>
 
@@ -68,11 +68,11 @@ const ComparePriceModal = ({ isOpen, onClose, newPrice, refurbPrice, productName
                                 <tr className="bg-gray-50/50">
                                     <td className="py-3 px-4 text-gray-900 font-bold">Price</td>
                                     <td className="py-3 px-4 text-left text-gray-400 font-medium text-xs line-through decoration-red-500/50 decoration-2">{newPrice}</td>
-                                    <td className="py-3 px-4 text-left text-gray-900 font-extrabold text-sm bg-green-50/30">{refurbPrice}</td>
+                                    <td className="py-3 px-4 text-left text-gray-900 font-bold text-sm bg-green-50/30">{refurbPrice}</td>
                                 </tr>
                                 <tr className="bg-green-100">
                                     <td colSpan={3} className="py-3 px-4 text-center text-green-800 font-bold text-sm">
-                                        Value: <span className="font-extrabold">Save GH₵{savings}</span>
+                                        Value: <span className="font-bold">Save GHâ‚µ{savings}</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -92,3 +92,4 @@ const ComparePriceModal = ({ isOpen, onClose, newPrice, refurbPrice, productName
 };
 
 export default ComparePriceModal;
+
