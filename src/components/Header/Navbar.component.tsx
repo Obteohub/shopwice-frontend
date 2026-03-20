@@ -20,7 +20,7 @@ const Navbar = () => {
 
   return (
     <header className="w-full">
-      <nav id="header" className="relative z-[60] w-full bg-white">
+      <nav id="header" className="sticky top-0 z-[60] w-full bg-white">
         <LocationPicker variant="headless" />
 
         {/* Mobile Navbar */}
