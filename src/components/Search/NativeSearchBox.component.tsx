@@ -1,15 +1,27 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSearchSuggestions } from '@/hooks/useSearchSuggestions';
 import { paddedPrice } from '../../utils/functions/functions';
-import { normalizeImageUrl } from '@/utils/image';
+import { firstValidImageUrl, toSizedImageUrl } from '@/utils/image';
 
 const SuggestionImage = ({ src, alt }: { src?: string; alt: string }) => {
-  const resolvedSrc = normalizeImageUrl(src);
+  const resolvedSrc = toSizedImageUrl(src, 96);
   if (!resolvedSrc) return null;
-  return <Image src={resolvedSrc} alt={alt} fill className="object-cover" sizes="48px" />;
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      className="h-full w-full object-cover"
+      width="48"
+      height="48"
+      loading="lazy"
+      decoding="async"
+      onError={(event) => {
+        event.currentTarget.src = '/product-placeholder.svg';
+      }}
+    />
+  );
 };
 
 const extractSlugFromUrl = (value: unknown) => {
@@ -76,11 +88,18 @@ const NativeSearchBox = () => {
                 const slug = String(source?.slug || '').trim() || extractSlugFromUrl(rawHref);
                 const href = rawHref || (slug ? `/product/${slug}/` : '');
                 if (!href) return null;
-                const imageUrl =
-                  normalizeImageUrl(source?.image?.sourceUrl) ||
-                  normalizeImageUrl(source?.image?.src) ||
-                  normalizeImageUrl(source?.image?.url) ||
-                  '';
+                const imageUrl = firstValidImageUrl(
+                  source?.image,
+                  source?.image?.sourceUrl,
+                  source?.image?.src,
+                  source?.image?.url,
+                  source?.thumbnail,
+                  source?.thumbnailUrl,
+                  source?.images?.[0],
+                  source?.images?.[0]?.sourceUrl,
+                  source?.images?.[0]?.src,
+                  source?.images?.[0]?.url,
+                );
                 const key = source?.id ?? source?.variationId ?? source?.productId ?? `${source?.name || 'item'}-${index}`;
                 return (
                   <li key={key}>
@@ -91,14 +110,19 @@ const NativeSearchBox = () => {
                         </div>
                         <div className="flex flex-col">
                           <span className="font-medium text-sm text-gray-900 line-clamp-1">{source?.title || source?.name}</span>
+                          {(source?.variantLabel || source?.variant_label) && (
+                            <span className="text-[11px] text-gray-500 line-clamp-1">
+                              {source?.variantLabel || source?.variant_label}
+                            </span>
+                          )}
                           <div className="flex items-center gap-2">
                             {source?.onSale ? (
                               <>
-                                <span className="text-xs font-bold text-red-600">{paddedPrice(source?.salePrice ?? source?.price ?? '', 'GHâ‚µ')}</span>
-                                <span className="text-[10px] text-gray-400 line-through">{paddedPrice(source?.regularPrice ?? '', 'GHâ‚µ')}</span>
+                                <span className="text-xs font-bold text-red-600">{paddedPrice(source?.salePrice ?? source?.price ?? '', 'GHS ')}</span>
+                                <span className="text-[10px] text-gray-400 line-through">{paddedPrice(source?.regularPrice ?? '', 'GHS ')}</span>
                               </>
                             ) : (
-                              <span className="text-xs font-bold text-gray-900">{paddedPrice(source?.price ?? '', 'GHâ‚µ')}</span>
+                              <span className="text-xs font-bold text-gray-900">{paddedPrice(source?.price ?? '', 'GHS ')}</span>
                             )}
                           </div>
                         </div>
@@ -116,3 +140,4 @@ const NativeSearchBox = () => {
 };
 
 export default NativeSearchBox;
+

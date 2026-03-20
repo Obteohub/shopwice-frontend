@@ -3,6 +3,7 @@ export const API_URL = process.env.NEXT_PUBLIC_REST_API_URL || process.env.NEXT_
 export const ENDPOINTS = {
     // Catalog (Proxied)
     PRODUCTS: '/api/products',
+    PRODUCTS_SOLD: '/api/products/sold',
     PRODUCT_BY_ID: '/api/products', // GET /api/products/:id
     PRODUCT_REVIEWS: '/api/products/reviews',
     /** GET /api/products/:idOrSlug/reviews — all approved reviews for a product */
@@ -20,6 +21,8 @@ export const ENDPOINTS = {
     COLLECTION_DATA: '/api/collection-data',
     REVIEWS: '/api/reviews',
     SEARCH: '/api/search',
+    /** GET /api/pages/:slugOrId */
+    page: (slugOrId: string | number) => `/api/pages/${slugOrId}`,
 
     // Cart Proxy
     CART: '/api/cart',
@@ -37,6 +40,7 @@ export const ENDPOINTS = {
     SHIPPING_RATES: '/api/shipping-rates',
     PAYMENT_METHODS: '/api/payment-methods',
     ORDERS: '/api/orders',
+    ORDERS_RECEIVED: '/api/orders/received',
 
     // Auth & User (Proxied)
     AUTH: {

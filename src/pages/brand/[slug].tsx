@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 import SeoHead from '@/components/SeoHead';
+import { normalizeCollectionDataPayload } from '@/features/collection/apiClient';
 import { api } from '@/utils/api';
+import { applyCachePolicy } from '@/utils/cacheControl';
 import { ENDPOINTS } from '@/utils/endpoints';
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
 import Link from 'next/link';
@@ -11,6 +13,7 @@ import {
     getAbsoluteUrlFromRequest,
     parsePageParam,
 } from '@/utils/seoPage';
+import { getRequestPathname, loggedNotFound } from '@/utils/routeEventLogger';
 import { buildTaxonomyBreadcrumbs } from '@/utils/taxonomyBreadcrumbs';
 import { decodeHtmlEntities } from '@/utils/text';
 
@@ -37,6 +40,7 @@ const BrandPage = ({
     breadcrumbs,
     totalCount,
     initialHasNextPage,
+    initialFacets,
     seoData,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
     const router = useRouter();
@@ -95,11 +99,13 @@ const BrandPage = ({
                 products={products}
                 slug={slug}
                 queryParams={{ brand: brandId || slug }}
+                customRouteScope={{ taxonomy: 'brand', value: String(brandId || slug) }}
                 description={decodeHtmlEntities(description || '')}
                 emptyMessage="No products found for this brand"
                 topSlot={subBrandSlot}
                 totalCount={totalCount}
                 initialHasNextPage={initialHasNextPage}
+                initialFacets={initialFacets}
                 loading={loading}
                 breadcrumbs={breadcrumbs}
             />
@@ -114,11 +120,19 @@ export const getServerSideProps: GetServerSideProps = async ({ params, query, re
     const attr = (query?.attr as string | undefined) || '';
     const term = (query?.term as string | undefined) || '';
     const page = parsePageParam(query?.page);
+    const requestPath = getRequestPathname(req, `/brand/${slug || ''}`);
 
-    if (!slug) return { notFound: true };
+    if (!slug) {
+        return loggedNotFound({
+            req,
+            pathname: requestPath,
+            matchedRoute: '/brand/[slug]',
+            reason: 'Missing brand slug',
+        });
+    }
 
     try {
-        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+        applyCachePolicy(res, 'archivePage');
 
         const productParams: any = {
             // Use slug directly; API accepts both slug and numeric ID.
@@ -130,10 +144,13 @@ export const getServerSideProps: GetServerSideProps = async ({ params, query, re
             productParams[`attribute_${attr}`] = term;
         }
 
-        // Phase 1: fetch all brands + products in parallel.
-        const [allBrandsRaw, productsRaw] = await Promise.all([
+        // Phase 1: fetch all brands + products + facets in parallel.
+        const [allBrandsRaw, productsRaw, collectionDataRaw] = await Promise.all([
             api.get(ENDPOINTS.BRANDS),
-            api.get(ENDPOINTS.PRODUCTS, { params: productParams }),
+            api.get(ENDPOINTS.PRODUCTS, { params: productParams, skipReviewEnrich: true }),
+            api.get(ENDPOINTS.COLLECTION_DATA, {
+                params: { brand: slug },
+            }).catch(() => null),
         ]);
 
         const allBrands: any[] = normalizeList<any>(allBrandsRaw);
@@ -141,12 +158,20 @@ export const getServerSideProps: GetServerSideProps = async ({ params, query, re
         const brand = allBrands.find((b: any) => b.slug?.toLowerCase() === normalizedSlug);
 
         if (!brand) {
-            return { notFound: true };
+            return loggedNotFound({
+                req,
+                pathname: requestPath,
+                matchedRoute: '/brand/[slug]',
+                reason: 'Brand not found in taxonomy payload',
+            });
         }
 
         const brandId = Number(brand.databaseId || brand.id || 0);
         const subBrands = allBrands.filter((b: any) => Number(b.parent) === brandId);
         const products: any[] = normalizeList<any>(productsRaw);
+        const initialFacets = collectionDataRaw
+            ? normalizeCollectionDataPayload(collectionDataRaw)
+            : [];
         const totalCount = Number(brand?.count || 0);
         const hasNextPage = totalCount > 0
             ? page * 24 < totalCount
@@ -184,6 +209,7 @@ export const getServerSideProps: GetServerSideProps = async ({ params, query, re
                 brandName: decodeHtmlEntities(brand.name),
                 brandId,
                 products: products || [],
+                initialFacets,
                 totalCount,
                 initialHasNextPage: hasNextPage,
                 slug,
@@ -197,6 +223,11 @@ export const getServerSideProps: GetServerSideProps = async ({ params, query, re
         };
     } catch (error) {
         console.error('Error fetching brand data:', error);
-        return { notFound: true };
+        return loggedNotFound({
+            req,
+            pathname: requestPath,
+            matchedRoute: '/brand/[slug]',
+            reason: 'Unhandled brand SSR error',
+        });
     }
 };

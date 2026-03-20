@@ -28,6 +28,7 @@ import type {
 } from './types';
 
 type CollectionControllerArgs<TProduct> = {
+  enabled?: boolean;
   router: NextRouter;
   initialProducts: TProduct[];
   initialFacets?: ApiFacetGroup[];
@@ -213,6 +214,124 @@ const canonicalTaxonomyKey = (value: unknown) =>
     .replace(/\s+/g, '-')
     .replace(/_+/g, '-');
 
+const normalizeSlugToken = (value: unknown) =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/_+/g, '-');
+
+const getTaxonomyTermsFromProduct = (product: unknown, field: string): Array<{ name: string; slug?: string }> => {
+  if (!product || typeof product !== 'object') return [];
+  const value = (product as Record<string, unknown>)[field];
+  const source = Array.isArray(value) ? value : [];
+  return source
+    .map((entry) => {
+      if (!entry) return null;
+      if (typeof entry === 'string') {
+        const name = entry.trim();
+        if (!name) return null;
+        return { name };
+      }
+      if (typeof entry !== 'object') return null;
+      const node = entry as Record<string, unknown>;
+      const name = String(node.name ?? '').trim();
+      if (!name) return null;
+      const slug = String(node.slug ?? '').trim() || undefined;
+      return { name, slug };
+    })
+    .filter(Boolean) as Array<{ name: string; slug?: string }>;
+};
+
+const buildTaxonomyFallbackFacets = (products: unknown[]): ApiFacetGroup[] => {
+  const buckets: Record<'category' | 'brand' | 'location' | 'tag', Map<string, { name: string; value: string; count: number }>> = {
+    category: new Map(),
+    brand: new Map(),
+    location: new Map(),
+    tag: new Map(),
+  };
+
+  const addTerms = (
+    field: 'categories' | 'brands' | 'locations' | 'tags',
+    bucket: Map<string, { name: string; value: string; count: number }>,
+  ) => {
+    products.forEach((product) => {
+      const terms = getTaxonomyTermsFromProduct(product, field);
+      const seenInProduct = new Set<string>();
+      terms.forEach((term) => {
+        const name = String(term.name || '').trim();
+        const slug = normalizeSlugToken(term.slug || name);
+        const value = String(term.slug || term.name || '').trim();
+        if (!name || !slug || !value) return;
+        if (seenInProduct.has(slug)) return;
+        seenInProduct.add(slug);
+        const existing = bucket.get(slug);
+        if (existing) {
+          existing.count += 1;
+          return;
+        }
+        bucket.set(slug, { name, value, count: 1 });
+      });
+    });
+  };
+
+  addTerms('categories', buckets.category);
+  addTerms('brands', buckets.brand);
+  addTerms('locations', buckets.location);
+  addTerms('tags', buckets.tag);
+
+  const toFacet = (taxonomy: 'category' | 'brand' | 'location' | 'tag', label: string) => {
+    const source = buckets[taxonomy];
+    const terms = Array.from(source.entries()).map(([slug, entry]) => ({
+      value: entry.value,
+      slug,
+      name: entry.name,
+      count: entry.count,
+    }));
+    if (!terms.length) return null;
+    return {
+      taxonomy,
+      label,
+      terms,
+    } satisfies ApiFacetGroup;
+  };
+
+  return [
+    toFacet('category', 'Categories'),
+    toFacet('brand', 'Brands'),
+    toFacet('location', 'Locations'),
+    toFacet('tag', 'Tags'),
+  ].filter(Boolean) as ApiFacetGroup[];
+};
+
+const mergeMissingTaxonomyFacets = (primary: ApiFacetGroup[], fallback: ApiFacetGroup[]) => {
+  if (!fallback.length) return primary;
+
+  const aliases: Record<string, Set<string>> = {
+    category: new Set(['category', 'categories', 'product-category']),
+    brand: new Set(['brand', 'brands', 'product-brand']),
+    location: new Set(['location', 'locations', 'product-location']),
+    tag: new Set(['tag', 'tags', 'product-tag']),
+  };
+
+  const hasTaxonomy = (groups: ApiFacetGroup[], taxonomy: string) => {
+    const allowed = aliases[taxonomy] || new Set([taxonomy]);
+    return groups.some((group) => {
+      const key = canonicalTaxonomyKey(group.taxonomy ?? group.name ?? group.label);
+      return allowed.has(key);
+    });
+  };
+
+  const merged = [...primary];
+  fallback.forEach((group) => {
+    const key = canonicalTaxonomyKey(group.taxonomy ?? group.name ?? group.label);
+    if (!key) return;
+    if (hasTaxonomy(merged, key)) return;
+    merged.push(group);
+  });
+  return merged;
+};
+
 const ROUTE_SCOPE_TAXONOMY_KEYS: Record<string, string[]> = {
   category: ['categories', 'category', 'product-category'],
   brand: ['brands', 'brand', 'product-brand'],
@@ -289,6 +408,7 @@ const resolveScopedCountFromFacets = (
 };
 
 export const useCollectionController = <TProduct>({
+  enabled = true,
   router,
   initialProducts,
   initialFacets,
@@ -302,6 +422,7 @@ export const useCollectionController = <TProduct>({
   omitManagedQueryKeys,
 }: CollectionControllerArgs<TProduct>) => {
   const resolvedPerPage = Number(defaultPerPage) > 0 ? Number(defaultPerPage) : 24;
+  const isEnabled = enabled !== false;
   const includeMobileVariations = useMemo(() => {
     const parseTruthy = (value: unknown) => {
       const normalized = String(value ?? '').trim().toLowerCase();
@@ -348,6 +469,7 @@ export const useCollectionController = <TProduct>({
   const skipInitialFacetsFetchRef = useRef(Array.isArray(initialFacets) && initialFacets.length > 0);
   // Stable ref so effects can call router methods without listing the whole object as a dep.
   const routerRef = useRef(router);
+  const pendingManagedUrlRef = useRef<string | null>(null);
   useEffect(() => {
     routerRef.current = router;
   });
@@ -357,7 +479,18 @@ export const useCollectionController = <TProduct>({
   }, [state]);
 
   useEffect(() => {
-    const syncFromRoute = () => {
+    if (!isEnabled) return;
+    const syncFromRoute = (completedUrl?: string) => {
+      const completed = String(completedUrl || routerRef.current.asPath || '').trim();
+      const pendingManagedUrl = pendingManagedUrlRef.current;
+      if (pendingManagedUrl && completed && completed !== pendingManagedUrl) {
+        // Ignore stale route completions from older shallow updates.
+        return;
+      }
+      if (pendingManagedUrl && completed === pendingManagedUrl) {
+        pendingManagedUrlRef.current = null;
+      }
+
       const next = makeStateFromRoute();
 
       setState((previous) => {
@@ -374,7 +507,7 @@ export const useCollectionController = <TProduct>({
       router.events?.off('routeChangeComplete', syncFromRoute);
       router.events?.off('hashChangeComplete', syncFromRoute);
     };
-  }, [makeStateFromRoute, routeScope, router.events]);
+  }, [isEnabled, makeStateFromRoute, routeScope, router.events]);
 
   const applyPatch = useCallback(
     (
@@ -419,6 +552,7 @@ export const useCollectionController = <TProduct>({
   );
 
   useEffect(() => {
+    if (!isEnabled) return;
     const normalized = searchInput.trim();
     const nextSearch = normalized || undefined;
     if ((state.search || undefined) === nextSearch) return;
@@ -430,7 +564,7 @@ export const useCollectionController = <TProduct>({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [applyPatch, searchInput, state.search]);
+  }, [applyPatch, isEnabled, searchInput, state.search]);
 
   const stateRequestKey = useMemo(
     () => buildCollectionRequestKey(state, routeScope),
@@ -438,6 +572,7 @@ export const useCollectionController = <TProduct>({
   );
 
   useEffect(() => {
+    if (!isEnabled) return;
     const r = routerRef.current;
     if (!r.isReady) return;
 
@@ -451,13 +586,19 @@ export const useCollectionController = <TProduct>({
     });
 
     if (nextUrl === r.asPath) return;
-    void r.replace(nextUrl, undefined, { shallow: true, scroll: false });
+    pendingManagedUrlRef.current = nextUrl;
+    void r.replace(nextUrl, undefined, { shallow: true, scroll: false }).catch(() => {
+      if (pendingManagedUrlRef.current === nextUrl) {
+        pendingManagedUrlRef.current = null;
+      }
+    });
   // router.isReady is the only router primitive we need to react to;
   // stateRequestKey captures all state + routeScope changes via buildCollectionRequestKey.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [omitManagedQueryKeys, resolvedPerPage, router.isReady, stateRequestKey]);
+  }, [isEnabled, omitManagedQueryKeys, resolvedPerPage, router.isReady, stateRequestKey]);
 
   useEffect(() => {
+    if (!isEnabled) return;
     if (!router.isReady) return;
 
     const controller = new AbortController();
@@ -554,13 +695,25 @@ export const useCollectionController = <TProduct>({
         }
       }
 
+      const resolvedProductsForFallback = (
+        productsResult.status === 'fulfilled' && productsResult.value !== null
+          ? productsResult.value.products
+          : products
+      ) as unknown[];
+      const fallbackFacets = buildTaxonomyFallbackFacets(resolvedProductsForFallback);
+
       if (!skipFacets) {
         if (facetsResult.status === 'fulfilled' && Array.isArray(facetsResult.value)) {
-          setFacets(facetsResult.value);
+          setFacets(mergeMissingTaxonomyFacets(facetsResult.value, fallbackFacets));
           setFacetsPanel({ isLoading: false, error: null });
         } else if (facetsResult.status === 'rejected') {
-          const message = String(facetsResult.reason?.message || 'Failed to load filters');
-          setFacetsPanel({ isLoading: false, error: message });
+          if (fallbackFacets.length > 0) {
+            setFacets(fallbackFacets);
+            setFacetsPanel({ isLoading: false, error: null });
+          } else {
+            const message = String(facetsResult.reason?.message || 'Failed to load filters');
+            setFacetsPanel({ isLoading: false, error: message });
+          }
         }
       }
     };
@@ -571,7 +724,7 @@ export const useCollectionController = <TProduct>({
   // stateRequestKey = buildCollectionRequestKey(state, routeScope) — it deep-serialises both,
   // so listing routeScope/state separately would only add unstable object references as deps.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includeMobileVariations, router.isReady, stateRequestKey]);
+  }, [includeMobileVariations, isEnabled, router.isReady, stateRequestKey]);
 
   const announcement = useMemo(
     () => `${totalCount.toLocaleString()} products found`,
@@ -579,6 +732,7 @@ export const useCollectionController = <TProduct>({
   );
 
   useEffect(() => {
+    if (!isEnabled) return;
     if (totalCount === 0 && !productsPanel.isLoading && !productsPanel.error) {
       trackNoResults({
         routeTaxonomy: routeScope?.taxonomy || null,
@@ -586,7 +740,7 @@ export const useCollectionController = <TProduct>({
         query: state,
       });
     }
-  }, [productsPanel.error, productsPanel.isLoading, routeScope, state, totalCount]);
+  }, [isEnabled, productsPanel.error, productsPanel.isLoading, routeScope, state, totalCount]);
 
   const clearAll = useCallback(() => {
     const defaultState = createDefaultCollectionFilterState(resolvedPerPage);
@@ -602,8 +756,27 @@ export const useCollectionController = <TProduct>({
     };
     const forcedNext = applyForcedState(next, forcedState);
     setSearchInput(forcedNext.search || '');
+
+    const r = routerRef.current;
+    if (r.isReady) {
+      const currentPath = (r.asPath || '').split('?')[0] || r.pathname;
+      const currentQuery = parseAsPathQuery(r.asPath || '');
+      const clearUrl = buildCollectionUrlFromState(currentPath, forcedNext, currentQuery, {
+        defaultPerPage: resolvedPerPage,
+        routeScope,
+        includePagination: true,
+        omitKeys: omitManagedQueryKeys,
+      });
+      pendingManagedUrlRef.current = clearUrl;
+      void r.replace(clearUrl, undefined, { shallow: true, scroll: false }).catch(() => {
+        if (pendingManagedUrlRef.current === clearUrl) {
+          pendingManagedUrlRef.current = null;
+        }
+      });
+    }
+
     applyPatch(forcedNext, 'clear');
-  }, [applyPatch, forcedState, resolvedPerPage, routeScope, searchFallback]);
+  }, [applyPatch, forcedState, omitManagedQueryKeys, resolvedPerPage, routeScope, searchFallback]);
 
   const setSort = useCallback(
     (orderby?: SortOrderBy, order?: SortOrder) => {

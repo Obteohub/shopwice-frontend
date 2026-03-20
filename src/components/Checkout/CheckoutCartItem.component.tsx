@@ -2,7 +2,7 @@ import React from 'react';
 import Image from 'next/image';
 import { RestCartItem } from '@/utils/cartTransformers';
 import { formatPriceWithDecimals } from '@/utils/functions/functions';
-import { normalizeImageUrl } from '@/utils/image';
+import { toDisplayImageUrl } from '@/utils/image';
 
 interface CheckoutCartItemProps {
     item: RestCartItem;
@@ -12,7 +12,7 @@ const CheckoutCartItem: React.FC<CheckoutCartItemProps> = ({ item }) => {
     const { quantity } = item;
     const displayPrice = item.totals?.line_subtotal || item.totals?.line_total || 'GHS 0.00';
     const displayName = item.name;
-    const displayImage = normalizeImageUrl(item.images?.[0]?.src);
+    const displayImage = toDisplayImageUrl(item.images?.[0]?.src);
     const variationLabel = item.variation
         ? item.variation.map((attr) => attr.value).join(', ')
         : '';
@@ -25,6 +25,7 @@ const CheckoutCartItem: React.FC<CheckoutCartItemProps> = ({ item }) => {
                         src={displayImage}
                         alt={displayName}
                         fill
+                        sizes="64px"
                         className="object-cover"
                     />
                 ) : null}

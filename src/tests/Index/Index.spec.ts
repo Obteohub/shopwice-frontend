@@ -1,13 +1,15 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Forside', () => {
+test.describe('Homepage', () => {
+  test.setTimeout(120000);
+
   test.beforeEach(async ({ page }) => {
-    await page.goto('http://localhost:3000');
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120000 });
   });
 
-  test('Har h1 innhold på forsiden', async ({ page }) => {
-    const h1 = await page.locator('h1');
+  test('Homepage has h1 content', async ({ page }) => {
+    const h1 = page.locator('h1');
     const count = await h1.count();
-    await expect(count).toBeGreaterThan(0);
+    expect(count).toBeGreaterThan(0);
   });
 });

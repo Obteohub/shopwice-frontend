@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { toDisplayImageUrl } from '@/utils/image';
+
+const LOCAL_ASSET_VERSION = '20260315-2';
+const versionedLocalAsset = (path: string) => `${path}?v=${LOCAL_ASSET_VERSION}`;
 
 const Hero = () => {
   const desktopSlidesPerView = 3.7;
@@ -8,19 +12,19 @@ const Hero = () => {
   const slides = [
     {
       text: "Everything You Ever Needed To Purchase Is Available At Shopwice",
-      src: "/hero-text-bg.jpg",
+      src: versionedLocalAsset('/hero-text-bg.jpg'),
       link: "/products",
-      color: "bg-blue-600",
+      overlay: "bg-blue-900",
       textColor: "text-white",
-      id: 7
+      id: 1
     },
     {
       text: "Lightning Fast Express Delivery in Just 2 Hours.",
-      src: "/hero-express.png",
+      src: versionedLocalAsset('/hero-express.png'),
       link: "/products",
       color: "bg-green-50",
       textColor: "text-gray-900",
-      id: 1
+      id: 2
     },
     {
       src: "https://cdn.shopwice.com/Homepage%20Banners/suxika%20halogen%20vertical%20image%20for%20homepage%20vertical%20banner%20slider_result.webp",
@@ -28,7 +32,7 @@ const Hero = () => {
       title: "Halogen Heaters",
       subtitle: "Winter Essentials",
       color: "bg-orange-50",
-      id: 2
+      id: 3
     },
     {
       src: "https://cdn.shopwice.com/Homepage%20Banners/suxika%20vertical%20image%20for%20homepage%20vertical%20banner%20slider_result.webp",
@@ -36,7 +40,7 @@ const Hero = () => {
       title: "Home Appliances",
       subtitle: "Upgrade Your Home",
       color: "bg-purple-50",
-      id: 3
+      id: 4
     },
     {
       src: "https://cdn.shopwice.com/Homepage%20Banners/vertical%20image%20for%20homepage%20vertical%20banner%20slider_result.webp",
@@ -44,7 +48,7 @@ const Hero = () => {
       title: "New Arrivals",
       subtitle: "Shop the Latest",
       color: "bg-emerald-50",
-      id: 4
+      id: 5
     },
     {
       src: "https://cdn.shopwice.com/Homepage%20Banners/air%20cooler%20with%20mosquito%20repllent%20vertical%20imager%20slider%20banner_result.webp",
@@ -52,7 +56,7 @@ const Hero = () => {
       title: "Best Sellers",
       subtitle: "Trending Now",
       color: "bg-rose-50",
-      id: 5
+      id: 6
     },
     {
       src: "https://cdn.shopwice.com/Homepage%20Banners/suxika%20halogen%20vertical%20image%20for%20homepage%20vertical%20banner%20slider_result.webp",
@@ -60,7 +64,7 @@ const Hero = () => {
       title: "Flash Deals",
       subtitle: "Limited Time Offer",
       color: "bg-amber-50",
-      id: 6
+      id: 7
     },
   ];
 
@@ -77,7 +81,7 @@ const Hero = () => {
   };
 
   return (
-    <section className="relative w-full py-8 bg-[#365feb] group">
+    <section className="relative w-full py-8 bg-[#057BFA] group">
 
       {/* ----------------- MOBILE VIEW (< 768px) ----------------- */}
       <div className="md:hidden block">
@@ -91,7 +95,7 @@ const Hero = () => {
               <Link href={slide.link || '#'} className={`block w-full h-full relative`}>
                 {slide.src && (
                   <Image
-                    src={slide.src}
+                    src={toDisplayImageUrl(slide.src)}
                     alt={slide.title || 'Product'}
                     fill
                     className="object-cover object-center"
@@ -105,7 +109,7 @@ const Hero = () => {
 
                 {slide.text && (
                   <div className={`absolute inset-0 p-8 flex items-start justify-center z-10 ${!slide.src ? 'relative bg-white h-full items-center' : ''}`}>
-                    <h3 className={`font-black text-2xl leading-tight text-center ${slide.textColor || 'text-gray-800'}`}>
+                    <h3 className={`font-black text-xl leading-tight text-center ${slide.textColor || 'text-gray-800'}`}>
                       {slide.text}
                     </h3>
                   </div>
@@ -139,7 +143,7 @@ const Hero = () => {
               <Link href={slide.link || '#'} className={`block w-full h-full relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow`}>
                 {slide.src && (
                   <Image
-                    src={slide.src}
+                    src={toDisplayImageUrl(slide.src)}
                     alt={slide.title || 'Product'}
                     fill
                     className="object-cover object-center"
@@ -153,7 +157,7 @@ const Hero = () => {
 
                 {slide.text && (
                   <div className={`absolute inset-0 p-8 flex items-start justify-center z-10 ${!slide.src ? 'relative bg-white h-full items-center' : ''}`}>
-                    <h3 className={`font-black text-2xl md:text-3xl leading-tight text-center ${slide.textColor || 'text-gray-800'}`}>
+                    <h3 className={`font:normal text-2xl leading-tight text-center ${slide.textColor || 'text-gray-600'}`}>
                       {slide.text}
                     </h3>
                   </div>

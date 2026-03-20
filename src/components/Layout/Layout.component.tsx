@@ -6,6 +6,8 @@ import Header from '@/components/Header/Header.component';
 import PageTitle from './PageTitle.component';
 import Footer from '@/components/Footer/Footer.component';
 import MobileBottomNav from './MobileBottomNav.component';
+import AddToCartToast from '@/components/Cart/AddToCartToast.component';
+import WhatsAppButton from '@/components/UI/WhatsAppButton.component';
 
 interface ILayoutProps {
   children?: ReactNode;
@@ -37,6 +39,9 @@ const Layout = ({ children, title, fullWidth = false }: ILayoutProps) => {
         </div>
       )}
       <MobileBottomNav />
+      <AddToCartToast />
+      {/* Floating WhatsApp button — sits above MobileBottomNav on mobile, bottom-right on desktop */}
+      <WhatsAppButton className="fixed bottom-[76px] right-4 z-[65] h-14 w-14 lg:bottom-6 lg:right-6 lg:h-14 lg:w-14" />
       <div className="mt-auto">
         <Footer />
       </div>

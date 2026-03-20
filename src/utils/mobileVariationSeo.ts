@@ -12,6 +12,7 @@ type VariationAttributeEntry = {
 type VariationLike = {
   id?: number | string;
   variation_id?: number | string;
+  synthetic?: boolean;
   sku?: string;
   price?: string | number | null;
   regularPrice?: string | number | null;
@@ -41,6 +42,12 @@ export const MOBILE_STORAGE_ALLOWED = new Set(['128gb', '256gb', '512gb']);
 
 const normalizeText = (value: unknown) => String(value ?? '').trim();
 const normalizeLower = (value: unknown) => normalizeText(value).toLowerCase();
+const isRealVariation = (variation: VariationLike | null | undefined) => {
+  if (!variation || variation.synthetic) return false;
+  const rawId = normalizeText(variation.id ?? variation.variation_id);
+  if (!rawId) return false;
+  return !rawId.startsWith('synthetic-');
+};
 const toSlug = (value: unknown) =>
   normalizeLower(value)
     .replace(/&/g, ' and ')
@@ -128,7 +135,8 @@ export const resolveSelectedVariation = (
   variations: VariationLike[] | null | undefined,
   queryAttributes: Record<string, string>,
 ) => {
-  const list = Array.isArray(variations) ? variations : [];
+  void product;
+  const list = Array.isArray(variations) ? variations.filter((variation) => isRealVariation(variation)) : [];
   if (!list.length) return null;
   const requested = Object.entries(queryAttributes || {}).filter(([key, value]) => key.startsWith('attribute_') && value);
   if (!requested.length) return null;
@@ -255,22 +263,36 @@ export const buildProductGroupJsonLd = (
   const productSlug = normalizeText(product?.slug);
   const currency =
     normalizeText(product?.currencyCode || product?.currency_code || product?.currency) || 'GHS';
+  const origin = (() => {
+    try {
+      return new URL(canonicalUrl).origin;
+    } catch {
+      return '';
+    }
+  })();
+  const toAbsoluteUrl = (value: string) => {
+    if (!value) return value;
+    if (/^https?:\/\//i.test(value)) return value;
+    if (!origin) return value;
+    return `${origin}${value.startsWith('/') ? value : `/${value}`}`;
+  };
 
   const toVariantNode = (variation: VariationLike) => {
     const attrs = normalizeVariationAttributes(variation);
     const label = buildVariationLabel(variation);
     const url = buildVariationUrl(productSlug, attrs);
+    const absoluteUrl = toAbsoluteUrl(url);
     return {
       '@type': 'Product',
       name: label ? `${productName} - ${label}` : productName,
       sku: normalizeText(variation?.sku) || undefined,
-      url,
+      url: absoluteUrl,
       offers: {
         '@type': 'Offer',
         priceCurrency: currency,
         price: toPrice(variation) || undefined,
         availability: toAvailability(variation),
-        url,
+        url: absoluteUrl,
       },
     };
   };
@@ -293,7 +315,7 @@ export const buildVariationUrlMap = (
   product: ProductLike,
   variations: VariationLike[] | null | undefined,
 ) => {
-  const list = Array.isArray(variations) ? variations : [];
+  const list = Array.isArray(variations) ? variations.filter((variation) => isRealVariation(variation)) : [];
   const slug = normalizeText(product?.slug);
   const byId = new Map<string, string>();
 

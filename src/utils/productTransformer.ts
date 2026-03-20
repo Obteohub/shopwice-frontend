@@ -8,7 +8,6 @@ const toArray = <T,>(v: any): T[] => (Array.isArray(v) ? v : []);
 const toArrayLoose = <T,>(v: any): T[] => {
   if (Array.isArray(v)) return v as T[];
   if (v && typeof v === 'object') {
-    if (Array.isArray((v as any).nodes)) return (v as any).nodes as T[];
     if (Array.isArray((v as any).items)) return (v as any).items as T[];
     if ('src' in v || 'sourceUrl' in v || 'url' in v || 'id' in v) return [v as T];
   }
@@ -19,8 +18,13 @@ const toVariationArray = <T,>(value: any): T[] => {
   if (Array.isArray(value)) return value as T[];
   if (!value || typeof value !== 'object') return [];
 
-  if (Array.isArray((value as any).nodes)) return (value as any).nodes as T[];
   if (Array.isArray((value as any).items)) return (value as any).items as T[];
+  if (Array.isArray((value as any).data)) return (value as any).data as T[];
+  if (Array.isArray((value as any).results)) return (value as any).results as T[];
+  if (Array.isArray((value as any).nodes)) return (value as any).nodes as T[];
+  if (Array.isArray((value as any).variations)) return (value as any).variations as T[];
+  if (Array.isArray((value as any).available_variations)) return (value as any).available_variations as T[];
+  if (Array.isArray((value as any).availableVariations)) return (value as any).availableVariations as T[];
 
   const objectValues = Object.values(value);
   if (
@@ -110,6 +114,30 @@ const toSlugFragment = (value: unknown) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+const extractSlugFromPathLike = (value: unknown) => {
+  const raw = normalizeText(value);
+  if (!raw) return '';
+
+  try {
+    const parsed = new URL(raw);
+    return parsed.pathname
+      .split('/')
+      .filter(Boolean)
+      .pop()
+      ?.trim()
+      .toLowerCase() || '';
+  } catch {
+    return raw
+      .split('?')[0]
+      .split('#')[0]
+      .split('/')
+      .filter(Boolean)
+      .pop()
+      ?.trim()
+      .toLowerCase() || '';
+  }
+};
 
 const buildSyntheticVariationsFromAttributes = ({
   product,
@@ -308,15 +336,17 @@ const normalizeImage = (img: any) => {
   const src = getImageUrl(img);
   if (!src) return null;
   return {
+    sourceUrl: src,
+    altText: img?.altText || img?.alt_text || img?.alt || '',
     src,
     alt: img?.alt || img?.altText || img?.alt_text || '',
   };
 };
 
-const dedupeBySrc = (images: any[]) => {
+  const dedupeBySrc = (images: any[]) => {
   const seen = new Set<string>();
   return images.filter((img) => {
-    const src = img?.src;
+    const src = img?.sourceUrl || img?.src;
     if (!src) return false;
     if (seen.has(src)) return false;
     seen.add(src);
@@ -331,9 +361,15 @@ export function normalizeProduct(product: any) {
 
   // --- Base IDs ---
   const id = p.id ?? p.product_id ?? p.databaseId ?? p.productId;
+  const resolvedSlug = normalizeText(
+    p.slug ??
+    p.handle ??
+    extractSlugFromPathLike(p.url ?? p.href ?? p.link ?? p.permalink),
+  ).toLowerCase();
+  const frontendProductUrl = resolvedSlug ? `/product/${encodeURIComponent(resolvedSlug)}` : '';
 
   // --- Categories / Brands / Locations ---
-  // Accept only REST-style arrays, ignore .nodes
+  // Accept only REST-style arrays.
   const categories = toArrayLoose<any>(p.categories ?? p.product_categories);
   const brands = toArrayLoose<any>(p.brands ?? p.product_brands);
   const locations = toArrayLoose<any>(p.locations ?? p.product_locations);
@@ -346,12 +382,7 @@ export function normalizeProduct(product: any) {
     const ownOptions = Array.isArray(attr?.options)
       ? attr.options
       : (attr?.value ? [attr.value] : (attr?.option ? [attr.option] : []));
-    const nestedOptions = toArrayLoose<any>(attr?.nodes).flatMap((node: any) =>
-      Array.isArray(node?.options)
-        ? node.options
-        : (node?.value ? [node.value] : (node?.option ? [node.option] : [])),
-    );
-    const rawOptions = [...ownOptions, ...nestedOptions];
+    const rawOptions = [...ownOptions];
     const options = rawOptions
       .map((o: any) => (typeof o === 'object' ? (o?.name || o?.label || o?.value || o?.slug || String(o)) : String(o)))
       .filter((option) => String(option || '').trim().length > 0);
@@ -428,26 +459,44 @@ export function normalizeProduct(product: any) {
       price: pickFirst(vObj, ['price', 'display_price']),
       regularPrice: pickFirst(vObj, ['regularPrice', 'regular_price']),
       salePrice: pickFirst(vObj, ['salePrice', 'sale_price']),
-      stockQuantity: variationStockQuantity,
+      stockQuantity: variationStockQuantity ?? null,
       stockStatus: variationStockStatus,
       attributes: extractVariationAttributes(vObj),
       manageStock:
         variationManageStock !== undefined
           ? variationManageStock
           : normalizedManageStock,
-      image: vImage ? { src: vImage.src, alt: vImage.alt } : null,
+      image: vImage
+        ? {
+            sourceUrl: vImage.sourceUrl,
+            altText: vImage.altText,
+            src: vImage.src,
+            alt: vImage.alt,
+          }
+        : null,
     };
   });
-  const syntheticVariations =
-    resolvedVariations.length === 0
-      ? buildSyntheticVariationsFromAttributes({
-          product: p,
-          attributes,
-          stockQuantity: normalizedStockQuantity,
-          stockStatus: normalizedStockStatus,
-          manageStock: normalizedManageStock,
-        })
-      : [];
+  const normalizedProductType = normalizeText(
+    p?.type ?? p?.productType ?? p?.product_type,
+  ).toLowerCase();
+  const isExplicitVariableProduct =
+    normalizedProductType === 'variable' || normalizedProductType === 'variation';
+  const hasMultiOptionVariationAttribute = attributes.some(
+    (attr) => Boolean(attr?.isVariation) && Array.isArray(attr?.options) && attr.options.length > 1,
+  );
+  const shouldBuildSyntheticVariations =
+    resolvedVariations.length === 0 &&
+    (isExplicitVariableProduct || hasMultiOptionVariationAttribute);
+
+  const syntheticVariations = shouldBuildSyntheticVariations
+    ? buildSyntheticVariationsFromAttributes({
+        product: p,
+        attributes,
+        stockQuantity: normalizedStockQuantity,
+        stockStatus: normalizedStockStatus,
+        manageStock: normalizedManageStock,
+      })
+    : [];
   const variations = resolvedVariations.length > 0 ? resolvedVariations : syntheticVariations;
 
   // --- Reviews ---
@@ -462,16 +511,16 @@ export function normalizeProduct(product: any) {
   }));
 
   // --- Images ---
-  // Unify: main image + images[] + gallery_images[] (REST only, ignore .nodes)
+  // Unify: main image + images[] + gallery_images[] (REST only)
   const mainImage = p.image ? normalizeImage(p.image) : null;
 
   const imagesFromImages = toArrayLoose<any>(p.images)
     .map(normalizeImage)
-    .filter(Boolean) as Array<{ src: string; alt: string }>;
+    .filter(Boolean) as Array<{ sourceUrl: string; altText: string; src: string; alt: string }>;
 
   const imagesFromGallery = toArrayLoose<any>(p.gallery_images ?? p.galleryImages)
     .map((img) => normalizeImage(img))
-    .filter(Boolean) as Array<{ src: string; alt: string }>;
+    .filter(Boolean) as Array<{ sourceUrl: string; altText: string; src: string; alt: string }>;
 
   const images = dedupeBySrc(
     [
@@ -481,6 +530,7 @@ export function normalizeProduct(product: any) {
     ].filter(Boolean)
   );
   const primaryImage = mainImage || images[0] || null;
+  const galleryImages = images.slice(mainImage ? 1 : 0);
 
   // --- Related / Upsell / CrossSell / Bought Together ---
   // Normalize to plain arrays of products (if present)
@@ -520,6 +570,11 @@ export function normalizeProduct(product: any) {
 
     // Core normalized fields
     id,
+    slug: resolvedSlug || p.slug || '',
+    url: frontendProductUrl || p.url || '',
+    href: frontendProductUrl || p.href || '',
+    link: frontendProductUrl || p.link || '',
+    productUrl: frontendProductUrl || p.productUrl || '',
     image: primaryImage,
     categories,
     brands,
@@ -528,6 +583,7 @@ export function normalizeProduct(product: any) {
     variations,
     reviews,
     images,
+    galleryImages,
     related,
     upsell,
     crossSell,
@@ -546,7 +602,7 @@ export function normalizeProduct(product: any) {
 
     // Normalize stock keys for convenience
     stockStatus: normalizedStockStatus,
-    stockQuantity: normalizedStockQuantity,
+    stockQuantity: normalizedStockQuantity ?? null,
     manageStock: normalizedManageStock,
     totalSales: normalizedSales,
     unitsSold: normalizedSales,

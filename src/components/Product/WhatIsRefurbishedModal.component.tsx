@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 
 interface WhatIsRefurbishedModalProps {
     isOpen: boolean;
@@ -64,38 +64,40 @@ const WhatIsRefurbishedModal = ({ isOpen, onClose }: WhatIsRefurbishedModalProps
     ];
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div
-                className="fixed inset-0"
+                className="absolute inset-0"
                 onClick={onClose}
             ></div>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden relative animate-in zoom-in-95 duration-200 z-10 font-sans">
+            <div className="relative z-10 flex min-h-full items-start justify-center overflow-y-auto p-4 sm:items-center">
+                <div className="relative my-4 flex max-h-[calc(100vh-2rem)] w-full max-w-2xl min-h-0 flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200 font-sans">
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100 z-20"
+                    className="absolute top-3 right-3 z-20 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 sm:top-4 sm:right-4"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
 
-                {/* Header */}
-                <div className="bg-blue-600 p-8 text-white relative overflow-hidden">
-                    <div className="relative z-10">
-                        <h3 className="text-2xl font-bold mb-2">Renewed & Refurbished Devices</h3>
-                        <p className="text-gray-300 text-sm leading-relaxed">
-                            A Refurbished or Renewed device is a premium product that has been professionally restored to its original factory condition to ensure 100% performance and a &quot;Fresh in Box&quot; experience.
-                        </p>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                    {/* Header */}
+                    <div className="relative overflow-hidden bg-blue-600 px-5 py-6 text-white sm:px-8 sm:py-8">
+                        <div className="relative z-10">
+                            <h3 className="mb-2 text-xl font-bold sm:text-2xl">Renewed & Refurbished Devices</h3>
+                            <p className="text-sm leading-relaxed text-blue-100">
+                                A Refurbished or Renewed device is a premium product that has been professionally restored to its original factory condition to ensure 100% performance and a &quot;Fresh in Box&quot; experience.
+                            </p>
+                        </div>
+                        {/* Decorative element */}
+                        <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white opacity-20 rounded-full blur-2xl"></div>
                     </div>
-                    {/* Decorative element */}
-                    <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white opacity-20 rounded-full blur-2xl"></div>
-                </div>
 
-                {/* Content */}
-                <div className="p-8 max-h-[70vh] overflow-y-auto">
-                    {/* Key Benefits Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                    {/* Content */}
+                    <div className="px-5 py-5 sm:px-8 sm:py-6">
+                        {/* Key Benefits Grid */}
+                        <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
                         {sections.map((section, idx) => (
                             <div key={idx} className="flex gap-4">
                                 <div className="mt-1 bg-gray-50 p-2 rounded-lg h-fit flex-shrink-0">
@@ -109,40 +111,42 @@ const WhatIsRefurbishedModal = ({ isOpen, onClose }: WhatIsRefurbishedModalProps
                                 </div>
                             </div>
                         ))}
-                    </div>
+                        </div>
 
-                    {/* FAQ/Details Section */}
-                    <div className="space-y-8 border-t pt-8">
-                        <h4 className="text-lg font-bold text-gray-900">Frequently Asked Questions</h4>
-                        {faqs.map((faq, idx) => (
-                            <div key={idx} className="space-y-2">
-                                <h5 className="font-bold text-gray-900 text-sm flex items-start gap-2">
-                                    <span className="text-blue-600 font-extrabold text-lg leading-none">Q.</span>
-                                    {faq.question}
-                                </h5>
-                                <div className="text-gray-600 text-sm leading-relaxed pl-6">
-                                    {faq.answer}
+                        {/* FAQ/Details Section */}
+                        <div className="space-y-6 border-t pt-6">
+                            <h4 className="text-lg font-bold text-gray-900">Frequently Asked Questions</h4>
+                            {faqs.map((faq, idx) => (
+                                <div key={idx} className="space-y-2">
+                                    <h5 className="font-bold text-gray-900 text-sm flex items-start gap-2">
+                                        <span className="text-blue-600 font-bold text-lg leading-none">Q.</span>
+                                        {faq.question}
+                                    </h5>
+                                    <div className="text-gray-600 text-sm leading-relaxed pl-6">
+                                        {faq.answer}
+                                    </div>
                                 </div>
+                            ))}
+                            <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50 p-4 text-left">
+                                <p className="mb-3 text-xs font-medium leading-relaxed text-blue-800">
+                                    <span className="font-bold">Our Promise:</span> Choosing refurbished doesn&apos;t mean compromising on quality. It means getting a premium device at a fraction of the cost, backed by our commitment to excellence.
+                                </p>
+                                <Link href="/refurbished-policy" className="text-blue-700 text-xs font-bold underline hover:text-blue-900 transition-colors">
+                                    Read our full Refurbished & Renewed Policy
+                                </Link>
                             </div>
-                        ))}
-                        <div className="mt-10 p-4 bg-blue-50 rounded-xl border border-blue-100 text-left">
-                            <p className="text-blue-800 text-xs font-medium leading-relaxed mb-3">
-                                <span className="font-bold">Our Promise:</span> Choosing refurbished doesn&apos;t mean compromising on quality. It means getting a premium device at a fraction of the cost, backed by our commitment to excellence.
-                            </p>
-                            <Link href="/refurbished-policy" className="text-blue-700 text-xs font-bold underline hover:text-blue-900 transition-colors">
-                                Read our full Refurbished & Renewed Policy
-                            </Link>
                         </div>
                     </div>
                 </div>
 
-                <div className="p-6 border-t bg-gray-50">
+                <div className="shrink-0 border-t bg-gray-50 px-5 py-4 sm:px-6 sm:py-5">
                     <button
                         onClick={onClose}
-                        className="w-full bg-gray-900 hover:bg-gray-800 text-white font-bold py-3.5 rounded-xl transition-all text-sm tracking-wide shadow-lg shadow-gray-200"
+                        className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-bold tracking-wide text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700"
                     >
                         Got it, thanks!
                     </button>
+                </div>
                 </div>
             </div>
         </div>
@@ -150,3 +154,4 @@ const WhatIsRefurbishedModal = ({ isOpen, onClose }: WhatIsRefurbishedModalProps
 };
 
 export default WhatIsRefurbishedModal;
+

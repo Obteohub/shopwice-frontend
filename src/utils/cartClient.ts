@@ -1,4 +1,4 @@
-import { api } from './api';
+import { ApiError, api } from './api';
 import { ENDPOINTS } from './endpoints';
 
 const CART_CACHE_KEY = 'shopwice-cart-response-v1';
@@ -19,6 +19,172 @@ const memoryCartByVariant: Record<string, { cart: any; ts: number }> = {};
 const inflightCartByVariant = new Map<string, Promise<any>>();
 
 const isBrowser = typeof window !== 'undefined';
+const CART_HEADER_STORAGE_KEYS = {
+  session: 'wc-session',
+  cartToken: 'wc-cart-token',
+  legacySession: 'woo-session',
+  nonce: 'wc-store-api-nonce',
+  legacyNonce: 'wc_store_api_nonce',
+} as const;
+
+const normalizeHeaderValue = (value: string) => {
+  if (!value) return '';
+  const first = value
+    .split(',')
+    .map((part) => part.trim())
+    .find(Boolean);
+  return first || value.trim();
+};
+
+const getResponseHeader = (response: Response, names: string[]) => {
+  for (const name of names) {
+    const value = response.headers.get(name);
+    if (value) return value;
+  }
+  return '';
+};
+
+const readPersistedCartToken = () => {
+  if (!isBrowser) return '';
+  try {
+    const legacyRaw = localStorage.getItem(CART_HEADER_STORAGE_KEYS.legacySession);
+    if (legacyRaw) {
+      const parsed = JSON.parse(legacyRaw);
+      const legacyToken = normalizeHeaderValue(String(parsed?.token || ''));
+      if (legacyToken) return legacyToken;
+    }
+  } catch {
+    // Ignore malformed legacy session payloads.
+  }
+
+  return normalizeHeaderValue(
+    localStorage.getItem(CART_HEADER_STORAGE_KEYS.cartToken)?.trim() ||
+    localStorage.getItem(CART_HEADER_STORAGE_KEYS.session)?.trim() ||
+    '',
+  );
+};
+
+const readPersistedNonce = () => {
+  if (!isBrowser) return '';
+  return normalizeHeaderValue(
+    localStorage.getItem(CART_HEADER_STORAGE_KEYS.nonce)?.trim() ||
+    localStorage.getItem(CART_HEADER_STORAGE_KEYS.legacyNonce)?.trim() ||
+    '',
+  );
+};
+
+export const persistCartHeadersFromResponse = (response: Response) => {
+  if (!isBrowser) return;
+
+  const sessionToken = normalizeHeaderValue(
+    getResponseHeader(response, ['X-WC-Session', 'Cart-Token', 'x-wc-session', 'cart-token']),
+  );
+  if (sessionToken) {
+    localStorage.setItem(CART_HEADER_STORAGE_KEYS.session, sessionToken);
+    localStorage.setItem(CART_HEADER_STORAGE_KEYS.cartToken, sessionToken);
+    localStorage.setItem(CART_HEADER_STORAGE_KEYS.legacySession, JSON.stringify({
+      token: sessionToken,
+      updatedAt: Date.now(),
+    }));
+  }
+
+  const nonce = normalizeHeaderValue(
+    getResponseHeader(response, ['Nonce', 'X-WC-Store-API-Nonce', 'nonce', 'x-wc-store-api-nonce']),
+  );
+  if (nonce) {
+    localStorage.setItem(CART_HEADER_STORAGE_KEYS.nonce, nonce);
+    localStorage.setItem(CART_HEADER_STORAGE_KEYS.legacyNonce, nonce);
+  }
+};
+
+export const ensureCartMutationHeaders = async () => {
+  if (!isBrowser) return {} as Record<string, string>;
+
+  let sessionToken = readPersistedCartToken();
+  let nonce = readPersistedNonce();
+
+  if (!sessionToken || !nonce) {
+    const response = await fetch(`${window.location.origin}${ENDPOINTS.CART}`, {
+      method: 'GET',
+      credentials: 'omit',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+      },
+    });
+    persistCartHeadersFromResponse(response);
+    sessionToken = readPersistedCartToken();
+    nonce = readPersistedNonce();
+  }
+
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+    Pragma: 'no-cache',
+  };
+
+  if (sessionToken) {
+    headers['X-WC-Session'] = sessionToken;
+    headers['Cart-Token'] = sessionToken;
+  }
+
+  if (nonce) {
+    headers.Nonce = nonce;
+    headers['X-WC-Store-API-Nonce'] = nonce;
+  }
+
+  return headers;
+};
+
+export const postCartMutation = async (
+  endpoint: string,
+  body: Record<string, unknown>,
+  params?: Record<string, string | number | boolean>,
+) => {
+  if (!isBrowser) {
+    return api.post(endpoint, body, { params });
+  }
+
+  const headers = await ensureCartMutationHeaders();
+  const url = new URL(`${window.location.origin}${endpoint}`);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        url.searchParams.set(key, String(value));
+      }
+    });
+  }
+
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    credentials: 'omit',
+    cache: 'no-store',
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  persistCartHeadersFromResponse(response);
+
+  let data: any = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      data?.message ||
+      data?.error ||
+      'Cart request failed';
+    throw new ApiError(message, response.status, data);
+  }
+
+  return data;
+};
 
 const normalizeProfile = (profile?: CartCacheProfile): Required<CartCacheProfile> => ({
   view: profile?.view || DEFAULT_PROFILE.view,

@@ -17,9 +17,9 @@ export interface Pricing {
  * Stock / Inventory Model (DRY)
  */
 export type StockStatus =
-  | 'IN_STOCK'
-  | 'OUT_OF_STOCK'
-  | 'ON_BACKORDER';
+  | 'instock'
+  | 'outofstock'
+  | 'onbackorder';
 
 export interface StockInfo {
   stockQuantity?: number | null;
@@ -34,7 +34,10 @@ export interface StockInfo {
 
 export interface Image {
   sourceUrl?: string | null;
+  src?: string | null;
+  url?: string | null;
   altText?: string | null;
+  alt?: string | null;
 }
 
 /**
@@ -116,6 +119,9 @@ export interface Product extends Pricing, StockInfo {
   name: string;
 
   onSale?: boolean;
+
+  unitsSold?: number;
+  totalSales?: number;
 
   averageRating?: number;
   reviewCount?: number;

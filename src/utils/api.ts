@@ -127,16 +127,31 @@ const normalizeHeaderValue = (value: string) => {
     return first || value.trim();
 };
 
-const findHeaderKey = (headers: Record<string, string>, name: string) =>
-    Object.keys(headers).find((key) => key.toLowerCase() === name.toLowerCase());
+const findHeaderKey = (headers: Headers | Record<string, string>, name: string) => {
+    if (headers instanceof Headers) {
+        for (const key of headers.keys()) {
+            if (key.toLowerCase() === name.toLowerCase()) return key;
+        }
+        return undefined;
+    }
+    return Object.keys(headers).find((key) => key.toLowerCase() === name.toLowerCase());
+};
 
-const hasHeader = (headers: Record<string, string>, name: string) => {
+const hasHeader = (headers: Headers | Record<string, string> | undefined, name: string) => {
+    if (!headers) return false;
+    if (headers instanceof Headers) {
+        return headers.has(name) || headers.has(name.toLowerCase());
+    }
     const key = findHeaderKey(headers, name);
     return !!(key && headers[key]);
 };
 
-const setHeaderIfMissing = (headers: Record<string, string>, name: string, value: string) => {
+const setHeaderIfMissing = (headers: Headers | Record<string, string>, name: string, value: string) => {
     if (!value) return;
+    if (headers instanceof Headers) {
+        if (!headers.has(name)) headers.set(name, value);
+        return;
+    }
     if (hasHeader(headers, name)) return;
     headers[name] = value;
 };
@@ -237,7 +252,7 @@ const getEndpointCacheTtl = (endpoint: string, method: RequestMethod): number | 
 const canUseEndpointEdgeCache = (ttl: number | null, config: RequestInit) => {
     if (!ttl) return false;
     if (typeof window !== 'undefined') return false;
-    const headers = config.headers as Record<string, string> | undefined;
+    const headers = config.headers as Headers | Record<string, string> | undefined;
     if (!headers) return true;
     if (hasHeader(headers, 'Authorization')) return false;
     if (hasHeader(headers, 'X-WC-Session')) return false;
@@ -653,12 +668,10 @@ async function request<T>(endpoint: string, method: RequestMethod, options: Fetc
     }
 
     // Default headers
-    const requestHeaders: Record<string, string> = {
-        Accept: 'application/json',
-        ...(headers as Record<string, string>),
-    };
+    const requestHeaders = new Headers(headers as HeadersInit | undefined);
+    setHeaderIfMissing(requestHeaders, 'Accept', 'application/json');
     if (method !== 'GET' && !hasHeader(requestHeaders, 'Content-Type')) {
-        requestHeaders['Content-Type'] = 'application/json';
+        requestHeaders.set('Content-Type', 'application/json');
     }
 
     const config: RequestInit = {
@@ -669,34 +682,34 @@ async function request<T>(endpoint: string, method: RequestMethod, options: Fetc
     };
 
     if (isSessionEndpoint(endpoint)) {
-        const sessionHeaders = config.headers as Record<string, string>;
-        sessionHeaders['Cache-Control'] = 'no-store';
-        sessionHeaders['Pragma'] = 'no-cache';
+        const sessionHeaders = config.headers as Headers;
+        sessionHeaders.set('Cache-Control', 'no-store');
+        sessionHeaders.set('Pragma', 'no-cache');
         config.cache = 'no-store';
     }
 
     // 1. JWT Auth Header (if logged in)
     const token = await getAuthToken();
     if (token && shouldAttachAuthHeader(endpoint, method, requireAuth)) {
-        setHeaderIfMissing(config.headers as Record<string, string>, 'Authorization', `Bearer ${token}`);
+        setHeaderIfMissing(config.headers as Headers, 'Authorization', `Bearer ${token}`);
     }
 
     // 2. WooCommerce session + nonce persistence for cart/checkout calls.
     if (typeof window !== 'undefined') {
-        const requestHeaders = config.headers as Record<string, string>;
+        const browserRequestHeaders = config.headers as Headers;
         if (shouldAttachSessionHeaders(endpoint, method)) {
             const sessionToken = readPersistedCartToken();
             if (sessionToken) {
-                setHeaderIfMissing(requestHeaders, 'X-WC-Session', sessionToken);
-                setHeaderIfMissing(requestHeaders, 'Cart-Token', sessionToken);
+                setHeaderIfMissing(browserRequestHeaders, 'X-WC-Session', sessionToken);
+                setHeaderIfMissing(browserRequestHeaders, 'Cart-Token', sessionToken);
             }
         }
 
         if (method !== 'GET' && shouldAttachSessionHeaders(endpoint, method)) {
             const nonce = readPersistedNonce();
             if (nonce) {
-                setHeaderIfMissing(requestHeaders, 'Nonce', nonce);
-                setHeaderIfMissing(requestHeaders, 'X-WC-Store-API-Nonce', nonce);
+                setHeaderIfMissing(browserRequestHeaders, 'Nonce', nonce);
+                setHeaderIfMissing(browserRequestHeaders, 'X-WC-Store-API-Nonce', nonce);
             }
         }
     }

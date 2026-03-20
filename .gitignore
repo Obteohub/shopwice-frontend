@@ -12,6 +12,9 @@
 /.next/
 /out/
 /.open-next/
+/.cf-pages-deploy/
+/.cf-pages-deploy2/
+/.cf-pages-hotfix/
 
 # sitemap and robots
 public/sitemap*.xml
@@ -61,3 +64,6 @@ src/pages/registrer.tsx
 
 # Cloudflare
 .wrangler
+
+# Sentry Config File
+.env.sentry-build-plugin

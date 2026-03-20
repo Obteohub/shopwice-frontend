@@ -4,7 +4,7 @@ import Image from 'next/image';
 
 import { filteredVariantPrice, paddedPrice } from '@/utils/functions/functions';
 import { getSlugFromUrl } from '@/utils/functions/productUtils';
-import { firstValidImageUrl } from '@/utils/image';
+import { firstDisplayImageUrl } from '@/utils/image';
 
 interface Image {
   sourceUrl?: string;
@@ -67,7 +67,7 @@ const DisplayProducts = ({ products }: IDisplayProductsProps) => (
             if (salePrice) {
               salePrice = paddedPrice(salePrice, 'GH₵');
             }
-            const imageUrl = firstValidImageUrl(image?.sourceUrl, image?.src, image?.url);
+            const imageUrl = firstDisplayImageUrl(image?.sourceUrl, image?.src, image?.url);
 
             return (
               <div key={`${slug || name}-${index}`} className="group bg-white rounded-none border border-gray-100 flex flex-col h-full hover:shadow-2xl hover:-translate-y-1 transition-all duration-500">

@@ -148,4 +148,5 @@ export const createCheckoutData = (order: ICheckoutDataProps) => ({
   payment_method: order.paymentMethod,
   payment_data: [],
   extensions: {},
+  return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/order-received`,
 });

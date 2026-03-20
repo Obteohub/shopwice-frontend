@@ -18,7 +18,6 @@ const Accordion: React.FC<AccordionProps> = ({
     onToggle
 }) => {
     const [internalIsOpen, setInternalIsOpen] = useState(defaultOpen);
-    const [hasBeenOpened, setHasBeenOpened] = useState(defaultOpen || (controlledIsOpen ?? false));
 
     const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
 
@@ -28,7 +27,6 @@ const Accordion: React.FC<AccordionProps> = ({
         } else {
             setInternalIsOpen((prev) => !prev);
         }
-        setHasBeenOpened(true);
     };
 
     return (
@@ -61,7 +59,7 @@ const Accordion: React.FC<AccordionProps> = ({
             >
                 <div className="overflow-hidden">
                     <div className="pb-2 text-gray-600 text-sm leading-relaxed prose prose-sm max-w-none">
-                        {hasBeenOpened ? children : null}
+                        {isOpen ? children : null}
                     </div>
                 </div>
             </div>

@@ -3,10 +3,10 @@ import { useRouter } from 'next/router';
 import Button from '@/components/UI/Button.component';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
 import { useCartStore } from '@/stores/cartStore';
-import { api } from '@/utils/api';
+import { useAddToCartToastStore } from '@/stores/addToCartToastStore';
 import { ENDPOINTS } from '@/utils/endpoints';
 import { transformAddToCartResponse } from '@/utils/cartTransformers';
-import { setCartResponseCache } from '@/utils/cartClient';
+import { postCartMutation, setCartResponseCache, ensureCartMutationHeaders } from '@/utils/cartClient';
 
 export interface RestImage {
   src?: string;
@@ -66,9 +66,10 @@ export interface AddToCartProps {
   buyNow?: boolean;
   quantity?: number;
   disabled?: boolean;
+  /** Renders as an outlined/secondary button instead of solid */
+  secondary?: boolean;
 }
 
-// Scoped to module but with a safer cleanup strategy
 const pendingCartMutations = new Set<string>();
 
 const AddToCart = ({
@@ -79,40 +80,29 @@ const AddToCart = ({
   buyNow = false,
   quantity = 1,
   disabled = false,
+  secondary = false,
 }: AddToCartProps) => {
   const router = useRouter();
   const debugCart = process.env.NEXT_PUBLIC_DEBUG_CART === 'true';
   const isMounted = useRef(true);
 
   const { syncWithWooCommerce, optimisticAddItem, rollbackOptimisticAdd } = useCartStore();
+  const showGlobalToast = useAddToCartToastStore((state) => state.showToast);
 
   const [requestError, setRequestError] = useState<string | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
 
-  const parentProductId = product?.id;
+  const parentProductId = product?.id ?? (product as any)?.databaseId;
 
-  // Track mounted state to prevent state updates after unmount
   useEffect(() => {
     isMounted.current = true;
+    // Pre-warm the WooCommerce session token on mount so the first add-to-cart
+    // doesn't pay the extra blocking GET /api/cart round-trip.
+    void ensureCartMutationHeaders();
     return () => {
       isMounted.current = false;
     };
   }, []);
-
-  // Prefetch checkout page as early as possible when this is a Buy Now button
-  useEffect(() => {
-    if (buyNow) void router.prefetch('/checkout');
-  }, [buyNow, router]);
-
-  // Reset "ADDED!" label after 2 seconds (only for Add To Cart, not Buy Now)
-  useEffect(() => {
-    if (!isSuccess) return;
-    const timer = setTimeout(() => {
-      if (isMounted.current) setIsSuccess(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [isSuccess]);
 
   const handleAddToCart = useCallback(async () => {
     if (isAdding || disabled) return;
@@ -145,14 +135,11 @@ const AddToCart = ({
     }
 
     const numericVariationId =
-      variationId !== undefined && variationId !== null
-        ? Number(variationId)
-        : undefined;
+      variationId !== undefined && variationId !== null ? Number(variationId) : undefined;
     const safeVariationId = Number.isFinite(numericVariationId)
       ? numericVariationId
       : undefined;
 
-    // --- Optimistic update: update cart UI immediately ---
     const optimisticId = optimisticAddItem?.({
       productId: numericProductId,
       variationId: safeVariationId,
@@ -164,10 +151,8 @@ const AddToCart = ({
       id: numericProductId,
       quantity: Number(quantity),
     };
-    if (variationId) {
-      if (safeVariationId !== undefined) {
-        payload.variation_id = safeVariationId;
-      }
+    if (variationId && safeVariationId !== undefined) {
+      payload.variation_id = safeVariationId;
     }
     if (normalizedVariationSelections.length > 0) {
       payload.variation = normalizedVariationSelections;
@@ -185,31 +170,41 @@ const AddToCart = ({
         });
       }
 
-      const response = await api.post(ENDPOINTS.CART_ADD, payload);
+      const response = await postCartMutation(ENDPOINTS.CART_ADD, payload, {
+        view: 'mini',
+      });
 
       if (debugCart) console.info('[AddToCart] Response', response);
+
+      // For buy-now: navigate immediately and sync the store in the background.
+      // The checkout page fetches its own cart state, so there's no need to
+      // block the redirect on the local store update.
+      if (buyNow) {
+        void router.push('/checkout');
+        setCartResponseCache(response);
+        const transformed = transformAddToCartResponse(response);
+        if (transformed?.cart) syncWithWooCommerce(transformed.cart);
+        return;
+      }
 
       setCartResponseCache(response);
       const transformed = transformAddToCartResponse(response);
 
       if (!transformed?.cart) throw new Error('Cart update failed.');
 
-      // Confirm optimistic update with real server state
       syncWithWooCommerce(transformed.cart);
 
       if (debugCart) {
-        console.info('[AddToCart] Cart synced', { items: transformed.cart?.products?.length ?? 0 });
+        console.info('[AddToCart] Cart synced', {
+          items: transformed.cart?.products?.length ?? 0,
+        });
       }
 
-      if (buyNow) {
-        // Navigate directly — skip the isSuccess→useEffect render cycle for maximum speed
-        void router.push('/checkout');
-        return;
-      }
-
-      if (isMounted.current) setIsSuccess(true);
+      showGlobalToast({
+        productName: String(product?.name || 'Item'),
+        cartCount: Number(transformed.cart?.totalProductsCount || 0),
+      });
     } catch (error: unknown) {
-      // Rollback optimistic update on failure
       if (optimisticId) rollbackOptimisticAdd?.(optimisticId);
 
       const err = error as Record<string, any>;
@@ -219,7 +214,7 @@ const AddToCart = ({
 
       if (isMounted.current) {
         setRequestError(
-          `${err?.message || 'Add to cart failed.'}${status}${details ? ` - ${details}` : ''}`
+          `${err?.message || 'Add to cart failed.'}${status}${details ? ` - ${details}` : ''}`,
         );
       }
     } finally {
@@ -227,16 +222,30 @@ const AddToCart = ({
       if (isMounted.current) setIsAdding(false);
     }
   }, [
-    isAdding, disabled, parentProductId, variationId, variationSelections, quantity,
-    buyNow, product, optimisticAddItem, rollbackOptimisticAdd,
-    syncWithWooCommerce, debugCart,
+    isAdding,
+    disabled,
+    parentProductId,
+    variationId,
+    variationSelections,
+    quantity,
+    buyNow,
+    product,
+    optimisticAddItem,
+    rollbackOptimisticAdd,
+    syncWithWooCommerce,
+    debugCart,
+    router,
+    showGlobalToast,
   ]);
 
-  // Only block on isAdding, not global cart loading
-  const isButtonDisabled = disabled || isAdding || isSuccess;
+  const isButtonDisabled = disabled || isAdding;
 
   const handlePointerEnter = useCallback(() => {
-    if (buyNow) void router.prefetch('/checkout');
+    if (!buyNow) return;
+    void router.prefetch('/checkout');
+    // Pre-warm the WooCommerce session token so ensureCartMutationHeaders
+    // won't need to fire an extra blocking GET when the user clicks.
+    void ensureCartMutationHeaders();
   }, [buyNow, router]);
 
   return (
@@ -245,13 +254,17 @@ const AddToCart = ({
         handleButtonClick={handleAddToCart}
         fullWidth={fullWidth}
         buttonDisabled={isButtonDisabled}
-        className={buyNow ? 'bg-[#fa710f] hover:bg-[#fa710f] border-[#fa710f]' : ''}
+        className={
+          buyNow
+            ? '!bg-[#fa710f] hover:!bg-[#e0670d] !border-[#fa710f] hover:!border-[#e0670d] !text-white'
+            : secondary
+              ? '!bg-white hover:!bg-blue-50 !border-blue-600 hover:!border-blue-600 !text-blue-600'
+              : '!bg-blue-600 hover:!bg-blue-700 !border-blue-600 hover:!border-blue-700 !text-white'
+        }
         onPointerEnter={handlePointerEnter}
       >
         {isAdding ? (
           <LoadingSpinner />
-        ) : isSuccess ? (
-          'Added!'
         ) : buyNow ? (
           'BUY NOW'
         ) : (

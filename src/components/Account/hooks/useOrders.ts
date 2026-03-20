@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 import { api } from '@/utils/api';
 import { ENDPOINTS } from '@/utils/endpoints';
-import { normalizeImageUrl } from '@/utils/image';
+import { toDisplayImageUrl } from '@/utils/image';
 
 export interface OrderItem {
     id: number;
@@ -71,7 +71,7 @@ export function useOrders() {
             ...order,
             line_items: Array.isArray(order?.line_items)
                 ? order.line_items.map((item) => {
-                    const imageSrc = normalizeImageUrl(item?.image?.src);
+                    const imageSrc = toDisplayImageUrl(item?.image?.src);
                     return {
                         ...item,
                         image: imageSrc ? { src: imageSrc } : undefined,

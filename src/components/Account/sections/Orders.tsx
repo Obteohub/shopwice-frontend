@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Button from '../../UI/Button.component';
 import LoadingSpinner from '../../LoadingSpinner/LoadingSpinner.component';
-import { normalizeImageUrl } from '@/utils/image';
+import { toDisplayImageUrl, toSizedImageUrl } from '@/utils/image';
 
 const StatusBadge = ({ status }: { status: string }) => {
     const statusMap: Record<string, { label: string; color: string }> = {
@@ -91,7 +91,7 @@ const OrderCard = ({ order }: { order: Order }) => {
                 <div className="flex items-center gap-4">
                     <div className="flex -space-x-4 overflow-hidden">
                         {orderItems.slice(0, 3).map((item, idx) => {
-                            const imageSrc = normalizeImageUrl(item.image?.src);
+                            const imageSrc = toDisplayImageUrl(item.image?.src);
                             return (
                                 <div
                                     key={item.id}
@@ -100,9 +100,10 @@ const OrderCard = ({ order }: { order: Order }) => {
                                 >
                                     {imageSrc ? (
                                         <Image
-                                            src={imageSrc}
+                                            src={toSizedImageUrl(imageSrc, 96)}
                                             alt={item.name}
                                             fill
+                                            sizes="48px"
                                             className="object-cover"
                                         />
                                     ) : (

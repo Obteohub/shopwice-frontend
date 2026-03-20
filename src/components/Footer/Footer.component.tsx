@@ -48,11 +48,18 @@ const Footer = () => {
               <span className="absolute bottom-0 left-0 w-12 h-1 bg-[#1e73be]"></span>
             </h4>
             <ul className="space-y-3 text-[#2c3338]">
-              {['My Account', 'Shop', 'Shipping', 'Size Guide', 'Refund', 'Payments', 'Contact Us'].map((item) => (
-                <li key={item} className="flex items-center justify-start gap-2 group">
+              {[
+                { label: 'My Account', href: '/my-account' },
+                { label: 'Shop', href: '/shop' },
+                { label: 'Delivery', href: '/delivery' },
+                { label: 'Refund & Returns', href: '/refund-and-returns' },
+                { label: 'Reviews', href: '/reviews' },
+                { label: 'Contact Us', href: '/contact-us' },
+              ].map((item) => (
+                <li key={item.label} className="flex items-center justify-start gap-2 group">
                   <span className="w-1.5 h-1.5 bg-[#1e73be] rounded-full group-hover:scale-125 transition-transform"></span>
-                  <Link prefetch={false} href={`/${item.toLowerCase().replace(/ /g, '-')}`} className="text-sm hover:text-[#1e73be] transition-colors">
-                    {item}
+                  <Link prefetch={false} href={item.href} className="text-sm hover:text-[#1e73be] transition-colors">
+                    {item.label}
                   </Link>
                 </li>
               ))}
@@ -66,11 +73,17 @@ const Footer = () => {
               <span className="absolute bottom-0 left-0 w-12 h-1 bg-[#1e73be]"></span>
             </h4>
             <ul className="space-y-3 text-[#2c3338]">
-              {['About Us', 'Terms', 'Privacy', 'Cookies', 'Sitemap', 'Blog', 'Feedback'].map((item) => (
-                <li key={item} className="flex items-center justify-start gap-2 group">
+              {[
+                { label: 'About Us', href: '/about-us' },
+                { label: 'Terms & Conditions', href: '/terms-and-conditions' },
+                { label: 'Privacy Policy', href: '/privacy-policy' },
+                { label: 'Refurbished Policy', href: '/refurbished-policy' },
+                { label: 'Sitemap', href: '/sitemap.xml' },
+              ].map((item) => (
+                <li key={item.label} className="flex items-center justify-start gap-2 group">
                   <span className="w-1.5 h-1.5 bg-[#1e73be] rounded-full group-hover:scale-125 transition-transform"></span>
-                  <Link prefetch={false} href={`/${item.toLowerCase().replace(/ /g, '-')}`} className="text-sm hover:text-[#1e73be] transition-colors">
-                    {item}
+                  <Link prefetch={false} href={item.href} className="text-sm hover:text-[#1e73be] transition-colors">
+                    {item.label}
                   </Link>
                 </li>
               ))}
@@ -86,12 +99,11 @@ const Footer = () => {
             <ul className="space-y-3 text-[#2c3338]">
               {[
                 { label: 'Brands', href: '/brands' },
-                { label: 'New Arrivals', href: '/new-arrivals' },
-                { label: 'Sale', href: '/sale' },
-                { label: 'Best Selling', href: '/best-selling' },
-                { label: 'Featured', href: '/featured' },
-                { label: 'Top Rated', href: '/top-rated' },
-                { label: 'Sell On Shopwice', href: '/sell-online-in-ghana/' },
+                { label: 'New Arrivals', href: '/products?orderby=date' },
+                { label: 'Sale', href: '/products?onSale=true' },
+                { label: 'Best Selling', href: '/most-sold' },
+                { label: 'Top Rated', href: '/products?orderby=rating' },
+                { label: 'Sell On Shopwice', href: '/sell-on-shopwice' },
               ].map((item) => (
                 <li key={item.label} className="flex items-center justify-start gap-2 group">
                   <span className="w-1.5 h-1.5 bg-[#1e73be] rounded-full group-hover:scale-125 transition-transform"></span>
@@ -158,8 +170,8 @@ const Footer = () => {
       <div className="bg-[#2c3338] py-3 px-6 relative">
         <div className="container mx-auto flex flex-col md:flex-row items-start justify-start gap-4 text-xs text-white opacity-70">
           <div className="flex gap-4">
-            <Link prefetch={false} href="/home-appliances" className="hover:text-white transition-colors">Home Appliances</Link>
-            <Link prefetch={false} href="/health-beauty" className="hover:text-white transition-colors">Health & Beauty</Link>
+            <Link prefetch={false} href="/product-category/home-appliances" className="hover:text-white transition-colors">Home Appliances</Link>
+            <Link prefetch={false} href="/product-category/health-beauty" className="hover:text-white transition-colors">Health & Beauty</Link>
             <Link prefetch={false} href="/refurbished-policy" className="hover:text-white transition-colors font-semibold">Refurbished Policy</Link>
           </div>
         </div>

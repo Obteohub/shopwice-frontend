@@ -1,11 +1,19 @@
 import type { GetServerSideProps, NextPage } from 'next';
+import { applyCachePolicy } from '@/utils/cacheControl';
+import { getRequestPathname, loggedNotFound, loggedRedirect } from '@/utils/routeEventLogger';
 
 const LegacyProductsSlugRedirectPage: NextPage = () => null;
 
-export const getServerSideProps: GetServerSideProps = async ({ params, query, res }) => {
+export const getServerSideProps: GetServerSideProps = async ({ params, query, res, req }) => {
   const slug = String(params?.slug ?? '').trim();
+  const requestPath = getRequestPathname(req, `/products/${slug || ''}`);
   if (!slug) {
-    return { notFound: true };
+    return loggedNotFound({
+      req,
+      pathname: requestPath,
+      matchedRoute: '/products/[slug]',
+      reason: 'Missing legacy products slug',
+    });
   }
 
   const nextParams = new URLSearchParams();
@@ -24,14 +32,16 @@ export const getServerSideProps: GetServerSideProps = async ({ params, query, re
   const queryString = nextParams.toString();
 
   const destination = `/product/${encodeURIComponent(slug)}${queryString ? `?${queryString}` : ''}`;
-  res.setHeader('Cache-Control', 'no-store');
+  applyCachePolicy(res, 'noStore');
 
-  return {
-    redirect: {
-      destination,
-      permanent: true,
-    },
-  };
+  return loggedRedirect({
+    req,
+    pathname: requestPath,
+    destination,
+    permanent: true,
+    matchedRoute: '/products/[slug]',
+    reason: 'Legacy products route redirected to product route',
+  });
 };
 
 export default LegacyProductsSlugRedirectPage;

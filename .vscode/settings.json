@@ -1,5 +1,20 @@
 {
     "claudeCode.useTerminal": false,
     "snyk.securityAtInception.autoConfigureSnykMcpServer": true,
-    "snyk.advanced.organization": "c7231b1e-df59-48c5-a1f8-9a4f9e7633e8"
+    "snyk.advanced.organization": "c7231b1e-df59-48c5-a1f8-9a4f9e7633e8",
+    "files.watcherExclude": {
+        "**/.cf-pages-deploy/**": true,
+        "**/.open-next/**": true
+    },
+    "search.exclude": {
+        "**/.cf-pages-deploy/**": true,
+        "**/.open-next/**": true
+    },
+    "liveshare.allowGuestDebugControl": true,
+    "liveshare.allowGuestTaskControl": true,
+    "liveshare.alwaysFollowHost": true,
+    "liveshare.diagnosticMode": true,
+    "liveshare.notebooks.allowGuestExecuteCells": true,
+    "liveshare.connectionMode": "relay",
+    "liveshare.diagnosticLogging": true
 }

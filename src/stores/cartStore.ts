@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { createSafeLocalStorage } from './persistStorage';
 
 interface Image {
   sourceUrl?: string;
@@ -39,6 +40,8 @@ interface CartState {
   rollbackOptimisticAdd: (optimisticKey: string) => void;
   clearWooCommerceSession: () => void;
 }
+
+type CartPersistedState = Pick<CartState, 'cart'>;
 
 const hasWindow = typeof window !== 'undefined';
 
@@ -164,6 +167,7 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'cart-store',
+      storage: createSafeLocalStorage<CartPersistedState>(),
       partialize: (state) => ({ cart: state.cart }),
     },
   ),

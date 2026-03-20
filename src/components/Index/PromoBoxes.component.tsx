@@ -1,16 +1,16 @@
-
+﻿
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
-import { firstValidImageUrl } from '@/utils/image';
+import { firstDisplayImageUrl, toDisplayImageUrl } from '@/utils/image';
 
 interface PromoBoxesProps {
     promoProduct?: any;
 }
 
 const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
-    const promoImage = firstValidImageUrl(
+    const promoImage = firstDisplayImageUrl(
         promoProduct?.image?.sourceUrl,
         promoProduct?.image?.src,
         promoProduct?.image?.url,
@@ -35,7 +35,7 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
                                     <span className="bg-[#EE7E02] text-white text-[10px] font-bold px-2 py-1 rounded-sm uppercase mb-4 inline-block">
                                         Flash Sale
                                     </span>
-                                    <h3 className="text-xl font-extrabold text-[#2c3338] mb-2 leading-tight line-clamp-2">
+                                    <h3 className="text-xl font-bold text-[#2c3338] mb-2 leading-tight line-clamp-2">
                                         {promoProduct.name}
                                     </h3>
                                     {/* Ratings */}
@@ -91,12 +91,12 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
 
                     {/* Box 2: iPhone 2x2 Grid */}
                     <div className="bg-white p-6 rounded-none border border-gray-100 flex flex-col justify-between group overflow-hidden">
-                        <h3 className="text-lg font-extrabold text-[#2c3338] mb-4">Apple iPhone <br /> Shop</h3>
+                        <h3 className="text-lg font-bold text-[#2c3338] mb-4">Apple iPhone <br /> Shop</h3>
                         <div className="grid grid-cols-2 gap-2 mb-4">
                             {[1, 2, 3, 4].map((i) => (
                                 <div key={i} className="aspect-square bg-gray-50 rounded-full overflow-hidden p-2 border border-gray-100 hover:border-[#0C6DC9] transition-colors relative">
                                     <Image
-                                        src={`https://cdn.shopwice.com/2025/01/apple-iphone.webp`}
+                                        src={toDisplayImageUrl('https://cdn.shopwice.com/2025/01/apple-iphone.webp')}
                                         alt="iPhone"
                                         fill
                                         sizes="(max-width: 768px) 120px, 160px"
@@ -110,7 +110,7 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
 
                     {/* Box 3: Electronics 2x2 Grid */}
                     <div className="bg-white p-6 rounded-none border border-gray-100 flex flex-col justify-between group overflow-hidden">
-                        <h3 className="text-lg font-extrabold text-[#2c3338] mb-4">Household <br /> Essentials</h3>
+                        <h3 className="text-lg font-bold text-[#2c3338] mb-4">Household <br /> Essentials</h3>
                         <div className="grid grid-cols-2 gap-2 mb-4">
                             {[
                                 'https://cdn.shopwice.com/2024/02/westpoint-wasing-machine-t.webp',
@@ -120,7 +120,7 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
                             ].map((src, i) => (
                                 <div key={i} className="aspect-square bg-gray-50 rounded-full overflow-hidden p-2 border border-gray-100 hover:border-[#0C6DC9] transition-colors relative">
                                     <Image
-                                        src={src}
+                                        src={toDisplayImageUrl(src)}
                                         alt="Product"
                                         fill
                                         sizes="(max-width: 768px) 120px, 160px"
@@ -135,12 +135,12 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
                     {/* Box 4: Lifestyle/Sneakers */}
                     <div className="bg-[#EEEBFD] p-6 rounded-none border border-gray-100 flex flex-col justify-between group overflow-hidden">
                         <div>
-                            <h3 className="text-lg font-extrabold text-[#2c3338] mb-2">Trendy <br /> Sneakers</h3>
+                            <h3 className="text-lg font-bold text-[#2c3338] mb-2">Trendy <br /> Sneakers</h3>
                             <p className="text-[#EE7E02] font-bold text-sm">New Collection Arrival</p>
                         </div>
                         <div className="relative h-40 my-4">
                             <Image
-                                src="https://cdn.shopwice.com/2025/04/trendy-sneaker-image-shopwice-ghana_result.avif"
+                                src={toDisplayImageUrl('https://cdn.shopwice.com/2025/04/trendy-sneaker-image-shopwice-ghana_result.avif')}
                                 alt="Sneakers"
                                 fill
                                 sizes="(max-width: 768px) 100vw, 25vw"
@@ -157,3 +157,4 @@ const PromoBoxes = ({ promoProduct }: PromoBoxesProps) => {
 };
 
 export default PromoBoxes;
+

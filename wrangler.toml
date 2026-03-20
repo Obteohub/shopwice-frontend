@@ -4,8 +4,10 @@ compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 pages_build_output_dir = ".cf-pages-deploy"
 
 [vars]
-NEXT_PUBLIC_SITE_URL = "https://shopwice.com"
-NEXT_PUBLIC_GRAPHQL_URL = "https://api.shopwice.com/graphql"
+NEXT_PUBLIC_REST_API_URL = "https://api.shopwice.com/api"
+NEXT_PUBLIC_STORE_API_URL = "https://api.shopwice.com/api"
+NEXT_PUBLIC_WP_API_URL = "https://shopwice.com"
+NEXT_PUBLIC_GTM_ID = "GTM-M3V2T863"
 
 [[r2_buckets]]
 binding = "NEXT_INC_CACHE_R2_BUCKET"

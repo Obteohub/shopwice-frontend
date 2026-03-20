@@ -75,11 +75,16 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({
             key={String(review.id)}
             className="border-b border-gray-100 pb-6 last:border-0"
           >
-            <div className="flex items-left justify-between mb-2">
-              <div>
-                <h4 className="font-semibold text-sm">{reviewerName}</h4>
-                <div className="mt-1">
-                  <StarRating rating={review.rating || 0} size={14} />
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-600 uppercase flex-shrink-0">
+                  {reviewerName.charAt(0)}
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm">{reviewerName}</h4>
+                  <div className="mt-0.5">
+                    <StarRating rating={review.rating || 0} size={14} />
+                  </div>
                 </div>
               </div>
 

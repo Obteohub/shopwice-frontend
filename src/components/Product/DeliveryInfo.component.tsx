@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 type DeliveryState = {
   text: React.ReactNode;
@@ -37,7 +38,7 @@ const DeliveryInfo = () => {
       if ((day === 6 && (hour > 16 || (hour === 16 && minute >= 1))) || day === 0) {
         text = (
           <>
-            Order it now and get it on <strong>Monday</strong>
+            get it on <strong>Monday</strong>
           </>
         );
       }
@@ -49,7 +50,7 @@ const DeliveryInfo = () => {
       ) {
         text = (
           <span className="text-gray-700">
-            Order it now and get it <strong>today</strong>
+            get it <strong>today</strong>
           </span>
         );
       }
@@ -57,7 +58,7 @@ const DeliveryInfo = () => {
       else if (day !== 0 && (hour > 8 || hour === 8 || (hour === 16 && minute === 0) || hour < 16) && hour >= 8 && (hour < 16 || (hour === 16 && minute === 0))) {
         text = (
           <span className="text-gray-700">
-            Order it now and get it in the <strong>next 3 hours</strong>
+            get it in the <strong>next 3 hours</strong>
           </span>
         );
         showTimer = true;
@@ -67,7 +68,7 @@ const DeliveryInfo = () => {
       else {
         text = (
           <span className="text-gray-700">
-            Order it now and get it tomorrow
+            get it tomorrow
           </span>
         );
       }
@@ -131,17 +132,17 @@ const DeliveryInfo = () => {
 
       <div className={`${deliveryData.isActive ? 'accra-delivery-active' : ''} min-h-[42px]`}>
         <div className="flex items-start gap-1">
-          <div className="text-xs text-gray-600 leading-relaxed">
-            Greater Accra: {deliveryData.text}
+          <div className="text-xs text-gray-700">
+            Express delivery in Accra. Order now {deliveryData.text}. Standard delivery available. Select your delivery option at checkout to see all timelines.
           </div>
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="text-gray-600 text-xs font-semibold underline hover:text-gray-800 focus:outline-none flex-shrink-0"
+            className="text-blue-600 text-xs font-semibold underline hover:text-blue-800 focus:outline-none flex-shrink-0"
             aria-label="Learn more about shipping"
             type="button"
           >
-            details
+            learn more
           </button>
         </div>
 
@@ -238,6 +239,18 @@ const DeliveryInfo = () => {
                 <p className="text-xs text-blue-900">
                   <strong>Note:</strong> These delivery times apply to Greater Accra (and Kasoa). Other regions have different schedules.
                 </p>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-xs text-gray-700 leading-relaxed">
+                  <strong>Nationwide delivery:</strong> We also ship across Ghana through transport partners such as STC, VIP, VVIP, OA, and similar nationwide services, depending on your location and route.
+                </p>
+                <Link
+                  href="/shipping"
+                  className="mt-3 inline-flex text-xs font-semibold text-blue-600 underline hover:text-blue-800"
+                >
+                  View full shipping information
+                </Link>
               </div>
             </div>
           </div>

@@ -8,7 +8,7 @@ import withAuth from '@/components/User/withAuth.component';
 import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner.component';
 import { api } from '@/utils/api';
 import { ENDPOINTS } from '@/utils/endpoints';
-import { normalizeImageUrl } from '@/utils/image';
+import { toDisplayImageUrl, toSizedImageUrl } from '@/utils/image';
 
 type OrderItem = {
   id: number | string;
@@ -54,7 +54,7 @@ const normalizeItem = (item: any, index: number): OrderItem => {
     item?.images?.[0]?.sourceUrl ||
     item?.thumbnail ||
     undefined;
-  const imageSrc = normalizeImageUrl(imageSrcRaw);
+  const imageSrc = toDisplayImageUrl(imageSrcRaw);
 
   return {
     id: item?.id ?? item?.product_id ?? item?.productId ?? `item-${index}`,
@@ -224,7 +224,7 @@ const OrderDetailsPage: NextPage = () => {
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="relative h-14 w-14 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
                           {item.image?.src ? (
-                            <Image src={item.image.src} alt={item.name} fill className="object-cover" />
+                            <Image src={toSizedImageUrl(item.image.src, 112)} alt={item.name} fill sizes="56px" className="object-cover" />
                           ) : (
                             <div className="h-full w-full flex items-center justify-center text-[10px] text-gray-400">N/A</div>
                           )}

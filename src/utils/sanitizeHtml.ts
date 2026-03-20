@@ -112,6 +112,44 @@ const sanitizeSrcset = (value: string): string | null => {
   return safeCandidates.length > 0 ? safeCandidates.join(', ') : null;
 };
 
+const normalizeMediaUrl = (value: string): string => {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+
+  try {
+    const parsed = new URL(trimmed, 'https://shopwice.com');
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname;
+
+    if (
+      (host === 'shopwice.com' || host === 'www.shopwice.com') &&
+      path.startsWith('/wp-content/uploads/')
+    ) {
+      parsed.hostname = 'cdn.shopwice.com';
+      parsed.pathname = path.replace(/^\/wp-content\/uploads/, '');
+      return parsed.toString();
+    }
+
+    return parsed.toString();
+  } catch {
+    return trimmed;
+  }
+};
+
+const normalizeMediaSrcset = (value: string): string =>
+  value
+    .split(',')
+    .map((candidate) => {
+      const trimmed = candidate.trim();
+      if (!trimmed) return '';
+
+      const [url, descriptor] = trimmed.split(/\s+/, 2);
+      const normalizedUrl = normalizeMediaUrl(url);
+      return descriptor ? `${normalizedUrl} ${descriptor}` : normalizedUrl;
+    })
+    .filter(Boolean)
+    .join(', ');
+
 const sanitizeElement = (element: HTMLElement): void => {
   const tag = element.tagName.toLowerCase();
 
@@ -147,8 +185,19 @@ const sanitizeElement = (element: HTMLElement): void => {
       continue;
     }
 
+    if (tag === 'img' && attr === 'src') {
+      element.setAttribute(name, normalizeMediaUrl(attrValue));
+      if (!element.getAttribute('loading')) {
+        element.setAttribute('loading', 'lazy');
+      }
+      if (!element.getAttribute('decoding')) {
+        element.setAttribute('decoding', 'async');
+      }
+      continue;
+    }
+
     if (attr === 'srcset') {
-      const safeSrcset = sanitizeSrcset(attrValue);
+      const safeSrcset = sanitizeSrcset(normalizeMediaSrcset(attrValue));
       if (!safeSrcset) {
         element.removeAttribute(name);
       } else {

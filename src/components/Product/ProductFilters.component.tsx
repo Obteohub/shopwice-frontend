@@ -58,6 +58,8 @@ let brandTaxonomyPromise: Promise<BrandTaxonomyIndex> | null = null;
 interface ProductFiltersProps {
   state: CollectionFilterState;
   facets: ApiFacetGroup[];
+  priceBounds?: [number, number];
+  hasExplicitPriceFilter?: boolean;
   onToggleCategory: (value: string) => void;
   onToggleBrand: (value: string) => void;
   onSetBrands?: (values: string[]) => void;
@@ -351,6 +353,8 @@ const areSameBrandSelections = (left: string[], right: string[]) => {
 const ProductFilters = ({
   state,
   facets,
+  priceBounds,
+  hasExplicitPriceFilter = false,
   onToggleCategory,
   onToggleBrand,
   onSetBrands,
@@ -372,7 +376,13 @@ const ProductFilters = ({
 
   useEffect(() => {
     let active = true;
-    if (!sections.brand || (routeTaxonomy === 'brand' && brandHierarchy)) return () => { active = false; };
+    // Avoid loading the global brand taxonomy on every listing page.
+    // Only hydrate hierarchical brand index for brand-scoped routes.
+    if (!sections.brand || routeTaxonomy !== 'brand' || brandHierarchy) {
+      return () => {
+        active = false;
+      };
+    }
 
     void loadBrandTaxonomyIndex()
       .then((index) => {
@@ -390,6 +400,7 @@ const ProductFilters = ({
   }, [brandHierarchy, routeTaxonomy, sections.brand]);
 
   const brandFacetView = useMemo<BrandFacetView | null>(() => {
+    if (routeTaxonomy !== 'brand') return null;
     if (!sections.brand) return null;
     if (!brandTaxonomyIndex) return null;
 
@@ -529,16 +540,29 @@ const ProductFilters = ({
       activeChainNodeIds,
       activeChain,
     };
-  }, [brandTaxonomyIndex, sections.brand, state.brand]);
+  }, [brandTaxonomyIndex, routeTaxonomy, sections.brand, state.brand]);
 
   const activeFilterCount = useMemo(() => {
+    const hasBoundMin = Array.isArray(priceBounds) && Number.isFinite(priceBounds[0]);
+    const hasBoundMax = Array.isArray(priceBounds) && Number.isFinite(priceBounds[1]);
+    const hasMinPriceFilter =
+      hasExplicitPriceFilter &&
+      typeof state.minPrice === 'number' &&
+      Number.isFinite(state.minPrice) &&
+      (!hasBoundMin || state.minPrice > Number(priceBounds[0]));
+    const hasMaxPriceFilter =
+      hasExplicitPriceFilter &&
+      typeof state.maxPrice === 'number' &&
+      Number.isFinite(state.maxPrice) &&
+      (!hasBoundMax || state.maxPrice < Number(priceBounds[1]));
+
     return (
       (state.category ? 1 : 0) +
       state.brand.length +
       state.tag.length +
       state.location.length +
-      (state.minPrice !== undefined ? 1 : 0) +
-      (state.maxPrice !== undefined ? 1 : 0) +
+      (hasMinPriceFilter ? 1 : 0) +
+      (hasMaxPriceFilter ? 1 : 0) +
       (state.minRating !== undefined ? 1 : 0) +
       (state.maxRating !== undefined ? 1 : 0) +
       state.stockStatus.length +
@@ -546,7 +570,7 @@ const ProductFilters = ({
       (state.onSale !== undefined ? 1 : 0) +
       Object.values(state.attributes).reduce((sum, values) => sum + values.length, 0)
     );
-  }, [state]);
+  }, [hasExplicitPriceFilter, priceBounds, state]);
 
   const stockStatusOptions: Array<{ value: StockStatus; label: string }> = [
     { value: 'instock', label: 'In Stock' },
@@ -809,8 +833,8 @@ const ProductFilters = ({
         </Accordion>
       )}
 
-      {(sections.brand || (routeTaxonomy === 'brand' && brandHierarchy)) && (
-        <Accordion title={sections.brand?.title || 'Brands'}>
+      {true && (
+        <Accordion title={sections.brand?.title || 'Brands'} defaultOpen={true}>
           {routeTaxonomy === 'brand' && brandHierarchy ? (
             <div className="px-2 pb-2 space-y-3">
               <div>
@@ -926,18 +950,22 @@ const ProductFilters = ({
                   })}
                 </>
               ) : (
-                (sections.brand?.options ?? []).map((option) => (
-                  <div key={`brand-option-${option.value}`} data-testid={`facet-brand-option-${option.value}`}>
-                    <Checkbox
-                      id={`brand-option-${option.value}`}
-                      label={
-                        option.count !== undefined ? `${option.label} (${option.count})` : option.label
-                      }
-                      checked={state.brand.some((value) => matchesOptionValue(value, option.value))}
-                      onChange={() => handleBrandSelection(option.value)}
-                    />
-                  </div>
-                ))
+                (sections.brand?.options ?? []).length > 0 ? (
+                  (sections.brand?.options ?? []).map((option) => (
+                    <div key={`brand-option-${option.value}`} data-testid={`facet-brand-option-${option.value}`}>
+                      <Checkbox
+                        id={`brand-option-${option.value}`}
+                        label={
+                          option.count !== undefined ? `${option.label} (${option.count})` : option.label
+                        }
+                        checked={state.brand.some((value) => matchesOptionValue(value, option.value))}
+                        onChange={() => handleBrandSelection(option.value)}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-500 py-1">No brands available.</p>
+                )
               )}
             </div>
           )}

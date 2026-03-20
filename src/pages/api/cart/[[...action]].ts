@@ -122,6 +122,24 @@ const mapActionToUpstream = (
     return { method, path, body: nextBody };
 };
 
+const appendForwardedQueryParams = (targetUrl: URL, req: NextApiRequest) => {
+    Object.entries(req.query).forEach(([key, value]) => {
+        if (key === 'action') return;
+        if (value == null) return;
+        if (Array.isArray(value)) {
+            value.forEach((entry) => {
+                const normalized = String(entry ?? '').trim();
+                if (!normalized) return;
+                targetUrl.searchParams.append(key, normalized);
+            });
+            return;
+        }
+        const normalized = String(value).trim();
+        if (!normalized) return;
+        targetUrl.searchParams.append(key, normalized);
+    });
+};
+
 const relaySessionHeaders = (res: NextApiResponse, upstream: Response) => {
     const token = normalizeHeaderValue(
         upstream.headers.get('X-WC-Session') ||
@@ -227,6 +245,7 @@ const sanitizeImages = (images: any) => {
 const sanitizeCartItem = (item: any) => ({
     key: String(item?.key || ''),
     id: Number(item?.id || 0),
+    slug: String(item?.slug || item?.post_name || ''),
     quantity: Number(item?.quantity || 0),
     name: String(item?.name || ''),
     permalink: String(item?.permalink || ''),
@@ -279,6 +298,7 @@ const sanitizeShippingRates = (shippingRates: any) => {
                 cost: String(rate?.cost ?? rate?.price ?? rate?.price_amount ?? ''),
                 price: String(rate?.price ?? rate?.cost ?? rate?.price_amount ?? ''),
                 price_amount: String(rate?.price_amount ?? rate?.price ?? rate?.cost ?? ''),
+                selected: Boolean(rate?.selected ?? rate?.chosen ?? rate?.is_selected),
             })),
         };
     });
@@ -365,7 +385,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             headers['Nonce'] = nonce;
         }
 
-        const upstreamUrl = `${API_ROOT}${mapped.path}`;
+        const upstreamUrl = new URL(`${API_ROOT}${mapped.path}`);
+        appendForwardedQueryParams(upstreamUrl, req);
         const fetchOptions: RequestInit = {
             method: mapped.method,
             credentials: 'omit',
@@ -380,7 +401,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const upstreamStartMs = nowMs();
-        const upstream = await fetch(upstreamUrl, fetchOptions);
+        const upstream = await fetch(upstreamUrl.toString(), fetchOptions);
         const upstreamLatencyMs = nowMs() - upstreamStartMs;
         relaySessionHeaders(res, upstream);
         const { data: upstreamPayload, bytes: upstreamPayloadBytes } = await parseUpstreamPayload(upstream);

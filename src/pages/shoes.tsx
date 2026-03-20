@@ -71,6 +71,7 @@ export const getStaticProps = async () => {
                 category: category.id,
                 per_page: 24
             },
+            skipReviewEnrich: true,
         });
 
         return {

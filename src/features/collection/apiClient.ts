@@ -355,6 +355,7 @@ export const fetchCollectionProducts = async <TProduct>(
   const payloadPromise = withInFlightDedupe<unknown>(requestKey, () =>
     api.get<unknown>(ENDPOINTS.PRODUCTS, {
       params: requestParams,
+      skipReviewEnrich: true,
     }),
   );
   const payload = await withAbortSignal(payloadPromise, signal);

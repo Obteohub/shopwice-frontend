@@ -1,59 +1,61 @@
-
-import React from 'react';
+﻿const TRUCK_ICON = String.fromCodePoint(0x1F69A);
+const BOX_ICON = String.fromCodePoint(0x1F4E6);
+const CARD_ICON = String.fromCodePoint(0x1F4B3);
+const SHIELD_ICON = String.fromCodePoint(0x1F6E1);
+const PHONE_ICON = String.fromCodePoint(0x1F4DE);
 
 const reasons = [
-    {
-        title: 'Best Pricing',
-        description: 'We offer competitive prices on all our items.',
-        icon: (
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3 1.343 3 3-1.343 3-3 3m0-13a9 9 0 110 18 9 9 0 010-18zm0 0V3m0 18v-3" />
-            </svg>
-        )
-    },
-    {
-        title: 'Reliable Shop',
-        description: 'Trusted by thousands of customers nationwide.',
-        icon: (
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-        )
-    },
-    {
-        title: 'Secure Payment',
-        description: 'Your transactions are 100% safe and encrypted.',
-        icon: (
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
-        )
-    }
+  {
+    id: 'delivery',
+    emoji: TRUCK_ICON,
+    title: 'Fast Delivery',
+    description: 'Same-day and next-day delivery options across Ghana.',
+  },
+  {
+    id: 'authentic',
+    emoji: BOX_ICON,
+    title: 'Authentic Products',
+    description: '100% genuine items sourced directly from verified suppliers.',
+  },
+  {
+    id: 'payment',
+    emoji: CARD_ICON,
+    title: 'Flexible Payments',
+    description: 'Pay on delivery, mobile money, card, or bank transfer.',
+  },
+  {
+    id: 'warranty',
+    emoji: SHIELD_ICON,
+    title: 'Warranty Protection',
+    description: 'All products carry manufacturer or Shopwice warranty.',
+  },
+  {
+    id: 'support',
+    emoji: PHONE_ICON,
+    title: 'Customer Support',
+    description: 'Friendly support team ready to help you every day.',
+  },
 ];
 
-const WhyChooseUs = () => {
-    return (
-        <section className="bg-white py-12 px-6">
-            <div className="container mx-auto">
-                <h2 className="text-xl md:text-2xl font-bold text-[#2c3338] mb-10 text-center uppercase tracking-wide">
-                    Why Choose Shopwice
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    {reasons.map((reason) => (
-                        <div key={reason.title} className="flex items-start gap-4 p-6 rounded-xl border border-gray-50 bg-gray-50/50 hover:bg-white hover:shadow-lg transition-all duration-300">
-                            <div className="flex-shrink-0 p-3 bg-[#0C6DC9] rounded-lg">
-                                {reason.icon}
-                            </div>
-                            <div>
-                                <h3 className="text-[#2c3338] text-lg font-bold mb-1">{reason.title}</h3>
-                                <p className="text-gray-500 text-sm leading-relaxed">{reason.description}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </section>
-    );
-};
+const WhyChooseUs = () => (
+  <section className="bg-white border-t border-gray-100 py-8">
+    <div className="w-full px-4 sm:px-6">
+      <h2 className="text-base font-bold text-gray-900 mb-4">Why Shopwice?</h2>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {reasons.map((r) => (
+          <div
+            key={r.id}
+            className="flex flex-col items-center text-center gap-2 p-4 rounded-xl bg-gray-50 border border-gray-100 hover:bg-white hover:shadow-md transition-all duration-200"
+          >
+            <span className="text-3xl" aria-hidden="true">{r.emoji}</span>
+            <p className="text-sm font-semibold text-gray-900 leading-tight">{r.title}</p>
+            <p className="text-xs text-gray-500 leading-relaxed">{r.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
 
 export default WhyChooseUs;

@@ -4,9 +4,11 @@ import Layout from '@/components/Layout/Layout.component';
 import ProductList, { type RestProduct } from '@/components/Product/ProductList.component';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 import SeoHead from '@/components/SeoHead';
+import { buildStaticAvonLanding, type AvonLandingContent } from '@/content/avonLanding';
 import { normalizeCollectionDataPayload } from '@/features/collection/apiClient';
 import type { ApiFacetGroup, CollectionFilterState, RouteScope } from '@/features/collection/types';
-import { ApiError, api } from '@/utils/api';
+import { api } from '@/utils/api';
+import { applyCachePolicy } from '@/utils/cacheControl';
 import { ENDPOINTS } from '@/utils/endpoints';
 import { sanitizeHtml } from '@/utils/sanitizeHtml';
 import { decodeHtmlEntities } from '@/utils/text';
@@ -16,24 +18,7 @@ import {
   parsePageParam,
   type SeoDataShape,
 } from '@/utils/seoPage';
-
-type OfferCard = {
-  title: string;
-  description?: string;
-  image?: string;
-  href?: string;
-  ctaLabel?: string;
-};
-
-type AvonLandingContent = {
-  title: string;
-  subtitle?: string;
-  bodyHtml?: string;
-  heroImage?: string;
-  heroCtaLabel?: string;
-  heroCtaHref?: string;
-  offers: OfferCard[];
-};
+import { getRequestPathname, loggedNotFound, loggedRedirect } from '@/utils/routeEventLogger';
 
 type BrandTerm = {
   id?: number | string;
@@ -75,6 +60,7 @@ type ChildBrandLink = {
 type AvonPageProps = {
   brandName: string;
   isBrandLanding: boolean;
+  isRootListingPage: boolean;
   resolvedSegments?: string[];
   currentBrandSlug?: string;
   childBrands?: ChildBrandLink[];
@@ -90,13 +76,10 @@ type AvonPageProps = {
   forcedState: Partial<CollectionFilterState>;
   queryParams: Record<string, string | number | boolean>;
   omitManagedQueryKeys: string[];
-  landingDiagnostic?: {
-    message: string;
-    status?: number;
-  } | null;
 };
 
 const SEGMENT_MAX_DEPTH = 4;
+const AVON_ALL_SEGMENT = 'all';
 const BRAND_HIERARCHY_CACHE_TTL_MS = Math.max(
   60_000,
   Number(process.env.BRAND_HIERARCHY_CACHE_TTL_MS ?? 10 * 60 * 1000),
@@ -211,6 +194,10 @@ const parseFilterQuery = (query: Record<string, string | string[] | undefined>) 
       return;
     }
 
+    if (key === 'view') {
+      return;
+    }
+
     const lowerKey = key.toLowerCase();
     if (PAGE_KEYS.has(lowerKey)) {
       page = parsePositive(normalized, 1);
@@ -251,99 +238,6 @@ const queryStringFromRecord = (query: Record<string, string>) => {
       params.set(key, value);
     });
   return params.toString();
-};
-
-const toRenderedHtml = (value: unknown): string => {
-  if (typeof value === 'string') return value;
-  if (!value || typeof value !== 'object') return '';
-  const rendered = (value as Record<string, unknown>).rendered;
-  return typeof rendered === 'string' ? rendered : '';
-};
-
-const pickFirstNode = (payload: unknown): Record<string, unknown> | null => {
-  if (Array.isArray(payload)) {
-    const first = payload[0];
-    return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
-  }
-  if (!payload || typeof payload !== 'object') return null;
-  const source = payload as Record<string, unknown>;
-  if (Array.isArray(source.data)) {
-    const first = source.data[0];
-    return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
-  }
-  if (source.data && typeof source.data === 'object') return source.data as Record<string, unknown>;
-  if (Array.isArray(source.results)) {
-    const first = source.results[0];
-    return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
-  }
-  if (Array.isArray(source.pages)) {
-    const first = source.pages[0];
-    return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
-  }
-  if (source.page && typeof source.page === 'object') return source.page as Record<string, unknown>;
-  return source;
-};
-
-const normalizeOffers = (rawOffers: unknown): OfferCard[] => {
-  if (!Array.isArray(rawOffers)) return [];
-  return rawOffers
-    .map((entry) => {
-      if (!entry || typeof entry !== 'object') return null;
-      const source = entry as Record<string, unknown>;
-      const imageNode = source.image && typeof source.image === 'object'
-        ? (source.image as Record<string, unknown>)
-        : null;
-
-      const title = toText(source.title ?? source.heading ?? source.name);
-      const description = toText(source.description ?? source.text ?? source.content);
-      const image = toText(imageNode?.url ?? imageNode?.src ?? source.image_url ?? source.imageUrl ?? '');
-      const href = toText(source.href ?? source.url ?? source.link);
-      const ctaLabel = toText(source.cta_label ?? source.button_label ?? source.buttonText ?? source.cta);
-
-      if (!title && !description && !image && !href) return null;
-      return {
-        title: title || 'Offer',
-        description: description || undefined,
-        image: image || undefined,
-        href: href || undefined,
-        ctaLabel: ctaLabel || undefined,
-      } satisfies OfferCard;
-    })
-    .filter(Boolean) as OfferCard[];
-};
-
-const normalizeLanding = (payload: unknown): AvonLandingContent => {
-  const node = pickFirstNode(payload);
-  if (!node) {
-    return { title: 'Avon', offers: [] };
-  }
-
-  const acf = node.acf && typeof node.acf === 'object' ? (node.acf as Record<string, unknown>) : {};
-  const hero = acf.hero && typeof acf.hero === 'object' ? (acf.hero as Record<string, unknown>) : {};
-  const heroImage = hero.image && typeof hero.image === 'object'
-    ? (hero.image as Record<string, unknown>)
-    : {};
-
-  const title = toText(hero.title ?? acf.hero_title ?? toRenderedHtml(node.title) ?? node.title_text ?? node.name) || 'Avon';
-  const subtitle = toText(hero.subtitle ?? acf.hero_subtitle ?? toRenderedHtml(node.excerpt) ?? acf.subtitle);
-  const bodyHtml =
-    toRenderedHtml(node.content) ||
-    toRenderedHtml(acf.content) ||
-    String(acf.body_html ?? acf.body ?? '').trim();
-  const heroImageUrl = toText(heroImage.url ?? heroImage.src ?? acf.hero_image_url ?? acf.banner_image_url);
-  const heroCtaLabel = toText(hero.cta_label ?? hero.button_label ?? acf.hero_cta_label);
-  const heroCtaHref = toText(hero.cta_href ?? hero.cta_url ?? hero.button_url ?? acf.hero_cta_url);
-  const offers = normalizeOffers(acf.offers ?? acf.offer_cards ?? node.offers);
-
-  return {
-    title,
-    subtitle: subtitle || undefined,
-    bodyHtml: bodyHtml || undefined,
-    heroImage: heroImageUrl || undefined,
-    heroCtaLabel: heroCtaLabel || undefined,
-    heroCtaHref: heroCtaHref || undefined,
-    offers,
-  };
 };
 
 const normalizeBrandNode = (entry: BrandTerm): BrandNode | null => {
@@ -485,7 +379,8 @@ const resolveBrandSegments = (
   return { chain, currentBrand, invalid: false };
 };
 
-const buildAvonH1 = (segments: string[]) => {
+const buildAvonH1 = (segments: string[], options?: { isRootListingPage?: boolean }) => {
+  if (options?.isRootListingPage) return 'Avon Products';
   if (segments.length === 0) return 'Avon';
   if (segments.length === 1) return `Avon ${titleCaseSlug(segments[0])}`;
 
@@ -501,8 +396,13 @@ const buildAvonH1 = (segments: string[]) => {
 
 const buildAvonBreadcrumbs = (
   resolvedChain: ResolvedSegment[],
+  options?: { isRootListingPage?: boolean },
 ): BreadcrumbItem[] => {
   const breadcrumbs: BreadcrumbItem[] = [{ label: 'Avon', href: '/brand/avon' }];
+  if (options?.isRootListingPage) {
+    breadcrumbs.push({ label: 'All Products', href: null });
+    return breadcrumbs;
+  }
   if (!resolvedChain.length) {
     breadcrumbs[0].href = null;
     return breadcrumbs;
@@ -574,6 +474,7 @@ const getFacetScopedCount = (
 const AvonPage = ({
   brandName,
   isBrandLanding,
+  isRootListingPage,
   resolvedSegments = [],
   currentBrandSlug = '',
   childBrands = [],
@@ -589,29 +490,35 @@ const AvonPage = ({
   forcedState,
   queryParams,
   omitManagedQueryKeys,
-  landingDiagnostic,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
   const title = isBrandLanding
     ? toText(landing.title || brandName || 'Avon')
     : toText(h1 || brandName || 'Avon');
   const subtitle = toText(landing.subtitle || '');
   const heroCtaLabel = toText(landing.heroCtaLabel || '');
-  const heroCtaHref = toText(landing.heroCtaHref || '#avon-products');
+  const heroCtaHref = toText(landing.heroCtaHref || '/brand/avon/all');
 
   if (!isBrandLanding) {
     const uniqueLinks = new Set<string>();
-    const nestedBasePath = resolvedSegments.length > 0
+    const nestedBasePath = isRootListingPage
+      ? '/brand/avon'
+      : resolvedSegments.length > 0
       ? `/brand/avon/${resolvedSegments.join('/')}`
       : '/brand/avon';
     const trail = [
-      { label: 'Avon', path: '/brand/avon?view=list', isCurrent: resolvedSegments.length === 0 },
+      {
+        label: 'Avon',
+        path: isRootListingPage ? '/brand/avon' : '/brand/avon/all',
+        isCurrent: !isRootListingPage && resolvedSegments.length === 0,
+      },
+      ...(isRootListingPage ? [{ label: 'All Products', path: '/brand/avon/all', isCurrent: true }] : []),
       ...resolvedSegments.map((segment, index) => {
         const path = `/brand/avon/${resolvedSegments.slice(0, index + 1).join('/')}`;
         const crumb = breadcrumbs[index + 1];
         return {
           label: toText(crumb?.label || titleCaseSlug(segment)),
           path,
-          isCurrent: index === resolvedSegments.length - 1,
+          isCurrent: !isRootListingPage && index === resolvedSegments.length - 1,
         };
       }),
     ];
@@ -683,17 +590,6 @@ const AvonPage = ({
       <SeoHead seoData={seoData} />
 
       <div className="w-full px-2 md:px-4 pt-2 pb-2">
-        {landingDiagnostic && (
-          <div
-            className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
-            role="status"
-            data-testid="avon-landing-diagnostic"
-          >
-            {landingDiagnostic.message}
-            {Number.isFinite(Number(landingDiagnostic.status)) ? ` (status ${landingDiagnostic.status})` : ''}
-          </div>
-        )}
-
         <nav className="text-sm text-gray-500 mb-3 pb-1" aria-label="Breadcrumb">
           <div className="overflow-x-auto">
             <ul className="flex flex-nowrap items-center gap-1 min-w-max">
@@ -836,6 +732,7 @@ export const getServerSideProps: GetServerSideProps<AvonPageProps> = async ({
   req,
   res,
 }) => {
+  const requestPath = getRequestPathname(req, '/brand/avon');
   const rawSegmentsInput = Array.isArray(params?.segments)
     ? params?.segments
     : params?.segments
@@ -843,7 +740,12 @@ export const getServerSideProps: GetServerSideProps<AvonPageProps> = async ({
       : [];
 
   if (rawSegmentsInput.length > SEGMENT_MAX_DEPTH) {
-    return { notFound: true };
+    return loggedNotFound({
+      req,
+      pathname: requestPath,
+      matchedRoute: '/brand/avon/[[...segments]]',
+      reason: 'Avon route exceeded maximum segment depth',
+    });
   }
 
   const normalizedSegments = normalizeIncomingSegments(rawSegmentsInput);
@@ -856,49 +758,84 @@ export const getServerSideProps: GetServerSideProps<AvonPageProps> = async ({
     query as Record<string, string | string[] | undefined>,
   );
 
+  const viewMode = firstQueryValue((query as Record<string, string | string[] | undefined>).view).toLowerCase();
+  const isLegacyRootListingView = normalizedSegments.length === 0 && viewMode === 'list';
+  const isRootListingPage = normalizedSegments.length === 1 && normalizedSegments[0] === AVON_ALL_SEGMENT;
+  const normalizedSegmentsForResolution = isRootListingPage ? [] : normalizedSegments;
   const canonicalPath = normalizedSegments.length
     ? `/brand/avon/${normalizedSegments.join('/')}`
-    : '/brand/avon';
-  const viewMode = firstQueryValue((query as Record<string, string | string[] | undefined>).view).toLowerCase();
-  const isBrandLanding = normalizedSegments.length === 0 && viewMode !== 'list';
+    : (isLegacyRootListingView ? `/brand/avon/${AVON_ALL_SEGMENT}` : '/brand/avon');
+  const isBrandLanding = normalizedSegments.length === 0 && !isLegacyRootListingView;
   const queryString = queryStringFromRecord(passThroughQuery);
   const canonicalDestination = queryString ? `${canonicalPath}?${queryString}` : canonicalPath;
   const isNextDataRequest = String(req.url || '').startsWith('/_next/data/');
 
   if (hasEmptyOrDirtySegments || hasDoubleSlashInPath) {
-    return {
-      redirect: {
-        destination: canonicalDestination,
-        permanent: true,
-      },
-    };
+    return loggedRedirect({
+      req,
+      pathname: requestPath,
+      destination: canonicalDestination,
+      permanent: true,
+      matchedRoute: '/brand/avon/[[...segments]]',
+      reason: 'Normalized Avon path to canonical segment structure',
+    });
   }
 
   try {
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    applyCachePolicy(res, 'archivePage');
 
     const { bySlug, byParent } = await getCachedBrandHierarchy();
     const avonBrand = bySlug.get('avon');
-    if (!avonBrand) return { notFound: true };
+    if (!avonBrand) {
+      return loggedNotFound({
+        req,
+        pathname: requestPath,
+        matchedRoute: '/brand/avon/[[...segments]]',
+        reason: 'Avon brand root missing from hierarchy cache',
+      });
+    }
 
     const brandName = toText(avonBrand.name || 'Avon');
-    const resolved = resolveBrandSegments(normalizedSegments, avonBrand, byParent);
+    const resolved = resolveBrandSegments(normalizedSegmentsForResolution, avonBrand, byParent);
     if (resolved.invalid) {
-      return { notFound: true };
+      return loggedNotFound({
+        req,
+        pathname: requestPath,
+        matchedRoute: '/brand/avon/[[...segments]]',
+        reason: 'Invalid Avon sub-brand path',
+      });
     }
 
     const resolvedSegmentsCanonical = resolved.chain.map((item) => item.pathSegment);
-    if (resolvedSegmentsCanonical.join('/') !== normalizedSegments.join('/')) {
-      const correctedPath = resolvedSegmentsCanonical.length
-        ? `/brand/avon/${resolvedSegmentsCanonical.join('/')}`
+    const expectedCanonicalSegments = isRootListingPage ? [AVON_ALL_SEGMENT] : resolvedSegmentsCanonical;
+    if (expectedCanonicalSegments.join('/') !== normalizedSegments.join('/')) {
+      const correctedPath = expectedCanonicalSegments.length
+        ? `/brand/avon/${expectedCanonicalSegments.join('/')}`
         : '/brand/avon';
       const correctedDestination = queryString ? `${correctedPath}?${queryString}` : correctedPath;
-      return {
-        redirect: {
-          destination: correctedDestination,
-          permanent: true,
-        },
-      };
+      return loggedRedirect({
+        req,
+        pathname: requestPath,
+        destination: correctedDestination,
+        permanent: true,
+        matchedRoute: '/brand/avon/[[...segments]]',
+        reason: 'Resolved Avon hierarchy to canonical path',
+      });
+    }
+
+    if (normalizedSegments[0] === AVON_ALL_SEGMENT && normalizedSegments.length > 1) {
+      const correctedPath = normalizedSegments.slice(1).length
+        ? `/brand/avon/${resolvedSegmentsCanonical.join('/')}`
+        : `/brand/avon/${AVON_ALL_SEGMENT}`;
+      const correctedDestination = queryString ? `${correctedPath}?${queryString}` : correctedPath;
+      return loggedRedirect({
+        req,
+        pathname: requestPath,
+        destination: correctedDestination,
+        permanent: true,
+        matchedRoute: '/brand/avon/[[...segments]]',
+        reason: 'Removed invalid all-segment prefix from Avon path',
+      });
     }
 
     const currentBrand = resolved.currentBrand;
@@ -922,38 +859,13 @@ export const getServerSideProps: GetServerSideProps<AvonPageProps> = async ({
       include_totals: true,
     };
 
-    const [productsResult, collectionResult, landingResult] = await Promise.allSettled([
-      api.get<unknown>(ENDPOINTS.PRODUCTS, { params: productParams }),
+    const [productsResult, collectionResult] = await Promise.allSettled([
+      api.get<unknown>(ENDPOINTS.PRODUCTS, { params: productParams, skipReviewEnrich: true }),
       api.get<unknown>(ENDPOINTS.COLLECTION_DATA, { params: sharedFilters }),
-      isBrandLanding ? api.get<unknown>(ENDPOINTS.BRAND_LANDING, { params: { brand: 'avon' } }) : Promise.resolve(null),
     ]);
 
     if (productsResult.status !== 'fulfilled') throw productsResult.reason;
     if (collectionResult.status !== 'fulfilled') throw collectionResult.reason;
-
-    let landingDiagnostic: AvonPageProps['landingDiagnostic'] = null;
-    let landingPayload: unknown = null;
-      if (landingResult.status === 'fulfilled') {
-        landingPayload = landingResult.value;
-      } else {
-      const reason = landingResult.reason;
-      const status = reason instanceof ApiError ? reason.status : undefined;
-      const isNotFound = status === 404;
-      landingDiagnostic = {
-        message: isNotFound
-          ? 'Avon landing content endpoint is not available yet. Showing catalog content only.'
-          : 'Avon landing content failed to load. Showing catalog content only.',
-        status,
-      };
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[Avon Catch-All] Landing content unavailable:', {
-          status,
-          message: String((reason as { message?: string })?.message || reason || ''),
-        });
-      }
-    }
-
-    const landing = normalizeLanding(landingPayload);
     const productsPayload = productsResult.value;
     const products = normalizeList<RestProduct>(productsPayload);
     const initialFacets = normalizeCollectionDataPayload(collectionResult.value);
@@ -970,8 +882,13 @@ export const getServerSideProps: GetServerSideProps<AvonPageProps> = async ({
     }
     if (!Number.isFinite(totalCount)) totalCount = products.length;
     const initialHasNextPage = totalCount > 0 ? page * perPage < totalCount : products.length >= perPage;
-    const breadcrumbs = buildAvonBreadcrumbs(resolved.chain);
-    const h1 = buildAvonH1(resolvedSegmentsCanonical);
+    const breadcrumbs = buildAvonBreadcrumbs(resolved.chain, { isRootListingPage });
+    const h1 = buildAvonH1(resolvedSegmentsCanonical, { isRootListingPage });
+    const landing = buildStaticAvonLanding({
+      brandName,
+      childBrands,
+      brandDescription: avonBrand.description || '',
+    });
     const pageUrl = getAbsoluteUrlFromRequest(req, canonicalDestination);
     const seoData = await buildArchiveSeoData({
       pageUrl,
@@ -985,7 +902,11 @@ export const getServerSideProps: GetServerSideProps<AvonPageProps> = async ({
       hasNextPage: initialHasNextPage,
       productCount: products.length,
       skipRankMath: isNextDataRequest,
+      allowThinArchiveNoindex: !isBrandLanding,
     });
+    if (isRootListingPage) {
+      seoData.robots = 'noindex, follow';
+    }
 
     const forcedState: Partial<CollectionFilterState> = {
       brand: [currentBrandFilterValue],
@@ -997,7 +918,8 @@ export const getServerSideProps: GetServerSideProps<AvonPageProps> = async ({
       props: {
         brandName,
         isBrandLanding,
-        resolvedSegments: resolvedSegmentsCanonical,
+        isRootListingPage,
+        resolvedSegments: isRootListingPage ? [AVON_ALL_SEGMENT] : resolvedSegmentsCanonical,
         currentBrandSlug: currentBrand.slug,
         childBrands,
         products,
@@ -1012,7 +934,6 @@ export const getServerSideProps: GetServerSideProps<AvonPageProps> = async ({
         forcedState,
         queryParams: passThroughQuery,
         omitManagedQueryKeys,
-        landingDiagnostic,
       },
     };
   } catch (error) {

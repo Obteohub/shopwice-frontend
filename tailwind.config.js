@@ -9,6 +9,12 @@ module.exports = {
       backgroundImage: {
         'hero-background': "url('/images/hero.jpg')",
       },
+      colors: {
+        'flat-accent': '#0c6dc9',
+        'flat-accent-dark': '#0a5ba8',
+        'flat-border': '#e2e8f0',
+        'flat-secondary': '#64748b',
+      },
     },
   },
   plugins: [

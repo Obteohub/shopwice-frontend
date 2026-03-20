@@ -32,6 +32,8 @@ const toOrigin = (value) => {
 
 const getFrontendSiteOrigin = () => toOrigin(getSiteUrl());
 const isLocalHostname = (value) => ['localhost', '127.0.0.1', '0.0.0.0'].includes(String(value || '').toLowerCase());
+const shouldForceNoindex = () =>
+  String(process.env.NEXT_PUBLIC_SITE_NOINDEX || '').toLowerCase() === 'true';
 
 const getWpOrigin = () => {
   const wpBase = toStringValue(process.env.NEXT_PUBLIC_WP_API_URL);
@@ -179,7 +181,7 @@ export const buildSeoHeadModel = (seoData) => {
 
   const title = normalizeMetaValue(data.title);
   const description = normalizeMetaValue(data.metaDescription);
-  const robots = normalizeRobots(data.robots);
+  const robots = shouldForceNoindex() ? 'noindex, nofollow' : normalizeRobots(data.robots);
   const siteName = normalizeMetaValue(getSiteName());
 
   const canonicalCandidate =

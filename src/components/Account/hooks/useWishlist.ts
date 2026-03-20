@@ -3,7 +3,7 @@ import { api } from '@/utils/api';
 import { ENDPOINTS } from '@/utils/endpoints';
 import { useEffect, useState } from 'react';
 import { RestProduct } from '@/hooks/useProductFilters';
-import { firstValidImageUrl } from '@/utils/image';
+import { firstDisplayImageUrl } from '@/utils/image';
 
 const fetcher = async (ids: number[]) => {
     if (!ids.length) return [];
@@ -52,7 +52,7 @@ export function useWishlist() {
     );
 
     const normalizedWishlistItems = (data || []).map((product) => {
-        const imageSrc = firstValidImageUrl(
+        const imageSrc = firstDisplayImageUrl(
             (product as any)?.image?.src,
             (product as any)?.image?.sourceUrl,
             (product as any)?.image?.url,

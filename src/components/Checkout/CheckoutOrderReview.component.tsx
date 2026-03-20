@@ -15,6 +15,11 @@ const CheckoutOrderReview = ({ cart }: ICheckoutOrderReviewProps) => {
     const cartSubtotal = cart?.totals?.total_items || cart?.totals?.total_price || cart.total;
     const cartTotal = cart?.totals?.total_price || cart.total;
     const shippingTotal = cart?.totals?.total_shipping || cart.shippingTotal;
+    const hasSelectedShippingMethod = Array.isArray(cart?.shipping_rates)
+        && cart.shipping_rates.some((pkg: any) =>
+            Array.isArray(pkg?.shipping_rates)
+            && pkg.shipping_rates.some((rate: any) => Boolean(rate?.selected ?? rate?.chosen ?? rate?.is_selected)));
+    const hasCalculatedShipping = Boolean(cart?.has_calculated_shipping || hasSelectedShippingMethod);
 
     return (
         <div className="bg-white rounded-md shadow-sm border border-gray-200 p-3 mb-2">
@@ -33,8 +38,10 @@ const CheckoutOrderReview = ({ cart }: ICheckoutOrderReviewProps) => {
                 </div>
                 <div className="flex justify-between text-gray-600">
                     <span>Shipping</span>
-                    {shippingTotal && Number(shippingTotal) !== 0 ? (
+                    {Number(shippingTotal) !== 0 ? (
                         <span className="font-medium text-gray-900">{formatPriceWithDecimals(shippingTotal, 'GH₵')}</span>
+                    ) : hasCalculatedShipping ? (
+                        <span className="font-medium text-gray-900">Free</span>
                     ) : (
                         <span className="text-xs text-gray-500">Address needed</span>
                     )}

@@ -1,9 +1,14 @@
 // Imports
+import dynamic from 'next/dynamic';
 import Router from 'next/router';
+import Script from 'next/script';
 import NProgress from 'nprogress';
 
-import GlobalInitializer from '@/components/GlobalInitializer.component';
-import InstallPrompt from '@/components/InstallPrompt/InstallPrompt.component';
+import {
+  GOOGLE_TAG_MANAGER_ID,
+  isTagManagerEnabled,
+  trackPageView,
+} from '@/utils/tagManager';
 
 // Types
 import type { AppProps } from 'next/app';
@@ -18,6 +23,14 @@ Router.events.on('routeChangeComplete', () => NProgress.done());
 Router.events.on('routeChangeError', () => NProgress.done());
 
 import { useEffect } from 'react';
+
+const GlobalInitializer = dynamic(() => import('@/components/GlobalInitializer.component'), {
+  ssr: false,
+});
+
+const InstallPrompt = dynamic(() => import('@/components/InstallPrompt/InstallPrompt.component'), {
+  ssr: false,
+});
 
 const STAGING_RUNTIME_RESET_VERSION = '20260315-1';
 const STAGING_RUNTIME_RESET_MARKER_KEY = 'shopwice-staging-runtime-reset';
@@ -107,11 +120,12 @@ function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
-    const enableServiceWorker = process.env.NEXT_PUBLIC_ENABLE_PWA_SW === 'true';
+    const enableServiceWorker =
+      String(process.env.NEXT_PUBLIC_ENABLE_PWA_SW || '').toLowerCase() !== 'false';
     const isProduction = process.env.NODE_ENV === 'production';
 
-    // Default behavior is SW OFF to avoid stale shell/chunk blank screens.
-    // Opt in explicitly with NEXT_PUBLIC_ENABLE_PWA_SW=true.
+    // Keep service worker enabled by default in production, but still allow
+    // an explicit env-based kill switch if a rollout ever needs to back off.
     if (!enableServiceWorker || !isProduction) {
       void navigator.serviceWorker.getRegistrations().then((registrations) => {
         for (const registration of registrations) {
@@ -132,9 +146,14 @@ function MyApp({ Component, pageProps }: AppProps) {
     }
 
     const registerServiceWorker = () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {
-        // Ignore service worker registration errors in UI runtime.
-      });
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => {
+          void registration.update();
+        })
+        .catch(() => {
+          // Ignore service worker registration errors in UI runtime.
+        });
     };
 
     window.addEventListener('load', registerServiceWorker);
@@ -143,8 +162,42 @@ function MyApp({ Component, pageProps }: AppProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isTagManagerEnabled) return;
+
+    const handleRouteAnalytics = (url: string) => {
+      trackPageView(url);
+    };
+
+    handleRouteAnalytics(window.location.pathname + window.location.search);
+    Router.events.on('routeChangeComplete', handleRouteAnalytics);
+
+    return () => {
+      Router.events.off('routeChangeComplete', handleRouteAnalytics);
+    };
+  }, []);
+
   return (
     <>
+      {isTagManagerEnabled ? (
+        <>
+          <Script id="gtm-datalayer" strategy="beforeInteractive" data-cfasync="false">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              window.dataLayer.push({
+                'gtm.start': Date.now(),
+                event: 'gtm.js'
+              });
+            `}
+          </Script>
+          <Script
+            id="google-tag-manager"
+            src={`https://www.googletagmanager.com/gtm.js?id=${GOOGLE_TAG_MANAGER_ID}`}
+            strategy="lazyOnload"
+            data-cfasync="false"
+          />
+        </>
+      ) : null}
       <GlobalInitializer />
       <InstallPrompt />
       <main className="font-sans">

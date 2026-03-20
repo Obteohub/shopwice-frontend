@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { toDisplayImageUrl } from '@/utils/image';
 
 const categories = [
     { name: 'Shoes', slug: 'shoes', image: 'https://cdn.shopwice.com/homepage-images/shoes.webp' },
@@ -36,7 +37,7 @@ const FeaturedCategories = () => {
                                     <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden bg-white shadow-sm relative group-hover:shadow-md transition-all duration-300">
                                         <div className="w-full h-full rounded-full overflow-hidden relative">
                                             <Image
-                                                src={cat.image}
+                                                src={toDisplayImageUrl(cat.image)}
                                                 alt={cat.name}
                                                 fill
                                                 sizes="(max-width: 768px) 100px, 150px"
@@ -57,7 +58,7 @@ const FeaturedCategories = () => {
                         <div className="relative w-full max-w-[400px] lg:max-w-none h-[600px] lg:h-full rounded-lg overflow-hidden group">
                             <Link href="/shop" className="block w-full h-full relative">
                                 <Image
-                                    src="https://cdn.shopwice.com/Homepage%20Banners/suxika%20halogen%20vertical%20image%20for%20homepage%20vertical%20banner%20slider_result.webp"
+                                    src={toDisplayImageUrl('https://cdn.shopwice.com/Homepage%20Banners/suxika%20halogen%20vertical%20image%20for%20homepage%20vertical%20banner%20slider_result.webp')}
                                     alt="Promotional Banner"
                                     fill
                                     className="object-fit group-hover:scale-0 transition-transform duration-500"

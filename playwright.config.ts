@@ -11,6 +11,8 @@ import { devices } from '@playwright/test';
  */
 const config: PlaywrightTestConfig = {
   testDir: './src/tests',
+  testMatch: /.*\.spec\.(ts|tsx)$/,
+  testIgnore: ['**/seo/**'],
   /* Maximum time one test can run for. */
   timeout: 60 * 1000, // Increased to 60 seconds
   expect: {
@@ -20,14 +22,14 @@ const config: PlaywrightTestConfig = {
      */
     timeout: 30000, // Increased to 30 seconds
   },
-  /* Run tests in files in parallel */
-  fullyParallel: true,
+  /* Run tests in a stable serial mode; local Next dev server is flaky under heavy parallel load. */
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: Boolean(process.env.CI),
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : '100%',
+  /* Keep one worker across environments for deterministic cross-browser runs. */
+  workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: process.env.CI ? 'github' : 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */

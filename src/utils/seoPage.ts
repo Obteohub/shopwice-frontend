@@ -39,6 +39,25 @@ const toPositiveInteger = (value: unknown, fallback: number) => {
   return fallback;
 };
 
+const buildArchiveFallbackDescription = ({
+  title,
+  description,
+  siteName,
+}: {
+  title: string;
+  description?: string | null;
+  siteName: string;
+}) => {
+  const fromDescription = buildFallbackDescription(description || '', 155);
+  if (fromDescription) return fromDescription;
+
+  const normalizedTitle = toStringValue(title) || 'products';
+  return buildFallbackDescription(
+    `Explore ${normalizedTitle} on ${siteName}. Shop available products, compare prices, and buy online.`,
+    155,
+  );
+};
+
 const shouldNoindexThinArchives = () =>
   String(process.env.SEO_NOINDEX_THIN_ARCHIVES ?? 'true').toLowerCase() !== 'false';
 
@@ -58,12 +77,46 @@ const buildPaginationUrl = (currentUrl: string, page: number) => {
   }
 };
 
-const hasExplicitIndexRobots = (robots: string) => {
-  const value = String(robots || '').toLowerCase();
-  if (!value) return false;
-  const hasNoindex = /(^|[\s,])noindex([\s,]|$)/.test(value);
-  const hasIndex = /(^|[\s,])index([\s,]|$)/.test(value);
-  return hasIndex && !hasNoindex;
+const compactSeoOverrides = (value: Partial<SeoDataShape> | null | undefined) => {
+  if (!value || typeof value !== 'object') return {};
+
+  const output: Partial<SeoDataShape> = {};
+
+  Object.entries(value).forEach(([key, entry]) => {
+    if (entry === null || entry === undefined) return;
+    if (typeof entry === 'string' && !entry.trim()) return;
+    (output as Record<string, unknown>)[key] = entry;
+  });
+
+  return output;
+};
+
+const normalizeMetaValue = (value: unknown) => toStringValue(value).toLowerCase();
+
+const isNotFoundLikeTitle = (value: unknown) => {
+  const normalized = normalizeMetaValue(value);
+  return (
+    normalized.includes('page not found') ||
+    normalized === '404' ||
+    normalized.startsWith('404 ')
+  );
+};
+
+const hasNoindexNofollow = (value: unknown) => {
+  const normalized = normalizeMetaValue(value);
+  return normalized.includes('noindex') && normalized.includes('nofollow');
+};
+
+const shouldDiscardArchiveSeoOverrides = (
+  parsed: Partial<SeoDataShape> | null | undefined,
+) => {
+  if (!parsed || typeof parsed !== 'object') return false;
+
+  return (
+    isNotFoundLikeTitle(parsed.title) ||
+    isNotFoundLikeTitle(parsed.ogTitle) ||
+    isNotFoundLikeTitle(parsed.twitterTitle)
+  );
 };
 
 export const getAbsoluteUrlFromRequest = (req: IncomingMessage, pathname: string) => {
@@ -102,6 +155,8 @@ type BuildArchiveSeoInput = {
   hasNextPage?: boolean;
   productCount?: number;
   skipRankMath?: boolean;
+  allowThinArchiveNoindex?: boolean;
+  rankMathUrlOverride?: string;
 };
 
 export const buildArchiveSeoData = async ({
@@ -112,9 +167,15 @@ export const buildArchiveSeoData = async ({
   hasNextPage = false,
   productCount = 0,
   skipRankMath = false,
+  allowThinArchiveNoindex = true,
+  rankMathUrlOverride,
 }: BuildArchiveSeoInput): Promise<SeoDataShape> => {
   const siteName = getSiteName();
-  const fallbackDescription = buildFallbackDescription(description || '', 155);
+  const fallbackDescription = buildArchiveFallbackDescription({
+    title,
+    description,
+    siteName,
+  });
 
   const fallbackSeo: SeoDataShape = {
     title: `${title} | ${siteName}`,
@@ -133,21 +194,30 @@ export const buildArchiveSeoData = async ({
     jsonLd: [],
   };
 
-  const rankMathHead = skipRankMath ? null : await getRankMathSEO(pageUrl);
+  const rankMathTargetUrl = toStringValue(rankMathUrlOverride) || pageUrl;
+  const rankMathHead = skipRankMath ? null : await getRankMathSEO(rankMathTargetUrl);
   const parsed = skipRankMath ? null : await parseSeoHead(rankMathHead);
+  const safeParsed = shouldDiscardArchiveSeoOverrides(parsed) ? null : parsed;
 
   if (!skipRankMath && !rankMathHead) {
-    console.warn(`[SEO] RankMath SEO unavailable for archive URL ${pageUrl}; using fallback metadata.`);
+    console.warn(`[SEO] RankMath SEO unavailable for archive URL ${rankMathTargetUrl}; using fallback metadata.`);
+  }
+  if (!skipRankMath && parsed && !safeParsed) {
+    console.warn(`[SEO] RankMath returned invalid archive metadata for ${rankMathTargetUrl}; using fallback metadata.`);
   }
 
   const seoData: SeoDataShape = {
     ...fallbackSeo,
-    ...parsed,
-    canonical: parsed?.canonical || pageUrl,
+    ...compactSeoOverrides(safeParsed),
+    canonical: safeParsed?.canonical || pageUrl,
     fallbackCanonical: pageUrl,
     isPaginated: currentPage > 1,
-    jsonLd: Array.isArray(parsed?.jsonLd) ? parsed.jsonLd : [],
+    jsonLd: Array.isArray(safeParsed?.jsonLd) ? safeParsed.jsonLd : [],
   };
+
+  if (hasNoindexNofollow(safeParsed?.robots) && currentPage <= 1) {
+    seoData.robots = fallbackSeo.robots;
+  }
 
   if (!seoData.prev && currentPage > 1) {
     seoData.prev = buildPaginationUrl(pageUrl, currentPage - 1);
@@ -157,11 +227,11 @@ export const buildArchiveSeoData = async ({
     seoData.next = buildPaginationUrl(pageUrl, currentPage + 1);
   }
 
-  if (currentPage > 1 && !hasExplicitIndexRobots(toStringValue(seoData.robots))) {
+  if (currentPage > 1) {
     seoData.robots = 'noindex, follow';
   }
 
-  if (shouldNoindexThinArchives() && productCount < thinArchiveThreshold()) {
+  if (allowThinArchiveNoindex && shouldNoindexThinArchives() && productCount < thinArchiveThreshold()) {
     seoData.robots = 'noindex, follow';
   }
 

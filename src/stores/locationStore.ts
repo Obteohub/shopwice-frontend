@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { createSafeLocalStorage } from './persistStorage';
 
 interface LocationState {
     selectedLocation: {
@@ -17,6 +18,7 @@ export const useLocationStore = create<LocationState>()(
         }),
         {
             name: 'location-storage',
+            storage: createSafeLocalStorage<LocationState>(),
         }
     )
 );

@@ -3,7 +3,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSearchSuggestions } from '@/hooks/useSearchSuggestions';
 import { paddedPrice } from '../../utils/functions/functions';
-import { getSlugFromUrl } from '@/utils/functions/productUtils';
+import { firstValidImageUrl, toSizedImageUrl } from '@/utils/image';
+
+const extractSlugFromUrl = (value: unknown) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const withoutQuery = raw.split('?')[0];
+  const clean = withoutQuery.replace(/^https?:\/\/[^/]+/i, '').split('/').filter(Boolean);
+  const productIndex = clean.findIndex((entry) => entry.toLowerCase() === 'product');
+  if (productIndex >= 0 && clean[productIndex + 1]) return clean[productIndex + 1];
+  return clean[clean.length - 1] || '';
+};
 
 const MobileNativeSearch = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,29 +91,70 @@ const MobileNativeSearch = () => {
 
           {!loading && !error && results.length > 0 && (
             <ul className="divide-y divide-gray-50 max-h-[400px] overflow-y-auto">
-              {results.map((product: any, index: number) => {
-                const sold = Number(product.unitsSold ?? product.units_sold ?? 0);
-                const productKey = product.id ?? product.databaseId ?? product.slug ?? `${product.name}-${index}`;
-                const href = product?.slug ? `/product/${getSlugFromUrl(product.slug)}` : '#';
+              {results.map((item: any, index: number) => {
+                const source = item?.product && typeof item.product === 'object' ? item.product : item;
+                const sold = Number(source?.unitsSold ?? source?.units_sold ?? 0);
+                const rawHref = String(
+                  source?.url || source?.href || source?.link || source?.permalink || source?.productUrl || '',
+                ).trim();
+                const slug = String(source?.slug || '').trim() || extractSlugFromUrl(rawHref);
+                const href = rawHref || (slug ? `/product/${slug}/` : '');
+                if (!href) return null;
+                const productKey = source?.id ?? source?.variationId ?? source?.productId ?? source?.slug ?? `${source?.name || 'item'}-${index}`;
                 return (
                   <li key={productKey}>
                     <Link href={href} onClick={() => setIsFocused(false)}>
                       <div className="flex items-center gap-4 p-3 hover:bg-gray-50 transition-colors">
+                        {(() => {
+                          const imageUrl = firstValidImageUrl(
+                            source?.image,
+                            source?.image?.sourceUrl,
+                            source?.image?.src,
+                            source?.image?.url,
+                            source?.thumbnail,
+                            source?.thumbnailUrl,
+                            source?.images?.[0],
+                            source?.images?.[0]?.sourceUrl,
+                            source?.images?.[0]?.src,
+                            source?.images?.[0]?.url,
+                          );
+                          return imageUrl ? (
+                            <img
+                              src={toSizedImageUrl(imageUrl, 80)}
+                              alt={source?.title || source?.name || 'Product'}
+                              className="h-10 w-10 rounded object-cover border border-gray-100"
+                              width="40"
+                              height="40"
+                              loading="lazy"
+                              decoding="async"
+                              onError={(event) => {
+                                event.currentTarget.src = '/product-placeholder.svg';
+                              }}
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded bg-gray-100 border border-gray-100" />
+                          );
+                        })()}
                         <div className="flex flex-col">
-                          <span className="font-medium text-sm text-gray-900 line-clamp-1">{product.name}</span>
+                          <span className="font-medium text-sm text-gray-900 line-clamp-1">{source?.title || source?.name}</span>
+                          {(source?.variantLabel || source?.variant_label) && (
+                            <span className="text-[11px] text-gray-500 line-clamp-1">
+                              {source?.variantLabel || source?.variant_label}
+                            </span>
+                          )}
                           <div className="flex items-center gap-2">
-                            {product.onSale ? (
+                            {source?.onSale ? (
                               <>
                                 <span className="text-xs font-bold text-red-600">
-                                  {paddedPrice(product.salePrice ?? product.price ?? '', 'GHS ')}
+                                  {paddedPrice(source?.salePrice ?? source?.price ?? '', 'GHS ')}
                                 </span>
                                 <span className="text-[10px] text-gray-400 line-through">
-                                  {paddedPrice(product.regularPrice ?? '', 'GHS ')}
+                                  {paddedPrice(source?.regularPrice ?? '', 'GHS ')}
                                 </span>
                               </>
                             ) : (
                               <span className="text-xs font-bold text-gray-900">
-                                {paddedPrice(product.price ?? '', 'GHS ')}
+                                {paddedPrice(source?.price ?? '', 'GHS ')}
                               </span>
                             )}
                             {sold > 0 && (

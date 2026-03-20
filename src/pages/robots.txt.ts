@@ -6,13 +6,21 @@ const RobotsTxt = () => null;
 
 export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   const siteUrl = trimTrailingSlash(process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com');
+  const shouldForceNoindex =
+    String(process.env.NEXT_PUBLIC_SITE_NOINDEX || '').toLowerCase() === 'true';
 
-  const robotsBody = [
-    'User-agent: *',
-    'Allow: /',
-    '# If WordPress backend paths share this same domain, disallow only those backend paths there.',
-    `Sitemap: ${siteUrl}/sitemap.xml`,
-  ].join('\n');
+  const robotsBody = shouldForceNoindex
+    ? [
+        'User-agent: *',
+        'Disallow: /',
+        '# Staging host: indexing is disabled at both robots.txt and X-Robots-Tag/meta levels.',
+      ].join('\n')
+    : [
+        'User-agent: *',
+        'Allow: /',
+        '# If WordPress backend paths share this same domain, disallow only those backend paths there.',
+        `Sitemap: ${siteUrl}/sitemap.xml`,
+      ].join('\n');
 
   res.statusCode = 200;
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');

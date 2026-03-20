@@ -14,10 +14,12 @@ const SitemapXml = () => null;
 
 export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
   const wpBaseUrl = trimTrailingSlash(process.env.NEXT_PUBLIC_WP_API_URL || '');
+  const shouldForceNoindex =
+    String(process.env.NEXT_PUBLIC_SITE_NOINDEX || '').toLowerCase() === 'true';
   const localMobileVariationSitemap = getAbsoluteUrlFromRequest(req, '/sitemaps/mobile-phones-variants.xml');
 
-  const entries: string[] = [localMobileVariationSitemap];
-  if (wpBaseUrl) {
+  const entries: string[] = shouldForceNoindex ? [] : [localMobileVariationSitemap];
+  if (!shouldForceNoindex && wpBaseUrl) {
     entries.push(`${wpBaseUrl}/sitemap_index.xml`);
   }
 

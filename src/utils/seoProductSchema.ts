@@ -1,4 +1,5 @@
 const toStringValue = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+const CMS_SCHEMA_HOSTS = new Set(['cms.shopwice.com', 'www.cms.shopwice.com']);
 
 const toFiniteNumber = (value: unknown): number | undefined => {
   if (typeof value === 'number') {
@@ -36,6 +37,53 @@ const dedupeStrings = (values: string[]) => {
     output.push(value);
   });
   return output;
+};
+
+const rewriteSchemaSiteUrl = (value: unknown, canonicalUrl: string) => {
+  const raw = toStringValue(value);
+  if (!raw || !canonicalUrl) return value;
+
+  try {
+    const parsed = new URL(raw);
+    const target = new URL(canonicalUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    const pathname = parsed.pathname || '/';
+    const isCmsHost = CMS_SCHEMA_HOSTS.has(hostname);
+    const isMediaAsset =
+      pathname.startsWith('/wp-content/') ||
+      pathname.startsWith('/wp-json/') ||
+      /\.(?:png|jpe?g|webp|avif|gif|svg|ico|pdf)$/i.test(pathname);
+
+    if (!isCmsHost || isMediaAsset) return value;
+
+    return `${target.origin}${pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return value;
+  }
+};
+
+const normalizeSchemaSiteUrls = (value: unknown, canonicalUrl: string): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeSchemaSiteUrls(entry, canonicalUrl));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const source = value as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+
+  Object.entries(source).forEach(([key, entry]) => {
+    if (key === '@id' || key === 'url') {
+      next[key] = rewriteSchemaSiteUrl(entry, canonicalUrl);
+      return;
+    }
+
+    next[key] = normalizeSchemaSiteUrls(entry, canonicalUrl);
+  });
+
+  return next;
 };
 
 const readCurrency = (product: Record<string, any>) =>
@@ -222,7 +270,7 @@ const enrichProductNode = (
   product: Record<string, any>,
   canonicalUrl: string,
 ) => {
-  const next: Record<string, any> = { ...node };
+  const next: Record<string, any> = normalizeSchemaSiteUrls(node, canonicalUrl) as Record<string, any>;
 
   const sku = toStringValue(product?.sku);
   if (!toStringValue(next.sku) && sku) next.sku = sku;
@@ -268,7 +316,7 @@ export const enrichRankMathProductSchemas = (
 
   const enriched = schemas.map((schema) => {
     if (!schema || typeof schema !== 'object') return schema;
-    const source = schema as Record<string, any>;
+    const source = normalizeSchemaSiteUrls(schema, canonicalUrl) as Record<string, any>;
 
     if (isSchemaType(source, 'Product')) {
       hasProductSchema = true;

@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useGlobalStore } from '@/stores/globalStore';
 import { api } from '@/utils/api';
 import { ENDPOINTS } from '@/utils/endpoints';
 import { decodeHtmlEntities } from '@/utils/text';
@@ -73,11 +74,6 @@ function filterCategories(list: Category[]): Category[] {
     return deduped;
 }
 
-function toParentId(value: unknown): number {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function readCache(): Category[] | null {
     if (!isBrowser()) return null;
 
@@ -122,6 +118,8 @@ const MegaMenu = () => {
     const [loading, setLoading] = useState<boolean>(true);
     const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
     const [mounted, setMounted] = useState<boolean>(false);
+    const storeSideMenuOpen = useGlobalStore((s) => s.sideMenuOpen);
+    const setSideMenuOpen = useGlobalStore((s) => s.setSideMenuOpen);
 
     const abortRef = useRef<AbortController | null>(null);
     const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -193,11 +191,29 @@ const MegaMenu = () => {
         };
     }, [loadCategories]);
 
-    const quickLinks = useMemo(() => {
-        const topLevel = categories.filter((cat) => toParentId(cat.parent) === 0);
-        const source = topLevel.length > 0 ? topLevel : categories;
-        return source.slice(0, 7);
-    }, [categories]);
+    // Open desktop side menu only on desktop widths when triggered globally.
+    useEffect(() => {
+        if (!storeSideMenuOpen) return;
+
+        const isDesktop = typeof window !== 'undefined'
+            && window.matchMedia('(min-width: 1024px)').matches;
+
+        if (isDesktop) {
+            setIsSideMenuOpen(true);
+            return;
+        }
+
+        // Prevent stale global mobile state from leaking into desktop menu logic.
+        setSideMenuOpen(false);
+    }, [storeSideMenuOpen, setSideMenuOpen]);
+
+    const staticLinks = [
+        { label: 'Sell on Shopwice', href: '/sell-on-shopwice' },
+        { label: 'Delivery', href: '/delivery' },
+        { label: 'Bulk Orders', href: '/bulk-orders' },
+        { label: 'Hot Deals', href: '/hot-deals' },
+        { label: 'Authentic & Guarantee', href: '/authentic-guarantee' },
+    ];
 
     const clearCloseTimer = () => {
         if (closeTimerRef.current) {
@@ -215,6 +231,7 @@ const MegaMenu = () => {
         clearCloseTimer();
         closeTimerRef.current = setTimeout(() => {
             setIsSideMenuOpen(false);
+            setSideMenuOpen(false);
             closeTimerRef.current = null;
         }, 180);
     };
@@ -223,7 +240,7 @@ const MegaMenu = () => {
 
     return (
         <div
-            className="bg-[#304bba] hidden lg:block relative z-[70]"
+            className="bg-[#045ffb] hidden lg:block relative z-[70]"
             onMouseLeave={scheduleCloseSideMenu}
         >
             <div className="w-full px-8">
@@ -231,7 +248,7 @@ const MegaMenu = () => {
                     <li className="h-full flex items-center pr-6 mr-6 border-r border-white/20">
                         <button
                             type="button"
-                            onClick={isSideMenuOpen ? () => setIsSideMenuOpen(false) : openSideMenu}
+                            onClick={isSideMenuOpen ? () => { setIsSideMenuOpen(false); setSideMenuOpen(false); } : openSideMenu}
                             onMouseEnter={openSideMenu}
                             className="flex items-center gap-2 text-white hover:text-white transition-all group py-1.5 px-3 rounded-sm hover:bg-white/10"
                             aria-haspopup="dialog"
@@ -251,14 +268,14 @@ const MegaMenu = () => {
                         </button>
                     </li>
 
-                    {quickLinks.map((category) => (
-                        <li key={String(category.id ?? category.slug)} className="h-full flex items-center mr-8 last:mr-0">
+                    {staticLinks.map((link) => (
+                        <li key={link.href} className="h-full flex items-center mr-8 last:mr-0">
                             <Link
-                                href={`/product-category/${category.slug}`}
+                                href={link.href}
                                 prefetch={false}
                                 className="text-white hover:text-white transition-colors text-sm font-medium tracking-tight py-1.5 px-3 rounded-sm hover:bg-white/10"
                             >
-                                {category.name}
+                                {link.label}
                             </Link>
                         </li>
                     ))}
@@ -267,7 +284,7 @@ const MegaMenu = () => {
 
             <DesktopSideMenu
                 isOpen={isSideMenuOpen}
-                onClose={() => setIsSideMenuOpen(false)}
+                onClose={() => { setIsSideMenuOpen(false); setSideMenuOpen(false); }}
                 onPanelEnter={openSideMenu}
                 onPanelLeave={scheduleCloseSideMenu}
                 categories={categories}

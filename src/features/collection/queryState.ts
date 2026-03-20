@@ -421,15 +421,19 @@ export const applyCollectionStatePatch = (
   options?: { resetPageOnFilterChange?: boolean },
 ): CollectionFilterState => {
   const resetPageOnFilterChange = options?.resetPageOnFilterChange !== false;
+  const hasOwn = (key: keyof CollectionFilterState) =>
+    Object.prototype.hasOwnProperty.call(patch, key);
 
   const merged: CollectionFilterState = {
     ...previous,
     ...patch,
-    brand: patch.brand ? dedupe(patch.brand) : previous.brand,
-    tag: patch.tag ? dedupe(patch.tag) : previous.tag,
-    location: patch.location ? dedupe(patch.location) : previous.location,
-    stockStatus: patch.stockStatus ? sanitizeStockStatus(patch.stockStatus) : previous.stockStatus,
-    attributes: patch.attributes || previous.attributes,
+    brand: hasOwn('brand') ? dedupe(patch.brand || []) : previous.brand,
+    tag: hasOwn('tag') ? dedupe(patch.tag || []) : previous.tag,
+    location: hasOwn('location') ? dedupe(patch.location || []) : previous.location,
+    stockStatus: hasOwn('stockStatus')
+      ? sanitizeStockStatus(patch.stockStatus || [])
+      : previous.stockStatus,
+    attributes: hasOwn('attributes') ? patch.attributes || {} : previous.attributes,
   };
 
   if (resetPageOnFilterChange && hasNonPaginationDiff(previous, merged)) {

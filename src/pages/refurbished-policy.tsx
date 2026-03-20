@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import Layout from '@/components/Layout/Layout.component';
 
 const RefurbishedPolicy = () => {
@@ -125,7 +125,7 @@ const RefurbishedPolicy = () => {
                 <ul className="list-disc pl-6 space-y-2">
                     <li>Replacement will be for the same model, storage, and refurbished condition</li>
                     <li>Replacement is subject to stock availability</li>
-                    <li>Replacement processing time may range from 3–10 business days</li>
+                    <li>Replacement processing time may range from 3â€“10 business days</li>
                     <li>Shopwice reserves the right to offer: a repair, a replacement, or a partial refund (see Section 8)</li>
                 </ul>
             )
@@ -139,7 +139,7 @@ const RefurbishedPolicy = () => {
                     <ul className="list-disc pl-6 space-y-2">
                         <li>The product is verified to be faulty on arrival</li>
                         <li>The defect was not disclosed before purchase</li>
-                        <li>A suitable replacement is not available within a reasonable period (7–10 business days)</li>
+                        <li>A suitable replacement is not available within a reasonable period (7â€“10 business days)</li>
                         <li>The product passes return inspection</li>
                     </ul>
                     <p className="text-sm border-t pt-4">Refunds are processed via the original payment method and exclude delivery, handling, and service fees, unless otherwise required by law.</p>
@@ -151,7 +151,7 @@ const RefurbishedPolicy = () => {
             title: "Partial Refunds (At Shopwice's Discretion)",
             content: (
                 <div className="space-y-4">
-                    <p>Shopwice may, at its sole discretion, offer a partial refund (70%–90% of value) for situations like:</p>
+                    <p>Shopwice may, at its sole discretion, offer a partial refund (70%â€“90% of value) for situations like:</p>
                     <ul className="list-disc pl-6 space-y-2">
                         <li>Minor cosmetic dissatisfaction</li>
                         <li>Customer preference for refund despite availability of replacement</li>
@@ -199,7 +199,7 @@ const RefurbishedPolicy = () => {
             id: 11,
             title: "Inspection & Verification Process",
             content: (
-                <p>All returned products are subject to technical inspection, condition verification, and IMEI/serial validation. The inspection period is 2–5 business days. Decisions after inspection are final.</p>
+                <p>All returned products are subject to technical inspection, condition verification, and IMEI/serial validation. The inspection period is 2â€“5 business days. Decisions after inspection are final.</p>
             )
         },
         {
@@ -251,7 +251,7 @@ const RefurbishedPolicy = () => {
                 <div className="bg-white border-b">
                     <div className="container mx-auto px-6 py-12 md:py-20 max-w-5xl">
                         <div className="text-center">
-                            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-6">Refurbished Products Policy</h1>
+                            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">Refurbished Products Policy</h1>
                             <p className="text-xl text-gray-500 max-w-3xl mx-auto leading-relaxed">
                                 Our commitment to transparency, quality, and your satisfaction when choosing premium refurbished technology.
                             </p>
@@ -350,3 +350,4 @@ const RefurbishedPolicy = () => {
 };
 
 export default RefurbishedPolicy;
+

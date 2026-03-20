@@ -6,7 +6,7 @@ import { RestCartItem } from '@/utils/cartTransformers';
 import { getSlugFromUrl } from '@/utils/functions/productUtils';
 import { formatPriceWithDecimals } from '@/utils/functions/functions';
 import QuantityControl from './QuantityControl.component';
-import { normalizeImageUrl } from '@/utils/image';
+import { toDisplayImageUrl } from '@/utils/image';
 
 interface CartItemProps {
     item: RestCartItem;
@@ -15,11 +15,90 @@ interface CartItemProps {
     loading: boolean;
 }
 
+const normalizeVariationParamKey = (rawKey?: string) => {
+    const text = String(rawKey || '').trim().toLowerCase();
+    if (!text) return '';
+
+    if (text.startsWith('attribute_pa_')) {
+        const suffix = text
+            .slice('attribute_pa_'.length)
+            .replace(/[+\s_]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        return suffix ? `attribute_pa_${suffix}` : '';
+    }
+
+    if (text.startsWith('attribute_')) {
+        const suffix = text
+            .slice('attribute_'.length)
+            .replace(/[+\s_]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        return suffix ? `attribute_${suffix}` : '';
+    }
+
+    return text
+        .replace(/[+\s]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+};
+
+const normalizeVariationParamValue = (rawValue?: string) =>
+    String(rawValue || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[+\s_]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+const buildVariationQuery = (variation?: Array<{ attribute: string; value: string }>) => {
+    if (!Array.isArray(variation) || variation.length === 0) return '';
+    const params = new URLSearchParams();
+    variation.forEach((attr) => {
+        const key = normalizeVariationParamKey(attr?.attribute);
+        const value = normalizeVariationParamValue(attr?.value);
+        if (!key || !value) return;
+        params.set(key, value);
+    });
+    const query = params.toString();
+    return query ? `?${query}` : '';
+};
+
+const toRelativeUrl = (value?: string) => {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    try {
+        const parsed = new URL(text, 'http://local.shopwice');
+        return `${parsed.pathname}${parsed.search}`;
+    } catch {
+        return '';
+    }
+};
+
 const CartItem: React.FC<CartItemProps> = ({ item, onUpdateQuantity, onRemove, loading }) => {
     const { quantity } = item;
     const lineTotal = item.totals?.line_total || item.totals?.line_subtotal || '0';
     const currencyMinorUnit = item?.totals?.currency_minor_unit ?? item?.prices?.currency_minor_unit ?? 2;
-    const imageUrl = normalizeImageUrl(item.images?.[0]?.src);
+    const imageUrl = toDisplayImageUrl(item.images?.[0]?.src);
+    const explicitSlug = String(item.slug || '').trim();
+    const permalinkSlug = getSlugFromUrl(item.permalink || '');
+    // Prefer non-numeric slug: item.slug is sometimes just the numeric ID
+    const isExplicitNumeric = /^\d+$/.test(explicitSlug);
+    const resolvedSlug = (explicitSlug && !isExplicitNumeric) ? explicitSlug : permalinkSlug;
+    const isNumericOnlySlug = /^\d+$/.test(resolvedSlug);
+    const numericId = Number(item.id);
+    const hasNumericId = Number.isFinite(numericId) && numericId > 0;
+    const variationQuery = buildVariationQuery(item.variation);
+    const relativePermalink = toRelativeUrl(item.permalink || '');
+    const hasUsablePermalink = /^\/product\/[^/?#]+/i.test(relativePermalink)
+        && !/^\/product\/\d+(?:[/?#]|$)/i.test(relativePermalink);
+    const productHref = hasUsablePermalink
+        ? relativePermalink
+        : resolvedSlug && !isNumericOnlySlug
+        ? `/product/${resolvedSlug}${variationQuery}`
+        : hasNumericId
+            ? `/product/${numericId}${variationQuery}`
+            : '/products';
     const variationLabel = item.variation
         ? item.variation.map((attr) => `${attr.attribute}: ${attr.value}`).join(', ')
         : '';
@@ -47,7 +126,7 @@ const CartItem: React.FC<CartItemProps> = ({ item, onUpdateQuantity, onRemove, l
             <div className="flex-grow flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex-1 min-w-0">
                     <Link
-                        href={`/product/${getSlugFromUrl(item.permalink)}`}
+                        href={productHref}
                         className="text-sm md:text-base font-medium text-gray-900 hover:text-blue-600 line-clamp-2 mb-1"
                     >
                         {item.name}

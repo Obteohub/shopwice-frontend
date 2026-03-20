@@ -1,6 +1,7 @@
 /*eslint complexity: ["error", 20]*/
 // Imports
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/router';
 
 // Components
 import Billing from './Billing.component';
@@ -46,6 +47,16 @@ const StepIndicator = ({ step }: { step: number }) => (
   </div>
 );
 
+type ShippingMethod = {
+  id: string;
+  rateId: string;
+  label: string;
+  cost?: string;
+  company?: string;
+  packageId?: number;
+  selected?: boolean;
+};
+
 const ShippingMethodStep = ({
   availableShippingMethods,
   selectedShippingRate,
@@ -54,7 +65,7 @@ const ShippingMethodStep = ({
   onNext,
   isUpdating,
 }: {
-  availableShippingMethods: Array<{ id: string; rateId: string; label: string; cost?: string; company?: string; packageId?: number }>;
+  availableShippingMethods: ShippingMethod[];
   selectedShippingRate: string;
   onSelectShippingRate: (value: string) => void;
   onBack: () => void;
@@ -83,7 +94,9 @@ const ShippingMethodStep = ({
               type="radio"
               name="shipping_method"
               value={rate.id}
+              checked={selectedShippingRate === rate.id}
               onChange={(e) => onSelectShippingRate(e.target.value)}
+              disabled={isUpdating}
               className="w-3 h-3 text-blue-600 border-gray-300 focus:ring-blue-500"
             />
             <div className="ml-2 flex-grow">
@@ -166,7 +179,14 @@ const PaymentStep = ({
               <p className="mt-0.5 text-[10px] text-gray-600">{gateway.description}</p>
             </div>
             {gateway.icon && (
-              <img src={gateway.icon} alt={gateway.title} className="h-4 object-contain" />
+              <img
+                src={gateway.icon}
+                alt={gateway.title}
+                className="h-4 object-contain"
+                onError={(event) => {
+                  event.currentTarget.src = '/icons/icon-192x192.png';
+                }}
+              />
             )}
           </label>
         ))
@@ -211,8 +231,12 @@ const mapRateToMethod = (rate: any, packageId: number) => {
     cost: String(rate?.price ?? rate?.cost ?? rate?.price_amount ?? ''),
     company: String(rate?.method_id ?? rate?.method_title ?? ''),
     packageId,
+    selected: Boolean(rate?.selected ?? rate?.chosen ?? rate?.is_selected),
   };
 };
+
+const getSelectedShippingMethodId = (methods: ShippingMethod[]) =>
+  methods.find((method) => method.selected)?.id || '';
 
 const extractShippingMethods = (rawShipping: any) => {
   if (!rawShipping) return [];
@@ -231,36 +255,82 @@ const extractShippingMethods = (rawShipping: any) => {
     return rates
       .map((rate: any) => mapRateToMethod(rate, packageId))
       .filter(Boolean);
-  }) as Array<{ id: string; rateId: string; label: string; cost?: string; company?: string; packageId?: number }>;
+  }) as ShippingMethod[];
 };
 
+// eslint-disable-next-line complexity
 const normalizeGateway = (gateway: any) => {
   if (typeof gateway === 'string') {
     const id = gateway.trim();
     if (!id) return null;
-    const title = id
-      .replace(/[_-]+/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+    const customMap: Record<string, any> = {
+      cod: {
+        title: "Cash on Delivery",
+        description: "Pay when your item is delivered.",
+        icon: "/icons/cod.png",
+      },
+      bacs: {
+        title: "Pay Using Bank Account",
+        description: "Make direct transfer to our bank account.",
+        icon: "/icons/bank.png",
+      },
+      cheque: {
+        title: "Pay With Clear Cheque",
+        description: "Order is processed after cheque clearance.",
+        icon: "/icons/cheque.png",
+      },
+      paystack: {
+        title: "Pay With Paystack",
+        description: "Pay with Card or mobile money online.",
+        icon: "/icons/paystack.png",
+      },
+    };
+
     return {
       id,
-      title,
-      description: '',
-      icon: '',
+      title: customMap[id]?.title || id,
+      description: customMap[id]?.description || '',
+      icon: customMap[id]?.icon || '',
     };
   }
 
   if (!gateway || typeof gateway !== 'object') return null;
+
   const id = String(gateway.id ?? gateway.method_id ?? '').trim();
   if (!id) return null;
+
+  const customMap: Record<string, any> = {
+    cod: {
+      title: "Cash on Delivery",
+      description: "Pay when your item is delivered.",
+      icon: "/icons/cod.png",
+    },
+    bacs: {
+      title: "Pay Using Bank Account",
+      description: "Make direct transfer to our bank account.",
+      icon: "/icons/bank.png",
+    },
+    cheque: {
+      title: "Pay With Clear Cheque",
+      description: "Order is processed after cheque clearance.",
+      icon: "/icons/cheque.png",
+    },
+    paystack: {
+      title: "Pay With Paystack",
+      description: "Pay with MoMo or Payment Card.",
+      icon: "/icons/paystack.png",
+    },
+  };
+
   return {
     ...gateway,
     id,
-    title: String(gateway.title ?? gateway.method_title ?? gateway.name ?? id),
-    description: String(gateway.description ?? ''),
-    icon: gateway.icon ?? gateway.image ?? '',
+    title: customMap[id]?.title || String(gateway.title ?? gateway.method_title ?? gateway.name ?? id),
+    description: customMap[id]?.description || String(gateway.description ?? ''),
+    icon: customMap[id]?.icon || gateway.icon || gateway.image || '',
   };
 };
-
 const normalizeGateways = (payload: any) => {
   const list = Array.isArray(payload)
     ? payload
@@ -310,13 +380,62 @@ const OrderCompleteState = ({ orderNumber }: { orderNumber?: string | number }) 
   </div>
 );
 
+const getOrderKeyFromResponse = (response: any, redirectUrl?: string) => {
+  const directKey = String(response?.order_key ?? response?.payment_result?.order_key ?? '').trim();
+  if (directKey) return directKey;
+  if (!redirectUrl) return '';
+
+  try {
+    const parsed = new URL(redirectUrl);
+    return String(parsed.searchParams.get('key') || '').trim();
+  } catch {
+    const match = String(redirectUrl).match(/[?&]key=([^&]+)/);
+    return match?.[1] ? decodeURIComponent(match[1]) : '';
+  }
+};
+
+/* eslint-disable complexity */
+const buildPendingOrderSnapshot = (
+  response: any,
+  cartData: any,
+  orderData: ICheckoutDataProps | null,
+  orderId: string | number,
+  orderKey: string,
+) => {
+  const cartItems = Array.isArray(cartData?.items) ? cartData.items : [];
+
+  return {
+    order_id: orderId ?? '',
+    order_key: orderKey,
+    order_number: response?.order_number ?? orderId ?? '',
+    total: String(cartData?.totals?.total_price ?? response?.total ?? ''),
+    currency: String(cartData?.totals?.currency_symbol ?? response?.currency ?? 'GHS'),
+    status: String(response?.status ?? 'pending'),
+    date_created: response?.date_created ?? new Date().toISOString(),
+    billing: {
+      first_name: orderData?.firstName ?? response?.billing_address?.first_name ?? '',
+    },
+    line_items: cartItems
+      .map((item: any) => ({
+        product_id: item?.id ?? item?.product_id ?? item?.productId,
+        name: String(item?.name ?? ''),
+        quantity: Number(item?.quantity ?? item?.qty ?? 1) || 1,
+        total: String(
+          item?.totals?.line_total ??
+          item?.totals?.line_subtotal ??
+          item?.prices?.price ??
+          '',
+        ),
+      }))
+      .filter((item: { name: string }) => item.name),
+  };
+};
+/* eslint-enable complexity */
+
 const CheckoutForm = () => {
+  const router = useRouter();
   const { cart: storeCart, clearWooCommerceSession, syncWithWooCommerce } = useCartStore();
   const debugCheckout = process.env.NEXT_PUBLIC_DEBUG_CHECKOUT === 'true';
-  const initialCachedCart = useMemo(
-    () => getCachedCartResponse(5 * 60 * 1000, { view: 'full', includeShippingRates: true }),
-    [],
-  );
   const [orderData, setOrderData] = useState<ICheckoutDataProps | null>(null);
   const [requestError, setRequestError] = useState<any>(null);
   const [orderCompleted, setOrderCompleted] = useState<boolean>(false);
@@ -327,8 +446,9 @@ const CheckoutForm = () => {
   const [checkoutLoading, setCheckoutLoading] = useState<boolean>(false);
 
   const [availableGateways, setAvailableGateways] = useState<any[]>([]);
-  const [cartData, setCartData] = useState<any>(initialCachedCart);
-  const [loading, setLoading] = useState<boolean>(!initialCachedCart);
+  const [cartData, setCartData] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [lastAppliedShippingRate, setLastAppliedShippingRate] = useState<string>('');
 
   // Checkout Steps: 1: Address, 2: Shipping, 3: Payment
   const [step, setStep] = useState<number>(1);
@@ -361,11 +481,6 @@ const CheckoutForm = () => {
     return true;
   }, []);
 
-  useEffect(() => {
-    if (!initialCachedCart) return;
-    syncWithWooCommerce(transformCartResponse(initialCachedCart));
-  }, [initialCachedCart, syncWithWooCommerce]);
-
   const loadPaymentMethods = useCallback(
     async ({ preserveSelection = true }: { preserveSelection?: boolean } = {}) => {
       const payload: any = await api.get(ENDPOINTS.PAYMENT_METHODS);
@@ -389,15 +504,28 @@ const CheckoutForm = () => {
   // Load cart and payment gateways
   useEffect(() => {
     const loadCartAndGateways = async () => {
-      if (!initialCachedCart) {
+      const cachedCart = getCachedCartResponse(5 * 60 * 1000, {
+        view: 'full',
+        includeShippingRates: true,
+      });
+
+      if (cachedCart) {
+        setCartData(cachedCart);
+        syncWithWooCommerce(transformCartResponse(cachedCart));
+        setLoading(false);
+      } else {
         setLoading(true);
       }
+
       try {
+        // Fire both fetches in parallel — payment methods is already in-flight
+        // while we wait for the cart, so if cart lacks gateways there's no extra wait.
         const cartPromise = getCartFast({
           maxAgeMs: 15000,
           view: 'full',
           includeShippingRates: true,
         });
+        const paymentPromise = api.get(ENDPOINTS.PAYMENT_METHODS).catch(() => null);
 
         const cart: any = await cartPromise;
         const normalizedCart = applyCartState(cart);
@@ -408,10 +536,18 @@ const CheckoutForm = () => {
 
         setLoading(false);
         // Prefer payment methods already in the cart (saves a round-trip).
-        // Fall back to dedicated fetch if cart didn't include them.
+        // Fall back to the already-in-flight fetch if cart didn't include them.
         const hadGateways = applyGatewaysFromCart(cart);
         if (!hadGateways) {
-          await loadPaymentMethods({ preserveSelection: true });
+          const paymentPayload = await paymentPromise;
+          if (paymentPayload) {
+            const gateways = normalizeGateways(paymentPayload);
+            setAvailableGateways(gateways);
+            setSelectedPaymentMethod((prev) => {
+              const ids = gateways.map((g: any) => g.id);
+              return (prev && ids.includes(prev)) ? prev : getDefaultPaymentMethodId(gateways);
+            });
+          }
         }
       } catch (error: any) {
         console.error('[Checkout] Error loading data:', error);
@@ -421,7 +557,7 @@ const CheckoutForm = () => {
     };
 
     loadCartAndGateways();
-  }, [applyCartState, applyGatewaysFromCart, debugCheckout, initialCachedCart, loadPaymentMethods]);
+  }, [applyCartState, applyGatewaysFromCart, debugCheckout, loadPaymentMethods, syncWithWooCommerce]);
 
   const refetchCart = async () => {
     try {
@@ -436,6 +572,36 @@ const CheckoutForm = () => {
       console.error('[Checkout] Error refetching cart:', error);
     }
   };
+
+  const applyShippingSelection = useCallback(async (selectionId: string) => {
+    const selectedMethod = extractShippingMethods(cartData?.shipping_rates).find(
+      (method) => method.id === selectionId,
+    );
+    if (!selectedMethod) return false;
+
+    setIsUpdatingShipping(true);
+    setRequestError(null);
+
+    try {
+      const packageId = Number.isFinite(Number(selectedMethod.packageId)) ? Number(selectedMethod.packageId) : 0;
+      const rateIdToUse = String(selectedMethod.rateId || '').trim() || String(selectionId || '').trim();
+
+      const response: any = await api.post(ENDPOINTS.CART_SHIPPING, {
+        package_id: packageId,
+        rate_id: rateIdToUse,
+      });
+
+      applyCartState(response);
+      setLastAppliedShippingRate(selectionId);
+      return true;
+    } catch (error: any) {
+      console.error('[Checkout] Shipping update failed:', error);
+      setRequestError(error.message || 'Failed to update shipping method.');
+      return false;
+    } finally {
+      setIsUpdatingShipping(false);
+    }
+  }, [applyCartState, cartData?.shipping_rates]);
 
   // Step 1 Handler: Address Submission
   const handleAddressSubmit = async (submitData: ICheckoutDataProps) => {
@@ -498,44 +664,8 @@ const CheckoutForm = () => {
     }
   };
 
-  // Step 2 Handler: Shipping Selection
-  const handleShippingSubmit = async () => {
-    if (!selectedShippingRate) return;
-
-    setIsUpdatingShipping(true);
-    try {
-      const selectedMethod = availableShippingMethods.find((m) => m.id === selectedShippingRate);
-      const packageId = Number.isFinite(Number(selectedMethod?.packageId)) ? Number(selectedMethod?.packageId) : 0;
-      const rateIdToUse = String(selectedMethod?.rateId || '').trim() || String(selectedShippingRate || '').trim();
-
-      const response: any = await api.post(ENDPOINTS.CART_SHIPPING, {
-        package_id: packageId,
-        rate_id: rateIdToUse,
-      });
-
-      const nextCart = applyCartState(response);
-
-      // Apply gateways from the cart response already in hand — no extra fetch.
-      const hadGateways = applyGatewaysFromCart(response);
-
-      // Fire background refreshes in parallel — don't block the step change.
-      if (!nextCart) {
-        refetchCart().catch(console.error);
-      }
-      if (!hadGateways) {
-        loadPaymentMethods({ preserveSelection: false }).catch(console.error);
-      }
-
-      setStep(3);
-    } catch (error: any) {
-      console.error('[Checkout] Shipping update failed:', error);
-      setRequestError(error.message || 'Failed to update shipping method.');
-    } finally {
-      setIsUpdatingShipping(false);
-    }
-  };
-
   // Step 3 Handler: Final Order Placement
+  // eslint-disable-next-line complexity
   const handlePaymentSubmit = async () => {
     if (!orderData) return;
 
@@ -567,29 +697,59 @@ const CheckoutForm = () => {
 
       // Extract order ID from the response (WooCommerce Store API field)
       const orderId = response?.order_id ?? response?.id;
+      const redirectUrl = String(response?.payment_result?.redirect_url ?? '').trim();
+      const orderKey = getOrderKeyFromResponse(response, redirectUrl);
 
-      if (response?.payment_result?.redirect_url) {
-        const redirectUrl: string = response.payment_result.redirect_url;
+      try {
+        sessionStorage.setItem(
+          'sw_pending_order',
+          JSON.stringify(buildPendingOrderSnapshot(response, cartData, orderData, orderId ?? '', orderKey)),
+        );
+      } catch {
+        // sessionStorage unavailable — /order-received will fetch from API directly
+      }
 
-        // If the redirect points to our own WooCommerce backend (the /order-received/ page),
-        // intercept it and show a frontend confirmation instead of sending the user to
-        // the raw WooCommerce site.
-        const wooSiteUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/+$/, '');
-        const isWooBackendRedirect = wooSiteUrl && redirectUrl.startsWith(wooSiteUrl);
+      if (redirectUrl) {
+
+        // WooCommerce order-received URLs always contain /order-received/ — intercept
+        // them regardless of which backend domain they originate from and show the
+        // frontend confirmation screen instead.
+        const isWooBackendRedirect = /\/order-received\//.test(redirectUrl);
 
         if (isWooBackendRedirect) {
-          // Parse order number from URL in case order_id was not in the response body
           const urlOrderMatch = redirectUrl.match(/order-received\/(\d+)/);
           const resolvedOrderId = orderId ?? (urlOrderMatch ? urlOrderMatch[1] : undefined);
           clearWooCommerceSession();
           clearCartResponseCache();
+          if (resolvedOrderId && orderKey) {
+            await router.push(
+              `/order-received?order_id=${encodeURIComponent(String(resolvedOrderId))}&order_key=${encodeURIComponent(orderKey)}`,
+            );
+            return;
+          }
           if (resolvedOrderId) setOrderNumber(resolvedOrderId);
           setOrderCompleted(true);
           return;
         }
 
-        // External payment gateway (e.g. mobile money) — follow the redirect so the
-        // customer can complete payment on the provider's site.
+        // External payment gateway (e.g. Paystack / mobile money).
+        // Persist a minimal order snapshot so the /order-received page can render
+        // immediately when the gateway redirects the customer back to the frontend.
+        try {
+          const orderKey = response?.order_key ?? response?.payment_result?.order_key ?? '';
+          sessionStorage.setItem('sw_pending_order', JSON.stringify({
+            order_id: orderId ?? '',
+            order_key: orderKey,
+            order_number: response?.order_number ?? orderId ?? '',
+            total: cartData?.totals?.total_price ?? '',
+            currency: cartData?.totals?.currency_symbol ?? 'GH₵',
+          }));
+        } catch {
+          // sessionStorage unavailable — /order-received will fetch from API directly
+        }
+
+        clearWooCommerceSession();
+        clearCartResponseCache();
         window.location.href = redirectUrl;
         return;
       }
@@ -597,6 +757,12 @@ const CheckoutForm = () => {
       // No redirect — order is complete (typical for COD / direct bank transfer)
       clearWooCommerceSession();
       clearCartResponseCache();
+      if (orderId && orderKey) {
+        await router.push(
+          `/order-received?order_id=${encodeURIComponent(String(orderId))}&order_key=${encodeURIComponent(orderKey)}`,
+        );
+        return;
+      }
       if (orderId) setOrderNumber(orderId);
       setOrderCompleted(true);
     } catch (error: any) {
@@ -611,9 +777,56 @@ const CheckoutForm = () => {
     [cartData?.shipping_rates],
   );
 
+  const handleShippingRateSelect = useCallback((value: string) => {
+    setSelectedShippingRate(value);
+
+    const selectedMethod = availableShippingMethods.find((method) => method.id === value);
+    if (!selectedMethod) return;
+
+    // Instantly update the order review totals using the rate's known cost.
+    // No API call is made here — shipping is applied once, when the user clicks "Next".
+    const newShippingCost = selectedMethod.cost || '0';
+    setCartData((prev: any) => {
+      if (!prev?.totals) return prev;
+      const diff = Number(newShippingCost) - Number(prev.totals.total_shipping || '0');
+      return {
+        ...prev,
+        totals: {
+          ...prev.totals,
+          total_shipping: newShippingCost,
+          total_price: String(Number(prev.totals.total_price || '0') + diff),
+        },
+      };
+    });
+  }, [availableShippingMethods]);
+
+  const handleShippingStepNext = useCallback(async () => {
+    if (!selectedShippingRate) return;
+
+    setStep(3);
+
+    if (selectedShippingRate !== lastAppliedShippingRate) {
+      applyShippingSelection(selectedShippingRate).catch(console.error);
+    }
+  }, [applyShippingSelection, lastAppliedShippingRate, selectedShippingRate]);
+
+  useEffect(() => {
+    const selectedMethodId = getSelectedShippingMethodId(availableShippingMethods);
+    if (selectedMethodId) {
+      setSelectedShippingRate(selectedMethodId);
+      // Do NOT set lastAppliedShippingRate here. A rate appearing "selected" in
+      // the cart response means WooCommerce calculated a default — it is not
+      // explicitly committed in the session until applyShippingSelection calls
+      // POST /cart/select-shipping-rate. Marking it applied here causes
+      // handleShippingStepNext to skip that call, POST /checkout then fails with
+      // "requires a shipping option", and the slow fallback order path fires.
+    }
+  }, [availableShippingMethods]);
+
   useEffect(() => {
     if (availableShippingMethods.length === 0) {
       if (selectedShippingRate) setSelectedShippingRate('');
+      if (lastAppliedShippingRate) setLastAppliedShippingRate('');
       return;
     }
 
@@ -621,7 +834,7 @@ const CheckoutForm = () => {
     if (!hasCurrentSelection) {
       setSelectedShippingRate(availableShippingMethods[0].id);
     }
-  }, [availableShippingMethods, selectedShippingRate]);
+  }, [availableShippingMethods, lastAppliedShippingRate, selectedShippingRate]);
 
   // Get Location from Store
   const { selectedLocation } = useLocationStore();
@@ -646,6 +859,12 @@ const CheckoutForm = () => {
             </div>
           )}
 
+          <div className="bg-amber-50 border border-amber-300 text-amber-800 rounded px-3 py-2 mb-3 text-xs leading-relaxed">
+            <p>Please place orders only when you are genuinely ready to receive and pay for your items. Orders that are placed without the intention to complete the purchase cause unnecessary inconvenience to our team and delivery partners.</p>
+            <p className="mt-1">Kindly note that customers who repeatedly place such orders may be <strong>restricted or blacklisted</strong> from using Shopwice in the future.</p>
+            <p className="mt-1">We appreciate your cooperation and understanding.</p>
+          </div>
+
           <div className="flex flex-col-reverse lg:flex-row gap-2">
             <div className="flex-grow lg:w-2/3">
               <StepIndicator step={step} />
@@ -664,9 +883,9 @@ const CheckoutForm = () => {
                 <ShippingMethodStep
                   availableShippingMethods={availableShippingMethods}
                   selectedShippingRate={selectedShippingRate}
-                  onSelectShippingRate={setSelectedShippingRate}
+                  onSelectShippingRate={handleShippingRateSelect}
                   onBack={() => setStep(1)}
-                  onNext={handleShippingSubmit}
+                  onNext={handleShippingStepNext}
                   isUpdating={isUpdatingShipping}
                 />
               )}
@@ -678,7 +897,7 @@ const CheckoutForm = () => {
                   onBack={() => setStep(2)}
                   onSubmit={handlePaymentSubmit}
                   isLoading={checkoutLoading}
-                  canSubmit={availableGateways.length > 0 && !!selectedPaymentMethod}
+                  canSubmit={availableGateways.length > 0 && !!selectedPaymentMethod && !isUpdatingShipping}
                 />
               )}
             </div>

@@ -1,22 +1,4 @@
-const pushDataLayerEvent = (eventName: string, payload: Record<string, unknown>) => {
-  if (typeof window === 'undefined') return;
-
-  const body = {
-    event: eventName,
-    ...payload,
-    timestamp: Date.now(),
-  };
-
-  const win = window as typeof window & {
-    dataLayer?: Array<Record<string, unknown>>;
-  };
-
-  if (!Array.isArray(win.dataLayer)) {
-    win.dataLayer = [];
-  }
-
-  win.dataLayer.push(body);
-};
+import { pushDataLayerEvent } from '@/utils/tagManager';
 
 export const trackFilterApplied = (payload: Record<string, unknown>) =>
   pushDataLayerEvent('filter_applied', payload);

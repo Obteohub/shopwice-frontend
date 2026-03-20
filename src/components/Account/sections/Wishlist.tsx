@@ -8,12 +8,12 @@ import Button from '../../UI/Button.component';
 import LoadingSpinner from '../../LoadingSpinner/LoadingSpinner.component';
 import { useCartStore } from '@/stores/cartStore';
 import { getSlugFromUrl } from '@/utils/functions/productUtils';
-import { normalizeImageUrl } from '@/utils/image';
+import { toDisplayImageUrl } from '@/utils/image';
 
 const WishlistCard = ({ product, onRemove }: { product: any; onRemove: (id: number) => void }) => {
     const [isAdding, setIsAdding] = useState(false);
     const updateCart = useCartStore(state => state.updateCart);
-    const productImageUrl = normalizeImageUrl(product.image?.src);
+    const productImageUrl = toDisplayImageUrl(product.image?.src);
 
     const handleAddToCart = async () => {
         setIsAdding(true);
@@ -21,6 +21,8 @@ const WishlistCard = ({ product, onRemove }: { product: any; onRemove: (id: numb
             const res: any = await api.post('/api/cart/add', {
                 id: product.id,
                 quantity: 1
+            }, {
+                params: { view: 'mini' },
             });
             if (res && res.cart) {
                 updateCart(res.cart);

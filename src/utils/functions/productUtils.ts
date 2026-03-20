@@ -43,6 +43,31 @@ export const parsePrice = (price?: string | number | null): number => {
  */
 export const getSlugFromUrl = (url?: string | null): string => {
   if (!url) return '';
-  const parts = String(url).split('/').filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : '';
+
+  const raw = String(url).trim();
+  if (!raw) return '';
+
+  const safeDecode = (value: string) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+
+  const withoutHash = raw.split('#')[0];
+  const withoutQuery = withoutHash.split('?')[0];
+  const withoutOrigin = withoutQuery.replace(/^https?:\/\/[^/]+/i, '');
+  const segments = withoutOrigin
+    .split('/')
+    .map((segment) => safeDecode(segment).trim())
+    .filter(Boolean);
+
+  if (!segments.length) return '';
+
+  // Always use the last path segment — WooCommerce places the product slug last
+  // regardless of permalink structure (e.g. /product/slug/ or /product/category/slug/).
+  const candidate = segments[segments.length - 1];
+
+  return candidate.replace(/\/+$/g, '').trim();
 };

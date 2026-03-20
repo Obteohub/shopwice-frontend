@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { paddedPrice } from '@/utils/functions/functions';
 import StarRating from '../UI/StarRating.component';
 import { ProductCategory } from '@/types/product';
+import { firstDisplayImageUrl } from '@/utils/image';
 
 interface ProductCardProps {
   databaseId?: number;
@@ -16,13 +18,21 @@ interface ProductCardProps {
   url?: string;
   type?: string;
   variantLabel?: string;
-  image?: { sourceUrl?: string | null } | null;
+  image?:
+    | { sourceUrl?: string | null; src?: string | null; url?: string | null }
+    | string
+    | null;
+  images?:
+    | Array<
+      | { sourceUrl?: string | null; src?: string | null; url?: string | null }
+      | string
+      | null
+    >
+    | null;
+  thumbnail?: string | null;
   averageRating?: number;
   productCategories?: { nodes?: ProductCategory[] | null };
-  attributes?:
-    | { nodes?: Array<{ name: string; options?: string[] | null }> | null }
-    | Array<{ name: string; options?: string[] | null }>
-    | null;
+  attributes?: Array<{ name: string; options?: string[] | null }> | null;
   stockQuantity?: number | null;
   reviewCount?: number;
 }
@@ -50,14 +60,65 @@ const hasRefurbishKeyword = (value?: any) => {
     strVal.toLowerCase().includes('renewed');
 };
 
-const ProductImage = ({ image, name }: { image?: { sourceUrl?: string | null } | null; name?: string }) => {
-  const imgSrc = image?.sourceUrl;
-  return imgSrc ? (
-    <img
-      src={imgSrc}
+const ProductImage = ({
+  image,
+  images,
+  thumbnail,
+  name,
+}: {
+  image?:
+    | { sourceUrl?: string | null; src?: string | null; url?: string | null }
+    | string
+    | null;
+  images?:
+    | Array<
+      | { sourceUrl?: string | null; src?: string | null; url?: string | null }
+      | string
+      | null
+    >
+    | null;
+  thumbnail?: string | null;
+  name?: string;
+}) => {
+  const firstGalleryImage = Array.isArray(images) ? images[0] : null;
+  const imageFromString = typeof image === 'string' ? image : '';
+  const firstGalleryString = typeof firstGalleryImage === 'string' ? firstGalleryImage : '';
+  const primarySrc = firstDisplayImageUrl(
+    imageFromString,
+    typeof image === 'object' ? image?.sourceUrl : '',
+    typeof image === 'object' ? image?.src : '',
+    typeof image === 'object' ? image?.url : '',
+    typeof image === 'object' ? (image as any)?.source_url : '',
+    typeof image === 'object' ? (image as any)?.node?.sourceUrl : '',
+    typeof image === 'object' ? (image as any)?.node?.src : '',
+    typeof image === 'object' ? (image as any)?.node?.url : '',
+    thumbnail,
+    firstGalleryString,
+    typeof firstGalleryImage === 'object' ? firstGalleryImage?.sourceUrl : '',
+    typeof firstGalleryImage === 'object' ? firstGalleryImage?.src : '',
+    typeof firstGalleryImage === 'object' ? firstGalleryImage?.url : '',
+    typeof firstGalleryImage === 'object' ? (firstGalleryImage as any)?.source_url : '',
+    typeof firstGalleryImage === 'object' ? (firstGalleryImage as any)?.node?.sourceUrl : '',
+    typeof firstGalleryImage === 'object' ? (firstGalleryImage as any)?.node?.src : '',
+    typeof firstGalleryImage === 'object' ? (firstGalleryImage as any)?.node?.url : '',
+  );
+  const [currentSrc, setCurrentSrc] = useState(primarySrc);
+  useEffect(() => {
+    setCurrentSrc(primarySrc);
+  }, [primarySrc]);
+
+  return currentSrc ? (
+    <Image
+      src={currentSrc}
       alt={name || 'Product image'}
+      fill
+      sizes="(max-width: 767px) 50vw, (max-width: 1279px) 33vw, 277px"
       loading="lazy"
-      decoding="async"
+      onError={() => {
+        if (currentSrc !== '/product-placeholder.svg') {
+          setCurrentSrc('/product-placeholder.svg');
+        }
+      }}
       className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-110"
     />
   ) : (
@@ -81,6 +142,8 @@ const ProductCard = (props: ProductCardProps) => {
     type,
     variantLabel,
     image,
+    images,
+    thumbnail,
     averageRating = 0,
     attributes,
     stockQuantity,
@@ -112,8 +175,7 @@ const ProductCard = (props: ProductCardProps) => {
 
   const attributeList = useMemo(() => {
     if (!attributes) return [];
-    if (Array.isArray(attributes)) return attributes;
-    return attributes.nodes ?? [];
+    return attributes;
   }, [attributes]);
 
   const isRefurbished = useMemo(() => {
@@ -152,7 +214,7 @@ const ProductCard = (props: ProductCardProps) => {
 
   const renderInfo = () => (
     <>
-      <p className="text-sm leading-tight min-h-[34px] line-clamp-2 text-gray-800 group-hover:text-blue-700 transition-colors">
+      <p className="text-sm leading-tight min-h-[34px] line-clamp-2 text-gray-800">
         {name}
       </p>
 
@@ -160,7 +222,7 @@ const ProductCard = (props: ProductCardProps) => {
         <StarRating rating={averageRating} size={14} />
         {!!reviewCount && (
           <span className="text-xs text-gray-500">
-            ({reviewCount})
+            {reviewCount} reviews
           </span>
         )}
       </div>
@@ -178,13 +240,14 @@ const ProductCard = (props: ProductCardProps) => {
         {href ? (
           <Link
             href={href}
+            prefetch={false}
             aria-label={`View product ${name}`}
             className="block w-full h-full"
           >
-            <ProductImage image={image} name={name} />
+            <ProductImage image={image} images={images} thumbnail={thumbnail} name={name} />
           </Link>
         ) : (
-          <ProductImage image={image} name={name} />
+          <ProductImage image={image} images={images} thumbnail={thumbnail} name={name} />
         )}
 
         {/* BADGES */}
@@ -211,7 +274,7 @@ const ProductCard = (props: ProductCardProps) => {
       <div className="flex flex-col flex-grow mt-2 px-1 pb-2">
 
         {href ? (
-          <Link href={href}>
+          <Link href={href} prefetch={false}>
             {renderInfo()}
           </Link>
         ) : (

@@ -7,8 +7,9 @@
     "lhci:perf": "lhci autorun --collect.settings.preset=perf",
     "lhci:desktop": "lhci autorun --collect.settings.preset=desktop",
     "dev": "next dev --turbopack",
-    "pages:build": "npx @opennextjs/cloudflare",
-    "build": "next build",
+    "analyze": "node scripts/analyze-build.mjs",
+    "pages:build": "node scripts/pages-build.mjs",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "format": "prettier --write \"**/*.{js,ts,tsx,json}\"",
@@ -16,6 +17,7 @@
     "playwright:ui": "npx playwright test --ui",
     "playwright:debug": "npx playwright test --debug",
     "playwright:codegen": "playwright codegen",
+    "test:seo": "vitest run src/components/SeoHead.test.ts src/utils/parseSeoHead.test.ts src/utils/seo.test.ts src/utils/seoProductSchema.test.ts src/utils/seoPage.test.ts src/tests/seo/productCategorySeo.test.tsx src/tests/seo/productPageSeo.test.tsx",
     "refresh": "rm -rf node_modules && rm package-lock.json && npm i && npm run format",
     "generate-reviews": "node scripts/generate-reviews.js",
     "postbuild": "next-sitemap"
@@ -31,6 +33,7 @@
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",
     "@react-oauth/google": "^0.13.4",
+    "@sentry/nextjs": "^10.42.0",
     "@types/react": "^19.2.7",
     "@types/react-facebook-login": "^4.1.11",
     "autoprefixer": "^10.4.23",
@@ -55,6 +58,7 @@
   },
   "devDependencies": {
     "@lhci/cli": "^0.15.1",
+    "@next/bundle-analyzer": "^16.1.6",
     "@opennextjs/cloudflare": "^1.17.1",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/typography": "^0.5.19",

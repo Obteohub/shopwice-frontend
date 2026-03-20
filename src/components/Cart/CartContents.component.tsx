@@ -34,7 +34,11 @@ const CartContents = () => {
   const loadCart = useCallback(async (force = false) => {
     try {
       // 1. Fetch data
-      const data: any = await getCartFast({ force, maxAgeMs: 0, view: 'mini' });
+      const data: any = await getCartFast({
+        force,
+        maxAgeMs: force ? 0 : 15000,
+        view: 'mini',
+      });
 
       if (debugCart) {
         console.info('[CartContents] Loaded cart', {
@@ -62,7 +66,7 @@ const CartContents = () => {
     const fetchCart = async () => {
       if (mounted) setLoading(true);
       try {
-        const data = await loadCart(true);
+        const data = await loadCart(false);
         if (mounted) {
           setCartData(data);
           setLoading(false);
@@ -141,8 +145,22 @@ const CartContents = () => {
     // Optimistic local update for snappier UI.
     setCartData((prev: any) => {
       if (!prev?.items || !Array.isArray(prev.items)) return prev;
+      const oldItem = prev.items.find((entry: RestCartItem) => entry.key === itemKey);
+      const unitPriceMinor = Number(oldItem?.prices?.price ?? 0);
+      const oldLineTotalMinor = Number(oldItem?.totals?.line_total ?? unitPriceMinor * Number(oldItem?.quantity ?? 1));
+      const newLineTotalMinor = unitPriceMinor * newQty;
+      const delta = newLineTotalMinor - oldLineTotalMinor;
+
       const nextItems = prev.items.map((entry: RestCartItem) =>
-        entry.key === itemKey ? { ...entry, quantity: newQty } : entry,
+        entry.key === itemKey
+          ? {
+              ...entry,
+              quantity: newQty,
+              totals: entry.totals
+                ? { ...entry.totals, line_total: String(newLineTotalMinor), line_subtotal: String(newLineTotalMinor) }
+                : entry.totals,
+            }
+          : entry,
       );
       const nextItemsCount = nextItems.reduce(
         (sum: number, entry: RestCartItem) => sum + Number(entry?.quantity || 0),
@@ -152,6 +170,11 @@ const CartContents = () => {
         ...prev,
         items: nextItems,
         items_count: nextItemsCount,
+        totals: prev.totals && delta !== 0 ? {
+          ...prev.totals,
+          total_items: String(Number(prev.totals.total_items ?? 0) + delta),
+          total_price: String(Number(prev.totals.total_price ?? 0) + delta),
+        } : prev.totals,
       };
     });
 
@@ -173,6 +196,8 @@ const CartContents = () => {
         const response: any = await api.post(ENDPOINTS.CART_UPDATE, {
           key: itemKey,
           quantity: quantityToCommit,
+        }, {
+          params: { view: 'mini' },
         });
 
         const nextCart = unwrapCartResponse(response);
@@ -197,7 +222,29 @@ const CartContents = () => {
   const handleRemoveItem = async (item: RestCartItem) => {
     if (!confirm('Remove this item?')) return;
     clearQuantityTimer(item.key);
-    setIsUpdating(true);
+
+    // Optimistic: remove item immediately so UI feels instant.
+    const previousCart = cartData;
+    setCartData((prev: any) => {
+      if (!prev?.items) return prev;
+      const nextItems = prev.items.filter((entry: RestCartItem) => entry.key !== item.key);
+      const nextItemsCount = nextItems.reduce(
+        (sum: number, entry: RestCartItem) => sum + Number(entry?.quantity || 0), 0,
+      );
+      // Also subtract this item's line total from cart totals
+      const lineTotalMinor = Number(item?.totals?.line_total ?? 0);
+      return {
+        ...prev,
+        items: nextItems,
+        items_count: nextItemsCount,
+        totals: prev.totals ? {
+          ...prev.totals,
+          total_items: String(Math.max(0, Number(prev.totals.total_items ?? 0) - lineTotalMinor)),
+          total_price: String(Math.max(0, Number(prev.totals.total_price ?? 0) - lineTotalMinor)),
+        } : prev.totals,
+      };
+    });
+    setQuantityPending(item.key, true);
 
     try {
       if (debugCart) {
@@ -205,19 +252,20 @@ const CartContents = () => {
       }
       const response: any = await api.post(ENDPOINTS.CART_REMOVE, {
         key: item.key
+      }, {
+        params: { view: 'mini' },
       });
 
-      // Update local state and sync
       const nextCart = unwrapCartResponse(response);
       setCartResponseCache(nextCart);
       setCartData(nextCart);
-      const transformed = transformCartResponse(nextCart);
-      syncWithWooCommerce(transformed);
-      setIsUpdating(false);
+      syncWithWooCommerce(transformCartResponse(nextCart));
     } catch (err: any) {
       console.error('[Cart] Remove Error:', err);
+      setCartData(previousCart); // rollback optimistic removal
       alert(`Error removing item: ${err.message}`);
-      setIsUpdating(false);
+    } finally {
+      setQuantityPending(item.key, false);
     }
   };
 
@@ -240,7 +288,9 @@ const CartContents = () => {
       }
 
       // Use single clear endpoint instead of N remove calls.
-      const response: any = await api.del(ENDPOINTS.CART_CLEAR);
+      const response: any = await api.del(ENDPOINTS.CART_CLEAR, {
+        params: { view: 'mini' },
+      });
       const nextCart = unwrapCartResponse(response);
       if (nextCart?.items) {
         setCartResponseCache(nextCart);

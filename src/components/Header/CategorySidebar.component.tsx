@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { api } from '@/utils/api';
 import { ENDPOINTS } from '@/utils/endpoints';
 import { decodeHtmlEntities } from '@/utils/text';
@@ -16,10 +17,12 @@ const CACHE_KEY = 'shopwice_menu_cache';
 const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
 const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => {
+    const router = useRouter();
     const [categories, setCategories] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
     const [viewStack, setViewStack] = useState<Category[]>([]);
+    const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const normalizeCategories = (payload: any): any[] => {
         const normalizeNames = (rows: any[]) =>
@@ -108,9 +111,38 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
         : categoryTree;
 
     const handleClose = () => {
+        if (closeTimeoutRef.current) {
+            clearTimeout(closeTimeoutRef.current);
+            closeTimeoutRef.current = null;
+        }
         setViewStack([]);
         onClose();
     };
+
+    const handleNavigate = () => {
+        // Defer close so Next.js Link navigation runs first.
+        setViewStack([]);
+        if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = setTimeout(() => {
+            onClose();
+            closeTimeoutRef.current = null;
+        }, 0);
+    };
+
+    useEffect(() => {
+        const onRouteStart = () => {
+            setViewStack([]);
+            onClose();
+        };
+        router.events.on('routeChangeStart', onRouteStart);
+        return () => {
+            router.events.off('routeChangeStart', onRouteStart);
+            if (closeTimeoutRef.current) {
+                clearTimeout(closeTimeoutRef.current);
+                closeTimeoutRef.current = null;
+            }
+        };
+    }, [onClose, router.events]);
 
     if (!isOpen) return null;
 
@@ -167,10 +199,10 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                             {viewStack.length === 0 && (
                                 <>
                                     <li className="border-b border-gray-100 pb-2">
-                                        <Link href="/" prefetch={false} onClick={handleClose} className="block py-2 text-[15px] font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">Home</Link>
+                                        <Link href="/" prefetch={false} onClick={handleNavigate} className="block py-2 text-[15px] font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">Home</Link>
                                     </li>
                                     <li className="border-b border-gray-100 pb-2">
-                                        <Link href="/my-account" prefetch={false} onClick={handleClose} className="block py-2 text-[15px] font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">My Account</Link>
+                                        <Link href="/my-account" prefetch={false} onClick={handleNavigate} className="block py-2 text-[15px] font-semibold text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition-colors">My Account</Link>
                                     </li>
                                 </>
                             )}
@@ -181,7 +213,7 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                                     <Link
                                         href={`/product-category/${currentCategory.slug}`}
                                         prefetch={false}
-                                        onClick={handleClose}
+                                        onClick={handleNavigate}
                                         className="block py-3 text-[15px] font-bold text-gray-900 hover:text-blue-600"
                                     >
                                         All {currentCategory.name}
@@ -206,7 +238,7 @@ const CategorySidebar = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
                                         <Link
                                             href={`/product-category/${cat.slug}`}
                                             prefetch={false}
-                                            onClick={handleClose}
+                                            onClick={handleNavigate}
                                             className="block py-2.5 text-[15px] font-semibold text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                                         >
                                             {cat.name}

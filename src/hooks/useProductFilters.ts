@@ -33,6 +33,9 @@ export type RestProduct = {
 
   averageRating?: number;
   reviewCount?: number;
+  stockQuantity?: number | null;
+  stockStatus?: 'instock' | 'outofstock' | 'onbackorder' | string | null;
+  inStock?: boolean | null;
 
   categories?: TaxonomyTerm[] | null;
   brands?: TaxonomyTerm[] | null;
@@ -58,6 +61,8 @@ type PreparedProduct = {
   rating: number;
   onSale: boolean;
   newestScore: number;
+  inStock: boolean;
+  stockStatus: 'instock' | 'outofstock' | 'onbackorder';
   categorySet: Set<string>;
   brandSet: Set<string>;
   locationSet: Set<string>;
@@ -71,6 +76,17 @@ type PreparedProduct = {
 const parsePrice = (value: any) => {
   if (value === null || value === undefined) return 0;
   if (typeof value === 'number') return value;
+  if (typeof value === 'object') {
+    const candidate =
+      value.amount ??
+      value.value ??
+      value.raw ??
+      value.price ??
+      value.current ??
+      value.min ??
+      value.max;
+    if (candidate !== undefined) return parsePrice(candidate);
+  }
 
   const str = String(value);
   // Handles currency-prefixed values and plain numerics, e.g. "1,200.00" or "1200".
@@ -89,6 +105,8 @@ const normalizeOption = (opt: any): string | null => {
 const normalizeText = (value: unknown) =>
   String(value ?? '')
     .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 
 const canonicalizeAttributeKey = (value: string) =>
@@ -298,6 +316,10 @@ export const useProductFilters = (products: RestProduct[]) => {
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedStockStatus, setSelectedStockStatus] = useState<
+    Array<'instock' | 'outofstock' | 'onbackorder'>
+  >([]);
+  const [inStock, setInStock] = useState<boolean | undefined>(undefined);
   const [priceRange, setPriceRange] = useState<[number, number]>(() => priceBounds);
   const [minRating, setMinRating] = useState<number>(0);
   const [showOnSaleOnly, setShowOnSaleOnly] = useState(false);
@@ -332,6 +354,18 @@ export const useProductFilters = (products: RestProduct[]) => {
         price: parsePrice(product.price),
         rating: product.averageRating || 0,
         onSale: Boolean(product.onSale),
+        inStock:
+          typeof product.inStock === 'boolean'
+            ? product.inStock
+            : Number(product.stockQuantity ?? 0) > 0,
+        stockStatus:
+          String(product.stockStatus || '').toLowerCase() === 'outofstock'
+            ? 'outofstock'
+            : String(product.stockStatus || '').toLowerCase() === 'onbackorder'
+              ? 'onbackorder'
+              : (typeof product.inStock === 'boolean' ? product.inStock : Number(product.stockQuantity ?? 0) > 0)
+                ? 'instock'
+                : 'outofstock',
         newestScore: Math.max(
           toTime(product.dateCreated),
           toTime(product.dateModified),
@@ -395,6 +429,12 @@ export const useProductFilters = (products: RestProduct[]) => {
     });
   };
 
+  const toggleStockStatus = (value: 'instock' | 'outofstock' | 'onbackorder') => {
+    setSelectedStockStatus((prev) =>
+      prev.includes(value) ? prev.filter((entry) => entry !== value) : [...prev, value],
+    );
+  };
+
   /* ---------------- Reset Filters ---------------- */
 
   const resetFilters = () => {
@@ -403,6 +443,8 @@ export const useProductFilters = (products: RestProduct[]) => {
     setSelectedLocations([]);
     setSelectedCategories([]);
     setSelectedTags([]);
+    setSelectedStockStatus([]);
+    setInStock(undefined);
     setPriceRange(priceBounds);
     setMinRating(0);
     setShowOnSaleOnly(false);
@@ -428,6 +470,14 @@ export const useProductFilters = (products: RestProduct[]) => {
 
     const filtered = indexedProducts.filter((entry) => {
       const { price, rating, onSale, searchBlob } = entry;
+
+      // In-stock toggle
+      if (inStock === true && !entry.inStock) return false;
+
+      // Explicit stock-status filters
+      if (selectedStockStatus.length > 0 && !selectedStockStatus.includes(entry.stockStatus)) {
+        return false;
+      }
 
       // Price
       if (price < priceRange[0] || price > priceRange[1]) return false;
@@ -580,6 +630,8 @@ export const useProductFilters = (products: RestProduct[]) => {
     selectedLocations,
     selectedCategories,
     selectedTags,
+    selectedStockStatus,
+    inStock,
     priceRange,
     minRating,
     showOnSaleOnly,
@@ -605,6 +657,11 @@ export const useProductFilters = (products: RestProduct[]) => {
 
     selectedTags,
     setSelectedTags,
+    selectedStockStatus,
+    setSelectedStockStatus,
+    toggleStockStatus,
+    inStock,
+    setInStock,
 
     priceBounds,
     priceRange,

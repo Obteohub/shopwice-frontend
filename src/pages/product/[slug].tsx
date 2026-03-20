@@ -117,7 +117,10 @@ const normalizeSlugValue = (value: unknown) =>
     .split('/')
     .filter(Boolean)
     .pop()
-    ?.toLowerCase() || '';
+    ?.toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') || '';
 
 const firstQueryValue = (value: string | string[] | undefined) => {
   if (Array.isArray(value)) return String(value[0] ?? '').trim();

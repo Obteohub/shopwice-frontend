@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import Button from '@/components/UI/Button.component';
 import { formatPriceWithDecimals } from '@/utils/functions/functions';
+import { getCartFast } from '@/utils/cartClient';
 
 interface CartSummaryProps {
     subtotal: string;
@@ -12,6 +13,12 @@ interface CartSummaryProps {
 }
 
 const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, total, totalProductsCount, currencyMinorUnit = 2 }) => {
+    // Warm up the checkout cart cache (full view + shipping rates) in the background
+    // so the checkout page can load instantly without showing a spinner.
+    useEffect(() => {
+        getCartFast({ view: 'full', includeShippingRates: true, maxAgeMs: 10000 }).catch(() => {});
+    }, []);
+
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
             <h2 className="text-lg font-bold text-gray-900 mb-4 pb-4 border-b border-gray-100">Order Summary</h2>
@@ -33,7 +40,7 @@ const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, total, totalProduct
                 </div>
             </div>
 
-            <Link href="/checkout" className="block w-full">
+            <Link href="/checkout" prefetch={false} className="block w-full">
                 <Button className="w-full py-4 text-base font-bold bg-[#fa710f] hover:bg-[#fa710f] border-[#fa710f] text-white shadow-md hover:shadow-lg transition-all rounded-lg">
                     Proceed to Checkout
                 </Button>

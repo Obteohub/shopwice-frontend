@@ -1,4 +1,4 @@
-import Link from 'next/link';
+﻿import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/utils/api';
 import { ENDPOINTS } from '@/utils/endpoints';
@@ -297,7 +297,7 @@ export default function DesktopSideMenu({
                                             href={`/product-category/${activeRoot.slug}`}
                                             prefetch={false}
                                             onClick={() => onClose?.()}
-                                            className="text-2xl font-extrabold text-[#111111] hover:text-[#0F5FBD]"
+                                            className="text-2xl font-bold text-[#111111] hover:text-[#0F5FBD]"
                                         >
                                             See all {activeRoot.name}
                                         </Link>
@@ -394,3 +394,4 @@ export default function DesktopSideMenu({
         </div>
     );
 }
+

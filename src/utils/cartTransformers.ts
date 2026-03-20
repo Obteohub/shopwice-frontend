@@ -6,6 +6,7 @@
 export interface RestCartItem {
     key: string;
     id: number;
+    slug?: string;
     quantity: number;
     name: string;
     short_description?: string;

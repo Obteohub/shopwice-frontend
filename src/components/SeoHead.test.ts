@@ -8,15 +8,18 @@ import {
 describe('SeoHead helpers', () => {
   const originalSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
   const originalWpUrl = process.env.NEXT_PUBLIC_WP_API_URL;
+  const originalSiteNoindex = process.env.NEXT_PUBLIC_SITE_NOINDEX;
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_SITE_URL = 'https://frontend.test';
     process.env.NEXT_PUBLIC_WP_API_URL = 'https://backend.test';
+    delete process.env.NEXT_PUBLIC_SITE_NOINDEX;
   });
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_SITE_URL = originalSiteUrl;
     process.env.NEXT_PUBLIC_WP_API_URL = originalWpUrl;
+    process.env.NEXT_PUBLIC_SITE_NOINDEX = originalSiteNoindex;
   });
 
   it('does not produce duplicate og:title tags', () => {
@@ -55,6 +58,22 @@ describe('SeoHead helpers', () => {
 
     expect(productCount).toBe(1);
     expect(breadcrumbCount).toBe(1);
+  });
+
+  it('forces noindex robots when site noindex flag is enabled', () => {
+    process.env.NEXT_PUBLIC_SITE_NOINDEX = 'true';
+
+    const model = buildSeoHeadModel({
+      title: 'Title A',
+      robots: 'index, follow',
+      canonical: 'https://frontend.test/product/a',
+      jsonLd: [],
+    });
+
+    expect(model.metaTags).toContainEqual({
+      name: 'robots',
+      content: 'noindex, nofollow',
+    });
   });
 });
 

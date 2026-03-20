@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import TaxonomyListingPage from '@/components/Product/TaxonomyListingPage.component';
 import SeoHead from '@/components/SeoHead';
+import { normalizeCollectionDataPayload } from '@/features/collection/apiClient';
 import { api } from '@/utils/api';
+import { applyCachePolicy } from '@/utils/cacheControl';
 import { ENDPOINTS } from '@/utils/endpoints';
 import { GetServerSideProps, InferGetServerSidePropsType } from 'next';
 import {
@@ -10,6 +12,7 @@ import {
     getAbsoluteUrlFromRequest,
     parsePageParam,
 } from '@/utils/seoPage';
+import { getRequestPathname, loggedNotFound } from '@/utils/routeEventLogger';
 import { buildTaxonomyBreadcrumbs } from '@/utils/taxonomyBreadcrumbs';
 import { decodeHtmlEntities } from '@/utils/text';
 
@@ -34,6 +37,7 @@ const LocationPage = ({
     description,
     totalCount,
     initialHasNextPage,
+    initialFacets,
     breadcrumbs,
     seoData,
 }: InferGetServerSidePropsType<typeof getServerSideProps>) => {
@@ -79,10 +83,12 @@ const LocationPage = ({
                 products={products}
                 slug={slug}
                 queryParams={{ location: slug }}
+                customRouteScope={{ taxonomy: 'location', value: slug }}
                 description={decodeHtmlEntities(description || '')}
                 emptyMessage="No products found for this location"
                 totalCount={totalCount}
                 initialHasNextPage={initialHasNextPage}
+                initialFacets={initialFacets}
                 loading={loading}
                 breadcrumbs={breadcrumbs}
             />
@@ -102,11 +108,19 @@ export const getServerSideProps: GetServerSideProps = async ({
     const attr = (query?.attr as string | undefined) || '';
     const term = (query?.term as string | undefined) || '';
     const page = parsePageParam(query?.page);
+    const requestPath = getRequestPathname(req, `/location/${slug || ''}`);
 
-    if (!slug) return { notFound: true };
+    if (!slug) {
+        return loggedNotFound({
+            req,
+            pathname: requestPath,
+            matchedRoute: '/location/[slug]',
+            reason: 'Missing location slug',
+        });
+    }
 
     try {
-        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+        applyCachePolicy(res, 'archivePage');
 
         const productParams: any = {
             location: slug,
@@ -117,10 +131,13 @@ export const getServerSideProps: GetServerSideProps = async ({
             productParams[`attribute_${attr}`] = term;
         }
 
-        // Phase 1: fetch all locations + products in parallel.
-        const [allLocationsRaw, productsRaw] = await Promise.all([
+        // Phase 1: fetch all locations + products + facets in parallel.
+        const [allLocationsRaw, productsRaw, collectionDataRaw] = await Promise.all([
             api.get(ENDPOINTS.LOCATIONS),
-            api.get(ENDPOINTS.PRODUCTS, { params: productParams }),
+            api.get(ENDPOINTS.PRODUCTS, { params: productParams, skipReviewEnrich: true }),
+            api.get(ENDPOINTS.COLLECTION_DATA, {
+                params: { location: slug },
+            }).catch(() => null),
         ]);
 
         const allLocations: any[] = normalizeList<any>(allLocationsRaw);
@@ -128,10 +145,18 @@ export const getServerSideProps: GetServerSideProps = async ({
         const location = allLocations.find((l: any) => l.slug?.toLowerCase() === normalizedSlug);
 
         if (!location) {
-            return { notFound: true };
+            return loggedNotFound({
+                req,
+                pathname: requestPath,
+                matchedRoute: '/location/[slug]',
+                reason: 'Location not found in taxonomy payload',
+            });
         }
 
         const products: any[] = normalizeList<any>(productsRaw);
+        const initialFacets = collectionDataRaw
+            ? normalizeCollectionDataPayload(collectionDataRaw)
+            : [];
         const totalCount = Number(location?.count || 0);
         const hasNextPage = totalCount > 0
             ? page * 24 < totalCount
@@ -168,6 +193,7 @@ export const getServerSideProps: GetServerSideProps = async ({
             props: {
                 locationName: decodeHtmlEntities(location.name),
                 products: products || [],
+                initialFacets,
                 totalCount,
                 initialHasNextPage: hasNextPage,
                 slug,
@@ -178,6 +204,11 @@ export const getServerSideProps: GetServerSideProps = async ({
         };
     } catch (error) {
         console.error('Error fetching location data:', error);
-        return { notFound: true };
+        return loggedNotFound({
+            req,
+            pathname: requestPath,
+            matchedRoute: '/location/[slug]',
+            reason: 'Unhandled location SSR error',
+        });
     }
 };
